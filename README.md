@@ -50,6 +50,7 @@ Caddy gets a free HTTPS certificate automatically. Messages and accounts are sto
 | `DATABASE_URL` | – | Store data in Postgres instead of SQLite |
 | `RETENTION_DAYS` | `30` | Encrypted messages are deleted from the server after this |
 | `TLS_CERT`, `TLS_KEY` | – | Serve HTTPS directly (not needed behind Caddy) |
+| `ALLOW_SIGNUP` | – | Set to `1` to let anyone create an account (sign-up is closed by default) |
 | `TRUST_PROXY` | – | Set to `1` behind a reverse proxy so rate limits see real client IPs |
 
 ## How the security works

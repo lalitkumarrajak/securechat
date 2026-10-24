@@ -11,7 +11,7 @@ import * as C from '../public/crypto.js';
 const PORT = 3999;
 const BASE = `http://localhost:${PORT}`;
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'securechat-test-'));
-const server = spawn(process.execPath, ['server.js'], { env: { ...process.env, PORT, DATA_DIR: dataDir }, stdio: 'pipe' });
+const server = spawn(process.execPath, ['server.js'], { env: { ...process.env, PORT, DATA_DIR: dataDir, ALLOW_SIGNUP: '1' }, stdio: 'pipe' });
 const cleanup = () => { server.kill(); fs.rmSync(dataDir, { recursive: true, force: true }); };
 
 const post = (p, body, token) => fetch(BASE + p, {

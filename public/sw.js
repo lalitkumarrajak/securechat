@@ -1,5 +1,5 @@
 // Service worker: caches the app shell so the app opens instantly, even offline or on 2G.
-const CACHE = 'securechat-v1';
+const CACHE = 'securechat-v2';
 const SHELL = ['/', '/app.js', '/crypto.js', '/store.js', '/style.css', '/icon.svg', '/manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {

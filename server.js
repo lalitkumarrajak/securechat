@@ -21,6 +21,7 @@ const MAX_BODY = 2_000_000; // max ciphertext length (chars) per message
 const TLS_CERT = process.env.TLS_CERT;
 const TLS_KEY = process.env.TLS_KEY;
 const TRUST_PROXY = process.env.TRUST_PROXY === '1';
+const ALLOW_SIGNUP = process.env.ALLOW_SIGNUP === '1'; // invite-only unless enabled
 
 const USER_RE = /^[a-z0-9_.]{3,24}$/;
 const CID_RE = /^[A-Za-z0-9_-]{8,40}$/;
@@ -173,6 +174,7 @@ const DUMMY_SALT = crypto.randomBytes(16);
 
 const routes = {
   'POST /api/register': async (req, res) => {
+    if (!ALLOW_SIGNUP) return sendJson(res, 403, { error: 'Sign-up is closed' });
     if (rateLimited('reg:' + clientIp(req), 10, 3600e3)) return sendJson(res, 429, { error: 'Too many attempts, try later' });
     const { u, auth, pub, encPriv } = await readJson(req);
     if (typeof u !== 'string' || !USER_RE.test(u)) return sendJson(res, 400, { error: 'Username: 3-24 chars, a-z 0-9 _ .' });
