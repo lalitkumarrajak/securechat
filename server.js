@@ -30,7 +30,9 @@ const scrypt = promisify(crypto.scrypt);
 const SCRYPT_OPTS = { N: 16384, r: 8, p: 1 };
 
 // ---------- database ----------
-const db = await openDatabase({ url: process.env.DATABASE_URL, dataDir: DATA_DIR });
+const db = await openDatabase({
+  mongoUri: process.env.MONGODB_URI, url: process.env.DATABASE_URL, dataDir: DATA_DIR,
+});
 
 // Every insert or status change gets a new seq so clients can sync deltas with one number.
 let seqCounter = (await db.get('maxSeq')).s;

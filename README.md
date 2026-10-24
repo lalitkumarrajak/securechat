@@ -40,10 +40,14 @@ DOMAIN=chat.example.com docker compose up -d --build
 
 Caddy gets a free HTTPS certificate automatically. Messages and accounts are stored in the `chatdata` Docker volume.
 
+**On Render:** create a free MongoDB Atlas cluster (allow access from `0.0.0.0/0`), then in Render choose **New → Blueprint**, pick this repo and paste the Atlas connection string as `MONGODB_URI`. Render provides HTTPS.
+
 | Variable | Default | Meaning |
 |---|---|---|
 | `PORT` | `3000` | HTTP port |
 | `DATA_DIR` | `./data` | Where the SQLite database lives |
+| `MONGODB_URI` | – | Store data in MongoDB instead of SQLite (e.g. Atlas) |
+| `DATABASE_URL` | – | Store data in Postgres instead of SQLite |
 | `RETENTION_DAYS` | `30` | Encrypted messages are deleted from the server after this |
 | `TLS_CERT`, `TLS_KEY` | – | Serve HTTPS directly (not needed behind Caddy) |
 | `TRUST_PROXY` | – | Set to `1` behind a reverse proxy so rate limits see real client IPs |

@@ -1,5 +1,5 @@
-// Storage layer. Uses Postgres when DATABASE_URL is set (needed on hosts with
-// ephemeral disks, like Render's free plan), otherwise a local SQLite file.
+// Storage layer. Uses MongoDB when MONGODB_URI is set or Postgres when DATABASE_URL is set
+// (needed on hosts with ephemeral disks, like Render's free plan), otherwise a local SQLite file.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -115,6 +115,89 @@ async function openPostgres(url) {
   };
 }
 
-export function openDatabase({ url, dataDir }) {
+// Turns the `LIKE 'term%' ESCAPE '\'` patterns built by the server into an anchored regex.
+function likeToRegex(pattern) {
+  let re = '^';
+  for (let i = 0; i < pattern.length; i++) {
+    const c = pattern[i];
+    if (c === '\\') re += pattern[++i].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    else if (c === '%') re += '.*';
+    else if (c === '_') re += '.';
+    else re += c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+  return re + '$';
+}
+
+async function openMongo(uri) {
+  const { MongoClient } = await import('mongodb');
+  const client = new MongoClient(uri, { maxPoolSize: 5 });
+  await client.connect();
+  // Use the database named in the URI, or "securechat" if it names none.
+  const mdb = client.db(client.options.dbName === 'test' ? 'securechat' : undefined);
+  const users = mdb.collection('users');
+  const sessions = mdb.collection('sessions');
+  const messages = mdb.collection('messages');
+  await Promise.all([
+    messages.createIndex({ sender: 1, cid: 1 }, { unique: true }),
+    messages.createIndex({ recipient: 1, seq: 1 }),
+    messages.createIndex({ sender: 1, seq: 1 }),
+    messages.createIndex({ seq: 1 }),
+    messages.createIndex({ ts: 1 }),
+    sessions.createIndex({ expires: 1 }),
+  ]);
+
+  // Shape documents like the SQL rows the server expects.
+  const bytes = (b) => (b && b.buffer instanceof Uint8Array ? b.buffer : b);
+  const userRow = (d) => d && { ...d, username: d._id, auth_hash: bytes(d.auth_hash), auth_salt: bytes(d.auth_salt) };
+  const msgRow = (d) => d && { ...d, id: d._id };
+  const changes = (n) => ({ changes: n });
+  const insertIgnoringDupes = async (coll, doc) => {
+    try { await coll.insertOne(doc); return changes(1); }
+    catch (e) { if (e.code === 11000) return changes(0); throw e; }
+  };
+
+  const ops = {
+    getUser: async (u) => userRow(await users.findOne({ _id: u })),
+    insertUser: (u, auth_hash, auth_salt, pubkey, enc_priv, created) =>
+      insertIgnoringDupes(users, { _id: u, auth_hash, auth_salt, pubkey, enc_priv, created, last_seen: 0 }),
+    searchUsers: async (pattern, me) => (await users
+      .find({ _id: { $regex: likeToRegex(pattern), $ne: me } }, { projection: { pubkey: 1 } })
+      .sort({ _id: 1 }).limit(20).toArray()).map((d) => ({ username: d._id, pubkey: d.pubkey })),
+    touchUser: async (ts, u) => changes((await users.updateOne({ _id: u }, { $set: { last_seen: ts } })).modifiedCount),
+    insertSession: async (token_hash, username, expires) => {
+      await sessions.insertOne({ _id: token_hash, username, expires });
+      return changes(1);
+    },
+    getSession: (h, now) => sessions.findOne({ _id: h, expires: { $gt: now } }),
+    deleteSession: async (h) => changes((await sessions.deleteOne({ _id: h })).deletedCount),
+    // The message id is its first seq: seqs only grow, so it is unique and an integer like SQL ids.
+    insertMsg: (seq, cid, sender, recipient, body, ts) =>
+      insertIgnoringDupes(messages, { _id: seq, seq, cid, sender, recipient, body, ts, status: 0 }),
+    getMsgByCid: async (sender, cid) => msgRow(await messages.findOne({ sender, cid })),
+    syncMsgs: async (after, me, _me, limit) => (await messages
+      .find({ seq: { $gt: after }, $or: [{ recipient: me }, { sender: me }] })
+      .sort({ seq: 1 }).limit(limit).toArray()).map(msgRow),
+    setStatus: async (status, seq, id, recipient, minStatus) => msgRow(await messages.findOneAndUpdate(
+      { _id: id, recipient, status: { $lt: minStatus } },
+      { $set: { status, seq } },
+      { returnDocument: 'after' })) ?? undefined,
+    maxSeq: async () => ({ s: (await messages.find().sort({ seq: -1 }).limit(1).next())?.seq ?? 0 }),
+    purgeMsgs: async (cutoff) => changes((await messages.deleteMany({ ts: { $lt: cutoff } })).deletedCount),
+    purgeSessions: async (now) => changes((await sessions.deleteMany({ expires: { $lt: now } })).deletedCount),
+  };
+  const call = (name, ...args) => ops[name](...args);
+  return {
+    kind: 'mongodb',
+    get: call,
+    all: call,
+    run: call,
+    // Receipt updates are independent and idempotent, so no multi-document transaction is needed.
+    transaction(fn) { return fn(this); },
+    close: () => client.close(),
+  };
+}
+
+export function openDatabase({ mongoUri, url, dataDir }) {
+  if (mongoUri) return openMongo(mongoUri);
   return url ? openPostgres(url) : openSqlite(dataDir);
 }

@@ -1,6 +1,6 @@
 # Render Blueprint: New → Blueprint → pick this repo.
-# Render's free web disk is wiped on every deploy/restart, so data lives in Postgres
-# (e.g. Neon's free plan). Render asks for DATABASE_URL when you create the Blueprint.
+# Render's free web disk is wiped on every deploy/restart, so data lives in MongoDB
+# (e.g. Atlas's free M0 cluster). Render asks for MONGODB_URI when you create the Blueprint.
 services:
   - type: web
     name: securechat
@@ -16,5 +16,5 @@ services:
         value: "1"
       - key: RETENTION_DAYS
         value: "30"
-      - key: DATABASE_URL
+      - key: MONGODB_URI
         sync: false
