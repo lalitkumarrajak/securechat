@@ -1,5 +1,6 @@
 # Render Blueprint: New → Blueprint → pick this repo.
-# Render's free web disk is wiped on every deploy/restart, so data lives in Postgres.
+# Render's free web disk is wiped on every deploy/restart, so data lives in Postgres
+# (e.g. Neon's free plan). Render asks for DATABASE_URL when you create the Blueprint.
 services:
   - type: web
     name: securechat
@@ -16,11 +17,4 @@ services:
       - key: RETENTION_DAYS
         value: "30"
       - key: DATABASE_URL
-        fromDatabase:
-          name: securechat-db
-          property: connectionString
-
-databases:
-  - name: securechat-db
-    plan: free
-    postgresMajorVersion: "16"
+        sync: false
