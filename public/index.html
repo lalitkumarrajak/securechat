@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#008069">
+  <meta name="description" content="End-to-end encrypted messaging">
+  <title>SecureChat</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <!-- Login / register -->
+  <section id="auth" class="auth" hidden>
+    <form id="auth-form" class="auth-card" autocomplete="on">
+      <img src="/icon.svg" alt="" width="64" height="64">
+      <h1>SecureChat</h1>
+      <p class="muted">Messages are end-to-end encrypted. Not even the server can read them.</p>
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" class="tab active" data-tab="login" aria-selected="true">Sign in</button>
+        <button type="button" role="tab" class="tab" data-tab="register" aria-selected="false">Sign up</button>
+      </div>
+      <label>Username
+        <input id="auth-user" name="username" autocomplete="username" required minlength="3" maxlength="24"
+               pattern="[a-zA-Z0-9_.]{3,24}" autocapitalize="none" spellcheck="false">
+      </label>
+      <label>Password
+        <input id="auth-pass" name="password" type="password" autocomplete="current-password" required minlength="8">
+      </label>
+      <label id="auth-pass2-wrap" hidden>Confirm password
+        <input id="auth-pass2" name="password2" type="password" autocomplete="new-password" minlength="8">
+      </label>
+      <button id="auth-submit" type="submit" class="btn primary wide">Sign in</button>
+      <p id="auth-msg" class="auth-msg" role="status"></p>
+      <p class="muted small">Your password unlocks your encryption key. It can't be reset — if you forget it, your account can't be recovered.</p>
+    </form>
+  </section>
+
+  <!-- Main app -->
+  <main id="app" class="app" hidden>
+    <aside class="sidebar">
+      <header class="bar">
+        <div class="avatar" id="me-avatar"></div>
+        <strong id="me-name" class="grow"></strong>
+        <button id="logout-btn" class="icon-btn" title="Sign out" aria-label="Sign out">
+          <svg viewBox="0 0 24 24"><path d="M16 17v-3H9v-4h7V7l5 5-5 5zM14 2a2 2 0 0 1 2 2v2h-2V4H5v16h9v-2h2v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9z"/></svg>
+        </button>
+      </header>
+      <div id="conn" class="conn" hidden></div>
+      <div class="search">
+        <input id="search" type="search" placeholder="Search or start new chat" autocomplete="off" autocapitalize="none" spellcheck="false">
+      </div>
+      <ul id="search-results" class="list" hidden></ul>
+      <ul id="chat-list" class="list"></ul>
+      <p id="empty-chats" class="empty muted" hidden>No chats yet. Search for a username above to start one.</p>
+    </aside>
+
+    <section class="chat" id="chat">
+      <div id="no-chat" class="no-chat">
+        <img src="/icon.svg" alt="" width="96" height="96">
+        <h2>SecureChat</h2>
+        <p class="muted">
+          <svg class="lock" viewBox="0 0 24 24"><path d="M12 2a5 5 0 0 1 5 5v3h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h1V7a5 5 0 0 1 5-5zm0 2a3 3 0 0 0-3 3v3h6V7a3 3 0 0 0-3-3z"/></svg>
+          Your personal messages are end-to-end encrypted
+        </p>
+      </div>
+      <div id="chat-view" class="chat-view" hidden>
+        <header class="bar">
+          <button id="back-btn" class="icon-btn back" aria-label="Back">
+            <svg viewBox="0 0 24 24"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z"/></svg>
+          </button>
+          <div class="avatar" id="peer-avatar"></div>
+          <div class="grow peer-info">
+            <strong id="peer-name"></strong>
+            <span id="peer-status" class="muted small"></span>
+          </div>
+          <button id="verify-btn" class="icon-btn" title="Verify security code" aria-label="Verify security code">
+            <svg viewBox="0 0 24 24"><path d="M12 1 3 5v6c0 5.5 3.8 10.7 9 12 5.2-1.3 9-6.5 9-12V5l-9-4zm-2 16-4-4 1.4-1.4L10 14.2l6.6-6.6L18 9l-8 8z"/></svg>
+          </button>
+        </header>
+        <div id="key-warning" class="key-warning" hidden>
+          The security code for this contact changed. Sending is paused until you verify it.
+          <button id="key-warning-btn" class="btn small">Review</button>
+        </div>
+        <div id="messages" class="messages" aria-live="polite"></div>
+        <form id="composer" class="composer">
+          <label class="icon-btn" title="Send photo" aria-label="Send photo">
+            <svg viewBox="0 0 24 24"><path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5l2.5 3 3.5-4.5 4.5 6H5l3.5-4.5z"/></svg>
+            <input id="file-input" type="file" accept="image/*" hidden>
+          </label>
+          <textarea id="input" rows="1" placeholder="Type a message" maxlength="8000"></textarea>
+          <button id="send-btn" class="send-btn" type="submit" aria-label="Send">
+            <svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
+          </button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="verify-dialog" class="dialog">
+    <h3>Verify security code</h3>
+    <p class="muted small">Compare these numbers with <b id="verify-peer"></b> in person or on a call. If they match, your chat is secure from interception.</p>
+    <div id="verify-code" class="code"></div>
+    <div id="verify-changed" hidden>
+      <p class="warn small">This contact's key changed. That happens if someone is trying to intercept your messages. Only accept it after checking the new code with them.</p>
+      <div id="verify-new-code" class="code"></div>
+      <button id="accept-key-btn" class="btn danger">Accept new code</button>
+    </div>
+    <form method="dialog"><button class="btn primary">Close</button></form>
+  </dialog>
+
+  <dialog id="image-dialog" class="dialog image-dialog">
+    <form method="dialog"><button class="img-close" aria-label="Close">✕</button></form>
+    <img id="image-full" alt="">
+  </dialog>
+</body>
+</html>

@@ -1,0 +1,30 @@
+# Production: set DOMAIN to a domain pointing at this server, then `docker compose up -d`.
+# Caddy fetches and renews a free HTTPS certificate automatically.
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      TRUST_PROXY: "1"
+      RETENTION_DAYS: "30"
+    volumes:
+      - chatdata:/data
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+    depends_on: [app]
+
+volumes:
+  chatdata:
+  caddydata:

@@ -1,0 +1,21 @@
+{
+  "name": "securechat",
+  "version": "1.0.0",
+  "description": "End-to-end encrypted, low-bandwidth chat app",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node scripts/smoke-test.js",
+    "cert": "sh scripts/gen-cert.sh"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "pg": "^8.23.1",
+    "ws": "^8.22.0"
+  }
+}
