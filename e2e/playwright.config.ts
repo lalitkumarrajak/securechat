@@ -42,6 +42,7 @@ export default defineConfig({
     env: {
       PORT: String(PORT), DATA_DIR: dataDir, SIGNUPS_PER_HOUR: '1000', PRESENCE_SWEEP_MS: '500', // real 45 s presence timeout
       KLIPY_API_KEY: 'test', KLIPY_BASE_URL: 'http://localhost:4322', PREVIEW_ALLOW_PRIVATE: '1',
+      GAME_TEST_DICE: '6,3,2,6,4,6,5', // e2e/games.spec.ts plays these in order
     },
   }],
 });

@@ -170,6 +170,11 @@ function wsSend(obj: unknown) {
   if (S.ws?.readyState === 1) { S.ws.send(JSON.stringify(obj)); return true; }
   return false;
 }
+export { wsSend as sendFrame };
+
+/** Other modules (games) handle their own frame types; registered by type, e.g. frameHooks.g = fn. */
+export const frameHooks: Record<string, (m: any) => void> = {};
+export const myName = () => S.me;
 
 // Presence: tell the server when this tab is hidden or closed, so friends don't see you
 // "online" after you leave. The server also times out tabs whose heartbeats stop.
@@ -192,6 +197,7 @@ window.addEventListener('pagehide', () => {
 window.addEventListener('pageshow', (e) => { if (e.persisted) connect(); });
 
 async function handle(m: any) {
+  if (Object.hasOwn(frameHooks, m.t)) return frameHooks[m.t](m);
   switch (m.t) {
     case 'ok':
       S.ready = true;
@@ -205,6 +211,7 @@ async function handle(m: any) {
       syncAvatar(S.me, m.av || 0).catch(() => {});
       flushOutbox();
       flushHides();
+      wsSend({ t: 'glist' });
       break;
     case 'batch': {
       for (const row of m.msgs) await ingest(row, true);

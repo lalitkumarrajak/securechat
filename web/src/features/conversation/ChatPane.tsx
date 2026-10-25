@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
   Archive, ArchiveRestore, ArrowLeft, Bell, BellOff, ChevronDown, ChevronUp, Copy, Forward, Lock, MoreVertical, Pencil, Pin, Reply,
-  Search, ShieldAlert, ShieldCheck, SquareCheck, Trash2, UserMinus, UserX, X,
+  Dices, Search, ShieldAlert, ShieldCheck, SquareCheck, Trash2, UserMinus, UserX, X,
 } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
 import { Button, IconButton } from '../../components/ui/button';
@@ -19,6 +19,7 @@ import { Composer } from './Composer';
 import { MessageList } from './MessageList';
 import { ChatDialogs } from './ChatDialogs';
 import { deleteFlow, setChatUi, startEdit, startReply } from './chatUi';
+import { openPicker } from '../games/store';
 import { canEdit } from '../../lib/controls';
 
 export function EmptyPane() {
@@ -115,12 +116,14 @@ function Header({ peer, name }: { peer: string; name: string }) {
           <span className={`block truncate text-xs ${typing || presence?.on ? 'text-accent-ink' : 'text-muted'}`}>{status}</span>
         </span>
       </button>
+      <IconButton label="Play Ludo" onClick={() => openPicker([peer])}><Dices /></IconButton>
       <IconButton label="Search in chat" className="hidden md:inline-flex" onClick={() => setApp({ searchOpen: true })}><Search /></IconButton>
       <Menu>
         <MenuTrigger asChild><IconButton label="Chat options"><MoreVertical /></IconButton></MenuTrigger>
         <MenuContent>
           <MenuItem icon={<Search />} onSelect={() => setApp({ searchOpen: true })}>Search</MenuItem>
           <MenuItem icon={<SquareCheck />} onSelect={() => setApp({ selection: [] })}>Select messages</MenuItem>
+          <MenuItem icon={<Dices />} onSelect={() => openPicker([peer])}>Play Ludo</MenuItem>
           {muted ? (
             <MenuItem icon={<Bell />} onSelect={() => doMute(0, 'Notifications on')}>Unmute</MenuItem>
           ) : (

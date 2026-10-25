@@ -52,7 +52,8 @@ export async function isMuted(user, peer) {
 
 // Set by friends.js (avoids an import cycle). canSee: may see photo/name (friends or a pending
 // request); canChat: may message and see presence (accepted friends, nobody blocked).
-export const profileHooks = { friendsOf: async () => [], canSee: async () => false, canChat: async () => false };
+// inGameTogether is set by games.js: people in the same game see each other's photo.
+export const profileHooks = { friendsOf: async () => [], canSee: async () => false, canChat: async () => false, inGameTogether: () => false };
 
 async function presenceFor(user, viewer) {
   const av = await avatarVersion(user);
@@ -149,7 +150,7 @@ export const routes = {
 
   'GET /api/avatar': async (req, res, me, token, url) => {
     const u = String(url.searchParams.get('u') || '');
-    if (u !== me && !(await profileHooks.canSee(u, me))) return sendJson(res, 404, { error: 'No photo' });
+    if (u !== me && !profileHooks.inGameTogether(u, me) && !(await profileHooks.canSee(u, me))) return sendJson(res, 404, { error: 'No photo' });
     const row = await ctx.db.get('getAvatar', u);
     if (!row) return sendJson(res, 404, { error: 'No photo' });
     sendBody(req, res, { body: Buffer.from(row.data), type: row.type, etag: `"${row.ver}"`, cache: 'private, no-cache' });

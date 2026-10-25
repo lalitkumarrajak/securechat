@@ -24,6 +24,11 @@ export const config = {
   deleteWindowMs: num(process.env.DELETE_WINDOW_MS, 5 * 60e3), // "delete for everyone" limit
   presenceTimeoutMs: num(process.env.PRESENCE_TIMEOUT_MS, 45e3), // no heartbeat for this long = offline
   presenceSweepMs: num(process.env.PRESENCE_SWEEP_MS, 10e3),
+  gameLobbyMs: num(process.env.GAME_LOBBY_MS, 10 * 60e3), // unanswered game invites expire
+  gameTurnMs: num(process.env.GAME_TURN_MS, 0),   // 0: each game's own turn time (tests shorten it)
+  gameAnimMs: num(process.env.GAME_ANIM_MS, 3000), // extra time per turn for animations to finish
+  // Tests only: dice values to roll, in order, before going back to random ("6,3,2").
+  gameTestDice: (process.env.GAME_TEST_DICE || '').split(',').map(Number).filter((n) => n >= 1 && n <= 6),
   publicUrl: process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || '',
   klipyKey: process.env.KLIPY_API_KEY || '',
   klipyBase: process.env.KLIPY_BASE_URL || 'https://api.klipy.com', // overridable for tests

@@ -7,6 +7,7 @@ Private, end-to-end encrypted messaging with the people you choose. Built to wor
 - **Chats:** unread divider, search inside a chat, drafts, mute (8 h / 1 week / always), archive, sent / delivered / read ticks, typing and "recording audio…".
 - **Presence that's honest:** you show as online only while Chattrix is open in front of you; closing the tab switches you to "last seen" immediately.
 - **Settings:** theme (system / light / dark), 6 accent colours, 5 chat wallpapers, text size, profile photo, name and about, last-seen and read-receipt privacy, push notifications, sounds, Enter to send, change password, sign out of all devices.
+- **Games:** Ludo with Ludo King's Classic rules for 2 to 6 players (a 6-arm board for 5–6), with a 30-second turn timer, emoji, quick phrases and chat during the game. Invite friends, or share a link so anyone with an account can join. The server rolls the dice and checks every move, so nobody can cheat. Game moves and game chat aren't end-to-end encrypted, and are deleted after the game.
 - **Works offline:** messages queue on the device and send when you're back. Installable as an app (PWA), with push notifications when it's closed.
 
 ## Run locally
@@ -58,6 +59,16 @@ Caddy gets a free HTTPS certificate automatically.
 | `DATA_DIR` | `./data` | Where the SQLite database lives when neither of the above is set |
 | `ALLOW_SIGNUP` | open | Set to `0` to close sign-up |
 | `RETENTION_DAYS` | `30` | Encrypted messages are deleted from the server after this (they stay on devices) |
+| `GAME_LOBBY_MS` | `600000` | How long a game waits for players before it's called off |
+| `KLIPY_API_KEY` | – | Turns on GIF and sticker search ([KLIPY](https://docs.klipy.com)) |
+
+## Adding a game
+
+Games plug into a shared platform: invites and share links, lobby, turns and the turn timer, saving and restoring, in-game chat, and results all come for free.
+
+1. **Rules:** `shared/games/<game>.js` exports a definition (`type`, `name`, `min`, `max`, `turnMs`, `begin`, `act`, `auto`, `pass`, `removed`); see `shared/games/core.js` for the contract and `ludo.js` for an example. The server runs it; the app imports it too.
+2. **Register:** add it to `shared/games/index.js`.
+3. **Board:** a React component in `web/src/features/games/<game>/`, listed in `web/src/features/games/registry.ts`. It gets the game state, an `act()` function and chat bubbles.
 | `TRUST_PROXY` | – | Set to `1` behind a reverse proxy so rate limits see real client IPs |
 | `TLS_CERT`, `TLS_KEY` | – | Serve HTTPS directly |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | generated | Web Push keys; generated once and stored in the database if not set |

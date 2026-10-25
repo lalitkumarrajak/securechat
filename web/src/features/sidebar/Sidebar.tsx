@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Archive, ArrowLeft, BellOff, Clock, LogOut, MessageSquarePlus, MoreVertical, Search, Settings, UserPlus, WifiOff, X } from 'lucide-react';
+import { Archive, ArrowLeft, BellOff, Clock, Gamepad2, LogOut, MessageSquarePlus, MoreVertical, Search, Settings, UserPlus, WifiOff, X } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
 import { Ticks } from '../../components/Ticks';
 import { IconButton } from '../../components/ui/button';
@@ -10,6 +10,8 @@ import { fmtListTime } from '../../lib/format';
 import { displayName, type Chat } from '../../lib/types';
 import { cn } from '../../lib/utils';
 import { setApp, useApp } from '../../state/app';
+import { GamesStrip } from '../games/GamesStrip';
+import { openPicker } from '../games/store';
 
 export function Sidebar() {
   const me = useApp((s) => s.me)!;
@@ -51,6 +53,7 @@ export function Sidebar() {
               <Avatar u={me.u} name={me.name} size={40} />
             </button>
             <h1 className="flex-1 pl-1 text-xl font-bold tracking-tight">Chattrix</h1>
+            <IconButton label="Play games" onClick={() => openPicker()}><Gamepad2 /></IconButton>
             <div className="relative">
               <IconButton label="Friends" onClick={() => setApp({ panel: 'friends', friendsTab: incoming ? 'requests' : 'friends' })}>
                 <UserPlus />
@@ -64,6 +67,7 @@ export function Sidebar() {
               <MenuContent>
                 <MenuItem icon={<MessageSquarePlus />} onSelect={() => setApp({ panel: 'friends', friendsTab: 'friends' })}>New chat</MenuItem>
                 <MenuItem icon={<UserPlus />} onSelect={() => setApp({ panel: 'friends', friendsTab: 'add' })}>Add friend</MenuItem>
+                <MenuItem icon={<Gamepad2 />} onSelect={() => openPicker()}>Play games</MenuItem>
                 <MenuItem icon={<Archive />} onSelect={() => setApp({ panel: 'archived' })}>Archived chats</MenuItem>
                 <MenuItem icon={<Settings />} onSelect={() => setApp({ panel: 'settings' })}>Settings</MenuItem>
                 <MenuSeparator />
@@ -114,6 +118,7 @@ export function Sidebar() {
             <span className="text-sm text-muted">{archivedCount}</span>
           </button>
         )}
+        {!archivedView && !query && <GamesStrip />}
         <ul>{visible.map((c) => <ChatRow key={c.peer} chat={c} />)}</ul>
         {!visible.length && <EmptyList archived={archivedView} searching={!!query || filter !== 'all'} />}
       </div>

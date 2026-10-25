@@ -133,3 +133,19 @@ html[data-font=lg] { font-size: 18px; }
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* ---------- Games (Ludo) ---------- */
+.ludo-token { transition: transform 140ms ease-out; }
+.ludo-token-can { animation: ludo-hop 0.7s ease-in-out infinite; }
+.ludo-ring { animation: ludo-pulse 1s ease-out infinite; transform-origin: center; transform-box: fill-box; }
+.ludo-roll-hint { animation: ludo-nudge 1.1s ease-in-out infinite; }
+.ludo-dice-roll { animation: ludo-tumble 0.3s linear infinite; }
+.ludo-bubble { animation: ludo-pop 0.25s cubic-bezier(.2, 1.4, .5, 1); }
+@keyframes ludo-hop { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-0.14px); } }
+@keyframes ludo-pulse { from { opacity: 0.9; transform: scale(0.7); } to { opacity: 0; transform: scale(1.25); } }
+@keyframes ludo-nudge { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+@keyframes ludo-tumble { 0% { transform: rotate(0) scale(0.92); } 50% { transform: rotate(180deg) scale(1.05); } 100% { transform: rotate(360deg) scale(0.92); } }
+@keyframes ludo-pop { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .ludo-token-can, .ludo-ring, .ludo-roll-hint, .ludo-dice-roll { animation: none; }
+}

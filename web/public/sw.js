@@ -44,7 +44,7 @@ self.addEventListener('push', (e) => {
   try { d = e.data.json(); } catch {}
   const name = d.name || d.from || 'Someone';
   const title = d.t === 'fr' ? 'New friend request' : name;
-  const body = d.t === 'fr' ? `${name} wants to be your friend` : 'New message';
+  const body = d.t === 'fr' ? `${name} wants to be your friend` : d.t === 'game' ? `invited you to play ${d.game || 'a game'} 🎲` : 'New message';
   e.waitUntil((async () => {
     // Don't notify if the app is open and visible: the page shows the message itself.
     const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });

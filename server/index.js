@@ -15,7 +15,8 @@ import { routes as friendRoutes, migrateFriends } from './friends.js';
 import { routes as pushRoutes, initPush } from './push.js';
 import { routes as gifRoutes } from './gifs.js';
 import { routes as previewRoutes } from './preview.js';
-import { handlers } from './messages.js';
+import { handlers as messageHandlers } from './messages.js';
+import { handlers as gameHandlers, loadGames, purgeGames } from './games.js';
 import { EMOJI_RE, serveEmoji } from './emoji.js';
 
 // ---------- database ----------
@@ -28,6 +29,7 @@ async function cleanup() {
   await ctx.db.run('purgeHidden', cutoff);
   await ctx.db.run('purgeSessions', Date.now());
   await ctx.db.run('purgeSessionInfo');
+  await purgeGames();
 }
 await cleanup();
 setInterval(() => cleanup().catch((e) => console.error('cleanup failed', e.message)), 3600e3).unref();
@@ -35,7 +37,10 @@ setInterval(() => cleanup().catch((e) => console.error('cleanup failed', e.messa
 const migrated = await migrateFriends();
 if (migrated) console.log(`made ${migrated} existing chat pair(s) friends`);
 await initPush();
+await loadGames();
 loadStatic();
+
+const handlers = { ...messageHandlers, ...gameHandlers };
 
 // ---------- HTTP ----------
 const routes = { ...authRoutes, ...profileRoutes, ...friendRoutes, ...pushRoutes, ...gifRoutes, ...previewRoutes };
@@ -129,7 +134,7 @@ wss.on('connection', (ws, req) => {
     // Any frame from the client proves its JavaScript is running (not frozen in the background).
     ws.beat = Date.now();
     if (rateLimited('ws:' + ws.user, 300, 10e3)) return send(ws, { t: 'err', e: 'Slow down' });
-    const h = handlers[m.t];
+    const h = Object.hasOwn(handlers, m.t) ? handlers[m.t] : null;
     if (h) await h(ws, m);
   }
 

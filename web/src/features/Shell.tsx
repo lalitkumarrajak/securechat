@@ -5,6 +5,8 @@ import { ChatPane, EmptyPane } from './conversation/ChatPane';
 import { FriendsPanel } from './friends/FriendsPanel';
 import { SettingsPanel } from './settings/SettingsPanel';
 import { ContactPanel } from './conversation/ContactPanel';
+import { GameScreen } from './games/GameScreen';
+import { NewGameDialog } from './games/NewGameDialog';
 
 /** Two panes on desktop; on phones, the chat list or the open chat. */
 export function Shell() {
@@ -20,6 +22,8 @@ export function Shell() {
       <FriendsPanel />
       <SettingsPanel />
       <ContactPanel />
+      <NewGameDialog />
+      <GameScreen />
     </div>
   );
 }

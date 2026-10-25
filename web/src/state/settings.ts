@@ -15,6 +15,7 @@ export interface Settings {
   wallpaper: Wallpaper;
   enterToSend: boolean;
   sound: boolean;
+  gameSound: boolean;
   push: boolean;
 }
 
@@ -34,6 +35,7 @@ const defaults: Settings = {
   wallpaper: 'doodle',
   enterToSend: !matchMedia('(pointer: coarse)').matches, // phones: Enter adds a new line
   sound: true,
+  gameSound: true,
   push: false,
 };
 

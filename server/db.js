@@ -86,6 +86,13 @@ const SCHEMA = (pg) => `
     created  BIGINT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS push_user ON push_subs(username);
+  CREATE TABLE IF NOT EXISTS games (
+    id      TEXT PRIMARY KEY,
+    type    TEXT NOT NULL,
+    status  TEXT NOT NULL,
+    state   TEXT NOT NULL,
+    updated BIGINT NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS config (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -163,6 +170,12 @@ const SQL = {
                ON CONFLICT (endpoint) DO UPDATE SET username = excluded.username, keys = excluded.keys, created = excluded.created`,
   deletePushSub: 'DELETE FROM push_subs WHERE endpoint = ?',
   pushSubsFor: 'SELECT endpoint, keys FROM push_subs WHERE username = ?',
+
+  // Games (Ludo, …): the whole state as JSON, rewritten after every move.
+  saveGame: `INSERT INTO games (id, type, status, state, updated) VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT (id) DO UPDATE SET status = excluded.status, state = excluded.state, updated = excluded.updated`,
+  openGames: "SELECT state FROM games WHERE status != 'over' AND updated > ?",
+  purgeGames: 'DELETE FROM games WHERE updated < ?',
 
   getConfig: 'SELECT value FROM config WHERE key = ?',
   setConfig: 'INSERT INTO config (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value',
@@ -246,8 +259,8 @@ async function openMongo(uri) {
   // Use the database named in the URI, or "securechat" if it names none.
   const mdb = client.db(client.options.dbName === 'test' ? 'securechat' : undefined);
   const c = (name) => mdb.collection(name);
-  const [users, sessions, messages, hidden, avatars, friendships, blocks, profiles, pushSubs, config] =
-    ['users', 'sessions', 'messages', 'message_hidden', 'avatars', 'friendships', 'blocks', 'profiles', 'push_subs', 'config'].map(c);
+  const [users, sessions, messages, hidden, avatars, friendships, blocks, profiles, pushSubs, games, config] =
+    ['users', 'sessions', 'messages', 'message_hidden', 'avatars', 'friendships', 'blocks', 'profiles', 'push_subs', 'games', 'config'].map(c);
   await Promise.all([
     sessions.createIndex({ expires: 1 }),
     sessions.createIndex({ username: 1 }),
@@ -378,6 +391,13 @@ async function openMongo(uri) {
     },
     deletePushSub: async (endpoint) => changes((await pushSubs.deleteOne({ _id: endpoint })).deletedCount),
     pushSubsFor: async (u) => (await pushSubs.find({ username: u }).toArray()).map((d) => ({ endpoint: d._id, keys: d.keys })),
+
+    saveGame: async (id, type, status, state, updated) => {
+      await games.replaceOne({ _id: id }, { type, status, state, updated }, { upsert: true });
+      return changes(1);
+    },
+    openGames: async (since) => games.find({ status: { $ne: 'over' }, updated: { $gt: since } }, { projection: { state: 1 } }).toArray(),
+    purgeGames: async (cutoff) => changes((await games.deleteMany({ updated: { $lt: cutoff } })).deletedCount),
 
     getConfig: (key) => config.findOne({ _id: key }),
     setConfig: async (key, value) => {

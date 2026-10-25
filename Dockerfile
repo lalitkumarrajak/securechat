@@ -12,6 +12,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY server ./server
+COPY shared ./shared
 COPY --from=build /app/web/dist ./web/dist
 RUN mkdir -p /data && chown node:node /data
 USER node
