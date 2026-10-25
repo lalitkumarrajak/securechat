@@ -128,9 +128,25 @@ test('emoji-only messages are big, animate once, and replay on tap', async () =>
   await A.page.screenshot({ path: shots('04-chat-emoji') });
 });
 
+// Phones only open the keyboard if focus() happens while handling the tap/swipe itself.
+// Headless Chrome has no keyboard, so record which event was being handled when the box got focus.
+const recordFocus = (p: Phone) => p.page.evaluate(() => {
+  const w = window as any;
+  w.__focusDuring = [];
+  const orig = HTMLTextAreaElement.prototype.focus;
+  HTMLTextAreaElement.prototype.focus = function (this: HTMLTextAreaElement, ...args: any[]) {
+    if (this.id === 'composer-input') w.__focusDuring.push(window.event?.type ?? 'none');
+    return orig.apply(this, args as []);
+  };
+});
+const focusEvents = (p: Phone) => p.page.evaluate(() => (window as any).__focusDuring as string[]);
+
 test('swipe to reply quotes the message on both phones', async () => {
+  await recordFocus(B);
   await swipeRight(B, bubble(B, 'Hi Rakhi!').locator('div').first());
+  expect(await focusEvents(B)).toContain('touchend'); // focused during the swipe → keyboard opens
   await expect(B.page.getByText(`Replying to ${A.u}`)).toBeVisible();
+  await expect(B.page.getByRole('textbox', { name: 'Message' })).toBeFocused(); // keyboard opens
   await B.page.screenshot({ path: shots('05-reply-bar') });
   await B.page.getByRole('textbox', { name: 'Message' }).fill("I'm good! 😊");
   await B.page.getByRole('button', { name: 'Send' }).tap();
@@ -146,6 +162,18 @@ test('long-press: react, edit, pin', async () => {
   await settle(B);
   await B.page.screenshot({ path: shots('06-action-sheet') });
   await B.page.getByRole('button', { name: 'React ❤️' }).click();
+
+  // Reply from the long-press sheet also focuses the box (opens the keyboard).
+  // Start with nothing focused, like a phone with the keyboard closed.
+  await B.page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await longPress(B, bubble(B, 'Second message').locator('div').first());
+  await recordFocus(B);
+  await B.page.getByRole('dialog').getByRole('button', { name: 'Reply' }).tap();
+  expect(await focusEvents(B)).toContain('click'); // focused during the tap → keyboard opens
+  await expect(B.page.getByText(`Replying to ${A.u}`)).toBeVisible();
+  await B.page.waitForTimeout(400); // the sheet's closing animation must not steal focus back
+  await expect(B.page.getByRole('textbox', { name: 'Message' })).toBeFocused();
+  await B.page.getByRole('button', { name: 'Cancel reply' }).click();
   await expect(bubble(A, 'Second message').getByRole('button', { name: '❤️' })).toBeVisible();
 
   // A edits their message

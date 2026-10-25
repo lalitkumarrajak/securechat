@@ -4,16 +4,17 @@ import type { ReactNode } from 'react';
 import { cn } from '../../lib/utils';
 
 /** A centred dialog on desktop that becomes a bottom sheet on phones. */
-export function Dialog({ open, onOpenChange, title, description, children, className, hideTitle }: {
+export function Dialog({ open, onOpenChange, title, description, children, className, hideTitle, keepFocus }: {
   open: boolean; onOpenChange: (o: boolean) => void; title: string; description?: string;
   children: ReactNode; className?: string; hideTitle?: boolean;
+  keepFocus?: boolean; // don't move focus back to what was focused before (e.g. after "Reply")
 }) {
   return (
     <D.Root open={open} onOpenChange={onOpenChange}>
       <D.Portal>
         <D.Overlay className="fixed inset-0 z-40 bg-overlay animate-fade-in" />
         <D.Content
-          aria-describedby={description ? undefined : undefined}
+          onCloseAutoFocus={keepFocus ? (e) => e.preventDefault() : undefined}
           className={cn(
             'fixed z-50 bg-panel text-ink shadow-2xl outline-none',
             'inset-x-0 bottom-0 max-h-[92dvh] overflow-y-auto rounded-t-3xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] animate-slide-up',

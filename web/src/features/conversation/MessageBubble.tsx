@@ -10,7 +10,7 @@ import { cn, isTouch } from '../../lib/utils';
 import { setApp } from '../../state/app';
 import { BigEmoji } from './BigEmoji';
 import { VoicePlayer } from './VoicePlayer';
-import { actionsFor, canReact, myReaction, reactTo, setChatUi, type Action } from './chatUi';
+import { actionsFor, canReact, myReaction, reactTo, setChatUi, startReply, type Action } from './chatUi';
 
 export const ICONS: Record<string, React.ReactNode> = {
   retry: <RotateCcw />, reply: <Reply />, copy: <Copy />, forward: <Forward />, pin: <Pin />, edit: <Pencil />,
@@ -70,7 +70,10 @@ export const MessageBubble = memo(function MessageBubble({ m, me, peerName, firs
     // After a long-press, cancel the click the browser would fire when the finger lifts:
     // it would land on the sheet that just opened under the finger.
     if (p.long && e.cancelable) e.preventDefault();
-    if (p.horizontal && p.dx > 60) setApp({ replyTo: m, editing: null });
+    if (p.horizontal && p.dx > 60) {
+      startReply(m); // focuses the message box during the swipe, so the keyboard opens
+      if (e.cancelable) e.preventDefault(); // no click afterwards that would take focus away
+    }
     if (row.current) { row.current.style.transition = ''; row.current.style.transform = ''; delete row.current.dataset.ready; }
     press.current = null;
   };
@@ -218,6 +221,7 @@ function DesktopMenu({ m, open, onOpenChange, bare }: { m: Msg; open: boolean; o
       </M.Trigger>
       <M.Portal>
         <M.Content align={m.out ? 'end' : 'start'} sideOffset={4} collisionPadding={8}
+          onCloseAutoFocus={(e) => e.preventDefault()} // keep focus in the message box after Reply/Edit
           className="z-50 w-56 rounded-xl border border-line bg-panel p-1 text-ink shadow-xl animate-fade-in" onClick={(e) => e.stopPropagation()}>
           {canReact(m) && (
             <div className="flex items-center justify-between gap-0.5 border-b border-line px-1 pt-1 pb-2">

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { flushSync } from 'react-dom';
 import * as D from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
 import { Check, Search, ShieldAlert, SmilePlus, X } from 'lucide-react';
@@ -32,7 +33,7 @@ function ActionSheet() {
   const m = useChatUi((s) => s.sheet);
   const close = () => setChatUi({ sheet: null });
   return (
-    <Dialog open={!!m} onOpenChange={(o) => !o && close()} title="Message options" hideTitle className="md:max-w-sm">
+    <Dialog open={!!m} onOpenChange={(o) => !o && close()} title="Message options" hideTitle keepFocus className="md:max-w-sm">
       {m && (
         <>
           <p className="mb-3 line-clamp-2 rounded-xl bg-panel-2 px-3 py-2 text-sm text-muted">{preview(m)}</p>
@@ -52,7 +53,9 @@ function ActionSheet() {
           <ul className="-mx-2">
             {actionsFor(m).map((a) => (
               <li key={a.key}>
-                <button onClick={() => { close(); a.run(); }}
+                // Close the sheet right now (it traps focus while open), then run the action in the
+                // same tap, so "Reply" can focus the message box and open the keyboard.
+                <button onClick={() => { flushSync(close); a.run(); }}
                   className={cn('flex w-full items-center gap-4 rounded-xl px-3 py-3 text-left hover:bg-hover [&_svg]:size-5', a.danger ? 'text-danger' : '[&_svg]:text-muted')}>
                   {ICONS[a.key]}{a.label}
                 </button>

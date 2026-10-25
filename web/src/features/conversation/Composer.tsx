@@ -86,6 +86,7 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
         {!editing && <EmojiButton onPick={insertEmoji} />}
         {!editing && <AttachButton onFile={photo} />}
         <textarea
+          id="composer-input"
           ref={input}
           value={text}
           onChange={(e) => change(e.target.value)}

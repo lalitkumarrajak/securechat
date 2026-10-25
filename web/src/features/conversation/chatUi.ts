@@ -18,6 +18,16 @@ interface ChatUi {
 export const useChatUi = create<ChatUi>(() => ({ forward: null, info: null, picker: null, sheet: null, verify: false, viewer: null }));
 export const setChatUi = useChatUi.setState;
 
+/** Focus the message box. Must run during the tap itself: phones only open the keyboard then. */
+export function focusComposer() {
+  document.querySelector<HTMLTextAreaElement>('#composer-input')?.focus();
+}
+
+export function startReply(m: Msg) {
+  setApp({ replyTo: m, editing: null });
+  focusComposer();
+}
+
 export async function deleteFlow(msgs: Msg[]) {
   if (!msgs.length) return;
   const everyone = canDeleteForEveryone(msgs);
@@ -46,11 +56,11 @@ export function actionsFor(m: Msg): Action[] {
   const pinned = !!getApp().chats.find((c) => c.peer === m.peer)?.pins?.some((p) => p.k === m.k);
   const list: Action[] = [];
   if (m.s === -2) list.push({ key: 'retry', label: 'Send again', run: () => retry(m) });
-  if (live && m.s !== -2) list.push({ key: 'reply', label: 'Reply', run: () => setApp({ replyTo: m, editing: null }) });
+  if (live && m.s !== -2) list.push({ key: 'reply', label: 'Reply', run: () => startReply(m) });
   if (live && m.text) list.push({ key: 'copy', label: 'Copy', run: () => copyMessages([m]).then(() => toast.success('Copied')) });
   if (live && m.s !== -2) list.push({ key: 'forward', label: 'Forward', run: () => setChatUi({ forward: [m] }) });
   if (live && m.id != null) list.push({ key: 'pin', label: pinned ? 'Unpin' : 'Pin', run: () => togglePin(m) });
-  if (canEdit(m)) list.push({ key: 'edit', label: 'Edit', run: () => setApp({ editing: m, replyTo: null }) });
+  if (canEdit(m)) list.push({ key: 'edit', label: 'Edit', run: () => { setApp({ editing: m, replyTo: null }); focusComposer(); } });
   list.push({ key: 'select', label: 'Select', run: () => setApp({ selection: [m.k] }) });
   if (m.out && live) list.push({ key: 'info', label: 'Info', run: () => setChatUi({ info: m }) });
   list.push({ key: 'delete', label: 'Delete', danger: true, run: () => deleteFlow([m]) });
