@@ -112,7 +112,7 @@ function AuthForm({ mode }: { mode: 'signin' | 'signup' }) {
       <div>
         <Label htmlFor={mode + '-u'} hint={signup ? 'a–z, 0–9, _ .' : undefined}>Username</Label>
         <Input id={mode + '-u'} value={u} onChange={(e) => setU(e.target.value)} autoComplete="username"
-          autoCapitalize="none" spellCheck={false} maxLength={24} required placeholder="e.g. rakhi312" />
+          autoCapitalize="none" spellCheck={false} maxLength={24} required placeholder="e.g. ayansh" />
       </div>
       <div>
         <Label htmlFor={mode + '-p'}>Password</Label>
