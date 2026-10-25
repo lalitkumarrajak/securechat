@@ -13,6 +13,7 @@ import { ctx } from './context.js';
 import { rateLimited } from './http.js';
 import { isActive, send, sendTo } from './hub.js';
 import { canChat } from './friends.js';
+import { shareGroup } from './groups.js';
 import { getProfile, profileHooks } from './profiles.js';
 import { notify } from './push.js';
 import * as core from '../shared/games/core.js';
@@ -122,7 +123,7 @@ export const handlers = {
     const open = to.length === 0 || m.open === true; // no one picked: share a link instead
     if ((!open && to.length < d.min - 1) || to.length > d.max - 1) return fail(`Pick ${d.min - 1} to ${d.max - 1} friends`);
     for (const u of to) {
-      if (typeof u !== 'string' || !USER_RE.test(u) || !(await canChat(ws.user, u))) return fail('You can only invite friends');
+      if (typeof u !== 'string' || !USER_RE.test(u) || !(await canChat(ws.user, u) || await shareGroup(ws.user, u))) return fail('You can only invite friends');
     }
     if (mine(ws.user).filter(isOpen).length >= MAX_OPEN) return fail('Finish or leave one of your games first');
     if (rateLimited('gnew:' + ws.user, 10, 60e3)) return fail('Slow down');

@@ -10,3 +10,9 @@ export function conversationKey(myPriv: CryptoKey, theirPub: string, me: string,
 export function encryptMessage(key: CryptoKey, obj: unknown, from: string, to: string, cid: string): Promise<string>;
 export function decryptMessage(key: CryptoKey, body: string, from: string, to: string, cid: string): Promise<any>;
 export function safetyNumber(userA: string, pubA: string, userB: string, pubB: string): Promise<string[]>;
+export function groupKeyId(): string;
+export function importGroupKey(rawB64: string): Promise<CryptoKey>;
+export function newGroupKey(): { kid: string; raw: string };
+export function encryptGroup(key: CryptoKey, kid: string, obj: unknown, from: string, to: string, cid: string): Promise<string>;
+export function bodyKeyId(body: string): string;
+export function decryptGroup(key: CryptoKey, body: string, from: string, to: string, cid: string): Promise<any>;

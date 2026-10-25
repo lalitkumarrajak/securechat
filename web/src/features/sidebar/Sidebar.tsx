@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Archive, ArrowLeft, BellOff, Clock, Gamepad2, Lock, LogOut, MessageSquarePlus, MoreVertical, Search, Settings, UserPlus, WifiOff, X } from 'lucide-react';
+import { Archive, ArrowLeft, BellOff, Clock, Gamepad2, Lock, LogOut, MessageSquarePlus, MoreVertical, Search, Settings, UserPlus, Users, WifiOff, X } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
 import { Ticks } from '../../components/Ticks';
 import { IconButton } from '../../components/ui/button';
@@ -14,6 +14,7 @@ import { GamesStrip } from '../games/GamesStrip';
 import { ChatListSkeleton } from '../../components/Skeleton';
 import { useSettings } from '../../state/settings';
 import { lockNow } from '../../lib/applock';
+import { groupIdOf, isGroup } from '../../lib/types';
 import { openPicker } from '../games/store';
 
 export function Sidebar() {
@@ -75,6 +76,7 @@ export function Sidebar() {
               <MenuTrigger asChild><IconButton label="Menu"><MoreVertical /></IconButton></MenuTrigger>
               <MenuContent>
                 <MenuItem icon={<MessageSquarePlus />} onSelect={() => setApp({ panel: 'friends', friendsTab: 'friends' })}>New chat</MenuItem>
+                <MenuItem icon={<Users />} onSelect={() => setApp({ panel: 'newgroup' })}>New group</MenuItem>
                 <MenuItem icon={<UserPlus />} onSelect={() => setApp({ panel: 'friends', friendsTab: 'add' })}>Add friend</MenuItem>
                 <MenuItem icon={<Gamepad2 />} onSelect={() => openPicker()}>Play games</MenuItem>
                 <MenuItem icon={<Archive />} onSelect={() => setApp({ panel: 'archived' })}>Archived chats</MenuItem>
@@ -182,12 +184,16 @@ function ChatRow({ chat }: { chat: Chat }) {
   const active = useApp((s) => s.active === chat.peer);
   const online = useApp((s) => s.presence[chat.peer]?.on);
   const typing = useApp((s) => s.typing[chat.peer]);
+  const group = useApp((s) => (isGroup(chat.peer) ? s.groups[groupIdOf(chat.peer)] : undefined));
+  const typingWho = useApp((s) => s.typingWho[chat.peer]);
+  const friendsMap = useApp((s) => s.friends);
   useApp((s) => s.me?.mutes); // re-render when mutes change
   const muted = isMuted(chat.peer);
-  const name = displayName(friend, chat.peer);
+  const name = isGroup(chat.peer) ? group?.name || 'Group' : displayName(friend, chat.peer);
+  const whoName = typingWho && (friendsMap[typingWho]?.name || group?.members.find((m) => m.u === typingWho)?.n || typingWho);
 
   let line: React.ReactNode = chat.last;
-  if (typing) line = <span className="text-accent-ink">{typing === 'recording' ? 'recording audio…' : 'typing…'}</span>;
+  if (typing) line = <span className="text-accent-ink">{whoName && isGroup(chat.peer) ? `${whoName} is ` : ''}{typing === 'recording' ? 'recording audio…' : 'typing…'}</span>;
   else if (chat.draft && !active) line = <><span className="text-danger">Draft: </span>{chat.draft}</>;
   else if (chat.lastOut && chat.last) line = <><Ticks s={chat.lastS ?? 0} className="mr-0.5 inline align-[-3px]" />{chat.last}</>;
 

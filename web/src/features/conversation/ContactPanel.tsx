@@ -89,7 +89,7 @@ function Contact({ peer }: { peer: string }) {
   );
 }
 
-function Quick({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
+export function Quick({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
   return (
     <button onClick={onClick} className="flex w-20 flex-col items-center gap-1.5 rounded-2xl border border-line py-3 text-xs font-medium text-accent-ink hover:bg-hover [&_svg]:size-5">
       {icon}{label}
@@ -97,7 +97,7 @@ function Quick({ icon, label, onClick }: { icon: React.ReactNode; label: string;
   );
 }
 
-function Row({ icon, label, sub, danger, onClick }: { icon: React.ReactNode; label: string; sub?: string; danger?: boolean; onClick?: () => void }) {
+export function Row({ icon, label, sub, danger, onClick }: { icon: React.ReactNode; label: string; sub?: string; danger?: boolean; onClick?: () => void }) {
   const Tag = onClick ? 'button' : 'div';
   return (
     <Tag onClick={onClick} className={cn('flex w-full items-center gap-4 px-6 py-3 text-left [&_svg]:size-5', onClick && 'hover:bg-hover', danger ? 'text-danger' : '[&_svg]:text-muted')}>

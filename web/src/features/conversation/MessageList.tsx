@@ -2,7 +2,7 @@ import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 
 import { ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { senderOf } from '../../lib/controls';
-import { me as myName } from '../../lib/engine';
+import { me as myName, preview } from '../../lib/engine';
 import { fmtDay } from '../../lib/format';
 import { setApp, useApp } from '../../state/app';
 import { useSettings } from '../../state/settings';
@@ -106,8 +106,14 @@ export function MessageList({ peer, peerName, unreadAtOpen }: { peer: string; pe
                   </span>
                 </div>
               )}
-              <MessageBubble m={m} me={me} peerName={peerName} first={first}
-                selecting={!!selection} selected={selected.has(m.k)} pinned={pinned.has(m.k)} />
+              {m.type === 'sys' ? (
+                <div className="my-2 flex justify-center px-6" data-k={m.k}>
+                  <span className="rounded-lg bg-panel/95 px-3 py-1 text-center text-xs text-muted shadow-bubble">{preview(m)}</span>
+                </div>
+              ) : (
+                <MessageBubble m={m} me={me} peerName={peerName} first={first || prev?.type === 'sys'}
+                  selecting={!!selection} selected={selected.has(m.k)} pinned={pinned.has(m.k)} />
+              )}
             </Fragment>
           );
         })}

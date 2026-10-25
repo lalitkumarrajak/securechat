@@ -11,12 +11,15 @@ import { useGames } from './games/store';
 
 // Loaded when a game is opened, so the app starts faster.
 const GameScreen = lazy(() => import('./games/GameScreen').then((m) => ({ default: m.GameScreen })));
+const GroupInfoPanel = lazy(() => import('./groups/GroupInfoPanel').then((m) => ({ default: m.GroupInfoPanel })));
+const NewGroupPanel = lazy(() => import('./groups/NewGroupPanel').then((m) => ({ default: m.NewGroupPanel })));
 import { handleInvite } from '../lib/invite';
 
 /** Two panes on desktop; on phones, the chat list or the open chat. */
 export function Shell() {
   const active = useApp((s) => s.active);
   const gameOpen = useGames((s) => !!s.open);
+  const panel = useApp((s) => s.panel);
   useEffect(() => { handleInvite(); }, []); // opened from someone's invite link
   return (
     <div className="mx-auto flex h-dvh max-w-[1600px] overflow-hidden bg-panel md:border-x md:border-line">
@@ -29,6 +32,10 @@ export function Shell() {
       <FriendsPanel />
       <SettingsPanel />
       <ContactPanel />
+      <Suspense fallback={null}>
+        {panel === 'group' && <GroupInfoPanel />}
+        {panel === 'newgroup' && <NewGroupPanel />}
+      </Suspense>
       <NewGameDialog />
       {gameOpen && <Suspense fallback={null}><GameScreen /></Suspense>}
     </div>

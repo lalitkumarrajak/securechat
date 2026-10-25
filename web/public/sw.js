@@ -43,10 +43,11 @@ self.addEventListener('push', (e) => {
   let d = {};
   try { d = e.data.json(); } catch {}
   const name = d.name || d.from || 'Someone';
-  const title = d.t === 'fr' ? 'New friend request' : d.t === 'signin' ? 'New sign-in to your account' : name;
+  const title = d.t === 'fr' ? 'New friend request' : d.t === 'signin' ? 'New sign-in to your account' : d.t === 'gmsg' ? (d.group || 'Group') : name;
   const body = d.t === 'fr' ? `${name} wants to be your friend`
     : d.t === 'game' ? `invited you to play ${d.game || 'a game'} 🎲`
     : d.t === 'gmention' ? `mentioned you in ${d.game || 'a game'}`
+    : d.t === 'gmsg' ? `${name}${d.mention ? ' mentioned you' : ': New message'}`
     : d.t === 'signin' ? `A device signed in${d.where || ''}. If this wasn’t you, open Chattrix → Settings → Active sessions.`
     : 'New message';
   e.waitUntil((async () => {
@@ -55,7 +56,8 @@ self.addEventListener('push', (e) => {
     if (wins.some((w) => w.visibilityState === 'visible')) return;
     await self.registration.showNotification(title, {
       body, icon: '/icon-192.png', badge: '/icon-192.png',
-      tag: (d.t || 'msg') + '-' + (d.from || ''), renotify: true, data: { peer: d.t === 'msg' ? d.from : null },
+      tag: (d.t || 'msg') + '-' + (d.peer || d.from || ''), renotify: true,
+      data: { peer: d.t === 'msg' ? d.from : d.t === 'gmsg' ? d.peer : null },
     });
   })());
 });

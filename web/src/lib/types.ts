@@ -1,7 +1,10 @@
 export type Reply = { f: string; c: string; p: string }; // quoted message: sender, cid, preview
 export interface LinkPreview { url: string; title: string; desc: string; site: string; img?: string }
 
-export type MsgType = 'text' | 'img' | 'voice' | 'gif' | 'sticker' | 'file' | 'location' | 'deleted' | 'err';
+export type MsgType = 'text' | 'img' | 'voice' | 'gif' | 'sticker' | 'file' | 'location' | 'deleted' | 'err' | 'sys';
+
+/** A group event shown in the chat ("Lalit added Rakhi"). Sent by the server, not encrypted. */
+export interface SysEvent { e: string; by: string; u?: string[]; name?: string; on?: boolean; auto?: boolean }
 
 /** A message as stored on this device (decrypted). `k` is "sender/cid", unique per message. */
 export interface Msg {
@@ -26,9 +29,21 @@ export interface Msg {
   loc?: { lat: number; lng: number; acc: number };
   edited?: number;        // time of the last accepted edit
   reacts?: Record<string, string>; // username -> emoji
+  sys?: SysEvent;
+  pending?: boolean;      // group message whose key hasn't arrived yet
+  mn?: string[];          // usernames @mentioned (groups)
 }
 
 export interface Pin { k: string; ts: number }
+
+export interface GroupMember { u: string; n: string; pub: string; admin: boolean; joined: number }
+export interface Group {
+  id: string; name: string; about: string; creator: string; created: number; epoch: number;
+  adminsOnly: boolean; photo: number; members: GroupMember[]; admin: boolean; link?: string;
+}
+/** Chats with a group use the peer "g:<group id>". */
+export const isGroup = (peer: string | null | undefined): peer is string => !!peer && peer.startsWith('g:');
+export const groupIdOf = (peer: string) => peer.slice(2);
 
 export interface Chat {
   peer: string;

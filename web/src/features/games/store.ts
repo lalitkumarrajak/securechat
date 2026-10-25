@@ -18,6 +18,9 @@ export interface Game<S = any> {
 }
 export interface ChatLine { f: string; x: string; ts: number }
 
+/** The "new game" dialog: who's ticked, and who can be picked (default: my friends; from a group: its members). */
+export interface Picker { pre: string[]; pool?: { u: string; name?: string }[] }
+
 interface GamesState {
   games: Record<string, Game>;
   chat: Record<string, ChatLine[]>;
@@ -25,7 +28,7 @@ interface GamesState {
   bubble: Record<string, { x: string; ts: number }>; // `${gameId}/${user}` -> what they just said
   open: string | null;       // game shown full screen
   chatOpen: boolean;
-  picker: string[] | null;   // "new game" dialog, with these friends ticked
+  picker: Picker | null;     // "new game" dialog
   dismissed: string[];       // finished games whose results were closed
 }
 
@@ -150,7 +153,7 @@ export const say = (id: string, x: string) => sendOrWarn({ t: 'gsay', id, x });
 export const linkShared = (g: Game) => { if (!g.open) sendOrWarn({ t: 'glink', id: g.id }); };
 
 export const openGame = (id: string | null) => set({ open: id, chatOpen: false });
-export const openPicker = (friends: string[] = []) => set({ picker: friends });
+export const openPicker = (pre: string[] = [], pool?: Picker['pool']) => set({ picker: { pre, ...(pool && { pool }) } });
 export const closePicker = () => set({ picker: null });
 export const setChatOpen = (chatOpen: boolean) =>
   set((s) => ({ chatOpen, unread: chatOpen && s.open ? { ...s.unread, [s.open]: 0 } : s.unread }));

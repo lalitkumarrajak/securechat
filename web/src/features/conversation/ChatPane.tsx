@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  Archive, ArchiveRestore, ArrowLeft, Bell, BellOff, ChevronDown, ChevronUp, Copy, Forward, Lock, MoreVertical, Pencil, Pin, Reply,
-  Dices, Search, ShieldAlert, ShieldCheck, SquareCheck, Trash2, UserMinus, UserX, X,
+  Archive, ArchiveRestore, ArrowLeft, Bell, BellOff, ChevronDown, ChevronUp, Copy, Dices, Forward, Info, Lock, LogOut,
+  MoreVertical, Pencil, Pin, Reply, Search, ShieldAlert, ShieldCheck, SquareCheck, Trash2, UserMinus, UserX, X,
 } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
 import { Button, IconButton } from '../../components/ui/button';
 import { confirm } from '../../components/ui/confirm';
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuSub, MenuSubContent, MenuSubTrigger, MenuTrigger } from '../../components/ui/menu';
 import {
-  acceptRequest, blockUser, closeChat, copyMessages, isMuted, mute, preview, removeFriend, sendRequest, setArchived, togglePin, unblockUser,
+  acceptRequest, blockUser, closeChat, copyMessages, deleteChatHere, isMuted, mute, preview, removeFriend, sendRequest, setArchived, togglePin, unblockUser,
 } from '../../lib/engine';
 import { fmtLastSeen } from '../../lib/format';
 import { displayName } from '../../lib/types';
@@ -21,6 +21,8 @@ import { ChatDialogs } from './ChatDialogs';
 import { deleteFlow, setChatUi, startEdit, startReply } from './chatUi';
 import { openPicker } from '../games/store';
 import { useGames } from '../games/store';
+import { groupIdOf, isGroup } from '../../lib/types';
+import { leaveGroup } from '../../lib/groups';
 import { canEdit } from '../../lib/controls';
 
 export function EmptyPane() {
@@ -67,15 +69,17 @@ export function ChatPane({ peer }: { peer: string }) {
   const requestIn = useApp((s) => s.incoming.some((r) => r.u === peer));
   // The unread count when the chat was opened places the "N unread" divider.
   const [unreadAtOpen] = useState(() => useApp.getState().chats.find((c) => c.peer === peer)?.unread || 0);
-  const name = displayName(friend, peer);
-  const canSend = !!friend && !blocked && !keyChanged;
+  const group = useApp((s) => (isGroup(peer) ? s.groups[groupIdOf(peer)] : undefined));
+  const groupsLoaded = useApp((s) => s.groupsLoaded);
+  const name = isGroup(peer) ? group?.name || 'Group' : displayName(friend, peer);
+  const canSend = isGroup(peer) ? !!group && (!group.adminsOnly || group.admin) : !!friend && !blocked && !keyChanged;
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-chat">
       {selection ? <SelectionBar /> : <Header peer={peer} name={name} />}
       {searchOpen && !selection && <SearchBar />}
       <PinnedBar peer={peer} />
-      {keyChanged && (
+      {keyChanged && !isGroup(peer) && (
         <Banner icon={<ShieldAlert className="size-5 text-danger" />} action={<Button size="sm" variant="outline" onClick={() => setChatUi({ verify: true })}>Review</Button>}>
           {name}’s security code changed. Sending is paused until you verify it.
         </Banner>
@@ -83,7 +87,11 @@ export function ChatPane({ peer }: { peer: string }) {
       <MessageList peer={peer} peerName={name} unreadAtOpen={unreadAtOpen} />
       {canSend ? <Composer key={peer} peer={peer} peerName={name} /> : (
         <div className="shrink-0 border-t border-line bg-panel px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-center text-sm">
-          {blocked ? (
+          {isGroup(peer) ? (
+            group ? <span className="text-muted">Only admins can send messages.</span>
+              : groupsLoaded ? <>You’re no longer in this group. <Action onClick={() => deleteChatHere(peer)}>Delete chat</Action></>
+              : <span className="text-muted">Loading…</span>
+          ) : blocked ? (
             <>You blocked {name}. <Action onClick={() => unblockUser(peer)}>Unblock</Action></>
           ) : keyChanged ? (
             <>Verify the new security code to keep chatting.</>
@@ -114,6 +122,79 @@ function Banner({ icon, children, action }: { icon: React.ReactNode; children: R
 }
 
 function Header({ peer, name }: { peer: string; name: string }) {
+  if (isGroup(peer)) return <GroupHeader peer={peer} name={name} />;
+  return <PersonHeader peer={peer} name={name} />;
+}
+
+const MuteItems = ({ peer }: { peer: string }) => {
+  useApp((s) => s.me?.mutes);
+  const doMute = (until: number, label: string) => mute(peer, until).then(() => toast(label)).catch((e) => toast.error(e.message));
+  return isMuted(peer) ? (
+    <MenuItem icon={<Bell />} onSelect={() => doMute(0, 'Notifications on')}>Unmute</MenuItem>
+  ) : (
+    <MenuSub>
+      <MenuSubTrigger icon={<BellOff />}>Mute notifications</MenuSubTrigger>
+      <MenuSubContent>
+        <MenuItem onSelect={() => doMute(Date.now() + 8 * 3600e3, 'Muted for 8 hours')}>8 hours</MenuItem>
+        <MenuItem onSelect={() => doMute(Date.now() + 7 * 864e5, 'Muted for 1 week')}>1 week</MenuItem>
+        <MenuItem onSelect={() => doMute(-1, 'Muted')}>Always</MenuItem>
+      </MenuSubContent>
+    </MenuSub>
+  );
+};
+
+function GroupHeader({ peer, name }: { peer: string; name: string }) {
+  const group = useApp((s) => s.groups[groupIdOf(peer)]);
+  const typing = useApp((s) => s.typing[peer]);
+  const who = useApp((s) => s.typingWho[peer]);
+  const friends = useApp((s) => s.friends);
+  const me = useApp((s) => s.me!.u);
+  const archived = useApp((s) => s.chats.find((c) => c.peer === peer)?.archived);
+  useApp((s) => s.me?.mutes);
+  const muted = isMuted(peer);
+  const memberName = (u: string) => (u === me ? 'You' : friends[u]?.name || group?.members.find((m) => m.u === u)?.n || u);
+  const status = typing && who ? `${memberName(who)} is ${typing === 'recording' ? 'recording audio' : 'typing'}…`
+    : group ? group.members.map((m) => memberName(m.u)).sort((a, b) => Number(a === 'You') - Number(b === 'You')).join(', ') : '';
+  const others = (group?.members || []).filter((m) => m.u !== me).map((m) => ({ u: m.u, name: memberName(m.u) }));
+  const playLudo = () => openPicker(others.slice(0, 5).map((m) => m.u), others);
+  const leave = async () => {
+    if (!group) return;
+    if (await confirm({ title: `Leave “${group.name}”?`, description: 'You’ll stop getting its messages. Your chat history stays on this device.', confirmText: 'Leave group', destructive: true })) {
+      leaveGroup(group.id).then(() => toast(`You left “${group.name}”`)).catch((e) => toast.error(e.message));
+    }
+  };
+
+  return (
+    <header className="flex h-16 shrink-0 items-center gap-1 border-b border-line bg-panel px-2">
+      <IconButton label="Back" className="md:hidden" onClick={closeChat}><ArrowLeft /></IconButton>
+      <button onClick={() => group && setApp({ panel: 'group' })} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-1.5 py-1 text-left hover:bg-hover">
+        <Avatar u={peer} name={name} size={40} />
+        <span className="min-w-0">
+          <span className="flex items-center gap-1.5 truncate font-semibold">{name}{muted && <BellOff className="size-3.5 text-muted" />}</span>
+          <span className={`block truncate text-xs ${typing ? 'text-accent-ink' : 'text-muted'}`}>{status || 'Tap for group info'}</span>
+        </span>
+      </button>
+      {group && others.length > 0 && <IconButton label="Play Ludo" onClick={playLudo}><Dices /></IconButton>}
+      <IconButton label="Search in chat" className="hidden md:inline-flex" onClick={() => setApp({ searchOpen: true })}><Search /></IconButton>
+      <Menu>
+        <MenuTrigger asChild><IconButton label="Chat options"><MoreVertical /></IconButton></MenuTrigger>
+        <MenuContent>
+          {group && <MenuItem icon={<Info />} onSelect={() => setApp({ panel: 'group' })}>Group info</MenuItem>}
+          <MenuItem icon={<Search />} onSelect={() => setApp({ searchOpen: true })}>Search</MenuItem>
+          <MenuItem icon={<SquareCheck />} onSelect={() => setApp({ selection: [] })}>Select messages</MenuItem>
+          {group && others.length > 0 && <MenuItem icon={<Dices />} onSelect={playLudo}>Play Ludo with the group</MenuItem>}
+          <MuteItems peer={peer} />
+          <MenuItem icon={archived ? <ArchiveRestore /> : <Archive />} onSelect={() => setArchived(peer, !archived)}>{archived ? 'Unarchive' : 'Archive'}</MenuItem>
+          <MenuSeparator />
+          {group ? <MenuItem icon={<LogOut />} danger onSelect={leave}>Leave group</MenuItem>
+            : <MenuItem icon={<Trash2 />} danger onSelect={() => deleteChatHere(peer)}>Delete chat</MenuItem>}
+        </MenuContent>
+      </Menu>
+    </header>
+  );
+}
+
+function PersonHeader({ peer, name }: { peer: string; name: string }) {
   const presence = useApp((s) => s.presence[peer]);
   const typing = useApp((s) => s.typing[peer]);
   const friend = useApp((s) => s.friends[peer]);

@@ -53,7 +53,7 @@ export async function isMuted(user, peer) {
 // Set by friends.js (avoids an import cycle). canSee: may see photo/name (friends or a pending
 // request); canChat: may message and see presence (accepted friends, nobody blocked).
 // inGameTogether is set by games.js: people in the same game see each other's photo.
-export const profileHooks = { friendsOf: async () => [], canSee: async () => false, canChat: async () => false, inGameTogether: () => false };
+export const profileHooks = { friendsOf: async () => [], canSee: async () => false, canChat: async () => false, inGameTogether: () => false, shareGroup: async () => false };
 
 async function presenceFor(user, viewer) {
   const av = await avatarVersion(user);
@@ -76,7 +76,7 @@ async function announceProfile(me) {
 
 const clean = (s, max) => String(s ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max);
 
-function imageType(b) {
+export function imageType(b) {
   if (b.length > 4 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
   if (b.length > 8 && b.toString('latin1', 0, 8) === '\x89PNG\r\n\x1a\n') return 'image/png';
   if (b.length > 12 && b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 8, 12) === 'WEBP') return 'image/webp';
@@ -119,7 +119,7 @@ export const routes = {
   // until: 0 = unmute, -1 = always, otherwise a timestamp.
   'POST /api/mute': async (req, res, me) => {
     const { u, until } = await readJson(req);
-    if (typeof u !== 'string' || !USER_RE.test(u) || !Number.isSafeInteger(until) || until < -1) {
+    if (typeof u !== 'string' || !(USER_RE.test(u) || /^g:[A-Za-z0-9_-]{12}$/.test(u)) || !Number.isSafeInteger(until) || until < -1) {
       return sendJson(res, 400, { error: 'Invalid mute' });
     }
     const p = structuredClone(await getProfile(me));
@@ -150,7 +150,7 @@ export const routes = {
 
   'GET /api/avatar': async (req, res, me, token, url) => {
     const u = String(url.searchParams.get('u') || '');
-    if (u !== me && !profileHooks.inGameTogether(u, me) && !(await profileHooks.canSee(u, me))) return sendJson(res, 404, { error: 'No photo' });
+    if (u !== me && !profileHooks.inGameTogether(u, me) && !(await profileHooks.canSee(u, me)) && !(await profileHooks.shareGroup(u, me))) return sendJson(res, 404, { error: 'No photo' });
     const row = await ctx.db.get('getAvatar', u);
     if (!row) return sendJson(res, 404, { error: 'No photo' });
     sendBody(req, res, { body: Buffer.from(row.data), type: row.type, etag: `"${row.ver}"`, cache: 'private, no-cache' });

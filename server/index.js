@@ -15,6 +15,7 @@ import { routes as friendRoutes, migrateFriends } from './friends.js';
 import { routes as pushRoutes, initPush } from './push.js';
 import { routes as gifRoutes } from './gifs.js';
 import { routes as previewRoutes } from './preview.js';
+import { routes as groupRoutes } from './groups.js';
 import { handlers as messageHandlers } from './messages.js';
 import { handlers as gameHandlers, loadGames, purgeGames } from './games.js';
 import { EMOJI_RE, serveEmoji } from './emoji.js';
@@ -43,7 +44,7 @@ loadStatic();
 const handlers = { ...messageHandlers, ...gameHandlers };
 
 // ---------- HTTP ----------
-const routes = { ...authRoutes, ...profileRoutes, ...friendRoutes, ...pushRoutes, ...gifRoutes, ...previewRoutes };
+const routes = { ...authRoutes, ...profileRoutes, ...friendRoutes, ...pushRoutes, ...gifRoutes, ...previewRoutes, ...groupRoutes };
 
 async function handleHttp(req, res) {
   const url = new URL(req.url, 'http://x');

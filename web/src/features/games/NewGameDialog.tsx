@@ -13,10 +13,10 @@ import { closePicker, createGame, useGames } from './store';
 
 export function NewGameDialog() {
   const picker = useGames((s) => s.picker);
-  return picker ? <Picker initial={picker} /> : null;
+  return picker ? <PickerDialog initial={picker.pre} pool={picker.pool} /> : null;
 }
 
-function Picker({ initial }: { initial: string[] }) {
+function PickerDialog({ initial, pool }: { initial: string[]; pool?: { u: string; name?: string }[] }) {
   const friends = useApp((s) => s.friends);
   const loaded = useApp((s) => s.friendsLoaded);
   const games = Object.values(GAME_UI);
@@ -29,10 +29,10 @@ function Picker({ initial }: { initial: string[] }) {
 
   const list = useMemo(() => {
     const s = q.trim().toLowerCase();
-    return Object.values(friends)
+    return (pool || Object.values(friends))
       .filter((f) => !s || f.u.includes(s) || (f.name || '').toLowerCase().includes(s))
       .sort((a, b) => displayName(a, a.u).localeCompare(displayName(b, b.u)));
-  }, [friends, q]);
+  }, [friends, pool, q]);
 
   const toggle = (u: string) => setPicked((p) => (p.includes(u) ? p.filter((x) => x !== u) : p.length >= max ? p : [...p, u]));
   const go = () => { setBusy(true); createGame(type, picked); setTimeout(() => setBusy(false), 4000); };

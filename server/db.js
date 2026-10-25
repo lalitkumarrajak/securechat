@@ -87,6 +87,33 @@ const SCHEMA = (pg) => `
     created  BIGINT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS push_user ON push_subs(username);
+  CREATE TABLE IF NOT EXISTS groups (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
+    about       TEXT NOT NULL DEFAULT '',
+    creator     TEXT NOT NULL,
+    created     BIGINT NOT NULL,
+    epoch       INTEGER NOT NULL DEFAULT 0,
+    admins_only INTEGER NOT NULL DEFAULT 0,
+    link        TEXT NOT NULL DEFAULT '',
+    photo_ver   BIGINT NOT NULL DEFAULT 0
+  );
+  CREATE INDEX IF NOT EXISTS groups_link ON groups(link);
+  CREATE TABLE IF NOT EXISTS group_members (
+    gid      TEXT NOT NULL,
+    username TEXT NOT NULL,
+    admin    INTEGER NOT NULL DEFAULT 0,
+    joined   BIGINT NOT NULL,
+    from_seq BIGINT NOT NULL,
+    PRIMARY KEY (gid, username)
+  );
+  CREATE INDEX IF NOT EXISTS group_members_user ON group_members(username);
+  CREATE TABLE IF NOT EXISTS group_photos (
+    gid  TEXT PRIMARY KEY,
+    data ${pg ? 'BYTEA' : 'BLOB'} NOT NULL,
+    type TEXT NOT NULL,
+    ver  BIGINT NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS games (
     id      TEXT PRIMARY KEY,
     type    TEXT NOT NULL,
@@ -132,7 +159,9 @@ const SQL = {
               VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (sender, cid) DO NOTHING`,
   getMsgByCid: 'SELECT * FROM messages WHERE sender = ? AND cid = ?',
   getMsgById: 'SELECT * FROM messages WHERE id = ?',
-  syncMsgs: `SELECT * FROM messages m WHERE m.seq > ? AND (m.recipient = ? OR m.sender = ?)
+  // Group messages go to "g:<group id>" and reach members who joined before they were sent.
+  syncMsgs: `SELECT * FROM messages m WHERE m.seq > ? AND (m.recipient = ? OR m.sender = ?
+               OR EXISTS (SELECT 1 FROM group_members gm WHERE gm.username = ? AND m.recipient = 'g:' || gm.gid AND m.seq > gm.from_seq))
              AND NOT EXISTS (SELECT 1 FROM message_hidden h WHERE h.msg_id = m.id AND h.username = ?)
              ORDER BY m.seq LIMIT ?`,
   setStatus: `UPDATE messages SET status = ?, seq = ? WHERE id = ? AND recipient = ? AND status < ?
@@ -182,6 +211,30 @@ const SQL = {
              ON CONFLICT (id) DO UPDATE SET status = excluded.status, state = excluded.state, updated = excluded.updated`,
   openGames: "SELECT state FROM games WHERE status != 'over' AND updated > ?",
   purgeGames: 'DELETE FROM games WHERE updated < ?',
+
+  // Groups. admin and admins_only are 0/1.
+  insertGroup: 'INSERT INTO groups (id, name, about, creator, created, link) VALUES (?, ?, ?, ?, ?, ?)',
+  getGroup: 'SELECT * FROM groups WHERE id = ?',
+  groupByLink: "SELECT * FROM groups WHERE link = ? AND link != ''",
+  updateGroup: 'UPDATE groups SET name = ?, about = ?, admins_only = ? WHERE id = ?',
+  setGroupLink: 'UPDATE groups SET link = ? WHERE id = ?',
+  bumpEpoch: 'UPDATE groups SET epoch = epoch + 1 WHERE id = ?',
+  setGroupPhotoVer: 'UPDATE groups SET photo_ver = ? WHERE id = ?',
+  deleteGroup: 'DELETE FROM groups WHERE id = ?',
+  addMember: `INSERT INTO group_members (gid, username, admin, joined, from_seq) VALUES (?, ?, ?, ?, ?)
+              ON CONFLICT (gid, username) DO NOTHING`,
+  removeMember: 'DELETE FROM group_members WHERE gid = ? AND username = ?',
+  setAdmin: 'UPDATE group_members SET admin = ? WHERE gid = ? AND username = ?',
+  getMember: 'SELECT * FROM group_members WHERE gid = ? AND username = ?',
+  groupMembers: `SELECT gm.username, gm.admin, gm.joined, u.pubkey FROM group_members gm
+                 JOIN users u ON u.username = gm.username WHERE gm.gid = ? ORDER BY gm.joined, gm.username`,
+  groupsOf: `SELECT g.* FROM groups g JOIN group_members gm ON gm.gid = g.id WHERE gm.username = ?`,
+  shareGroup: `SELECT 1 AS x FROM group_members a JOIN group_members b ON a.gid = b.gid
+               WHERE a.username = ? AND b.username = ? LIMIT 1`,
+  getGroupPhoto: 'SELECT data, type, ver FROM group_photos WHERE gid = ?',
+  setGroupPhoto: `INSERT INTO group_photos (gid, data, type, ver) VALUES (?, ?, ?, ?)
+                  ON CONFLICT (gid) DO UPDATE SET data = excluded.data, type = excluded.type, ver = excluded.ver`,
+  deleteGroupPhoto: 'DELETE FROM group_photos WHERE gid = ?',
 
   getConfig: 'SELECT value FROM config WHERE key = ?',
   setConfig: 'INSERT INTO config (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value',
@@ -267,8 +320,9 @@ async function openMongo(uri) {
   // Use the database named in the URI, or "securechat" if it names none.
   const mdb = client.db(client.options.dbName === 'test' ? 'securechat' : undefined);
   const c = (name) => mdb.collection(name);
-  const [users, sessions, messages, hidden, avatars, friendships, blocks, profiles, pushSubs, games, config] =
-    ['users', 'sessions', 'messages', 'message_hidden', 'avatars', 'friendships', 'blocks', 'profiles', 'push_subs', 'games', 'config'].map(c);
+  const [users, sessions, messages, hidden, avatars, friendships, blocks, profiles, pushSubs, games, config, groups, groupMembers, groupPhotos] =
+    ['users', 'sessions', 'messages', 'message_hidden', 'avatars', 'friendships', 'blocks', 'profiles', 'push_subs', 'games', 'config',
+      'groups', 'group_members', 'group_photos'].map(c);
   await Promise.all([
     sessions.createIndex({ expires: 1 }),
     sessions.createIndex({ username: 1 }),
@@ -279,6 +333,9 @@ async function openMongo(uri) {
     messages.createIndex({ ts: 1 }),
     hidden.createIndex({ username: 1, ts: 1 }),
     friendships.createIndex({ a: 1 }),
+    groupMembers.createIndex({ username: 1 }),
+    groupMembers.createIndex({ gid: 1 }),
+    groups.createIndex({ link: 1 }),
     friendships.createIndex({ b: 1 }),
     blocks.createIndex({ blocked: 1 }),
     pushSubs.createIndex({ username: 1 }),
@@ -288,6 +345,7 @@ async function openMongo(uri) {
   const bytes = (b) => (b && b.buffer instanceof Uint8Array ? b.buffer : b);
   const userRow = (d) => d && { ...d, username: d._id, auth_hash: bytes(d.auth_hash), auth_salt: bytes(d.auth_salt) };
   const msgRow = (d) => d && { ...d, id: d._id };
+  const groupRow = (d) => d && { ...d, id: d._id };
   const changes = (n) => ({ changes: n });
   const insertIgnoringDupes = async (coll, doc) => {
     try { await coll.insertOne(doc); return changes(1); }
@@ -328,15 +386,19 @@ async function openMongo(uri) {
     getMsgById: async (id) => msgRow(await messages.findOne({ _id: id })),
     // Hidden rows are excluded before the limit (like the SQL NOT EXISTS), so a page full of
     // hidden messages can't come back empty and stall the sync.
-    syncMsgs: async (after, me, _me, _me2, limit) => (await messages.aggregate([
-      { $match: { seq: { $gt: after }, $or: [{ recipient: me }, { sender: me }] } },
+    syncMsgs: async (after, me, _me, _me2, _me3, limit) => {
+      const mine = await groupMembers.find({ username: me }).toArray();
+      return (await messages.aggregate([
+      { $match: { seq: { $gt: after }, $or: [{ recipient: me }, { sender: me },
+        ...mine.map((m) => ({ recipient: 'g:' + m.gid, seq: { $gt: m.from_seq } }))] } },
       { $sort: { seq: 1 } },
       { $lookup: { from: 'message_hidden', let: { id: '$_id' }, as: 'h',
         pipeline: [{ $match: { $expr: { $and: [{ $eq: ['$msg_id', '$$id'] }, { $eq: ['$username', me] }] } } }] } },
       { $match: { h: { $size: 0 } } },
       { $limit: limit },
       { $project: { h: 0 } },
-    ]).toArray()).map(msgRow),
+    ]).toArray()).map(msgRow);
+    },
     setStatus: async (status, seq, id, recipient, minStatus) => msgRow(await messages.findOneAndUpdate(
       { _id: id, recipient, status: { $lt: minStatus } },
       { $set: { status, seq } },
@@ -406,6 +468,45 @@ async function openMongo(uri) {
     },
     openGames: async (since) => games.find({ status: { $ne: 'over' }, updated: { $gt: since } }, { projection: { state: 1 } }).toArray(),
     purgeGames: async (cutoff) => changes((await games.deleteMany({ updated: { $lt: cutoff } })).deletedCount),
+
+    insertGroup: async (id, name, about, creator, created, link) => {
+      await groups.insertOne({ _id: id, name, about, creator, created, epoch: 0, admins_only: 0, link, photo_ver: 0 });
+      return changes(1);
+    },
+    getGroup: async (id) => groupRow(await groups.findOne({ _id: id })),
+    groupByLink: async (link) => (link ? groupRow(await groups.findOne({ link })) : undefined),
+    updateGroup: async (name, about, admins_only, id) => changes((await groups.updateOne({ _id: id }, { $set: { name, about, admins_only } })).modifiedCount),
+    setGroupLink: async (link, id) => changes((await groups.updateOne({ _id: id }, { $set: { link } })).modifiedCount),
+    bumpEpoch: async (id) => changes((await groups.updateOne({ _id: id }, { $inc: { epoch: 1 } })).modifiedCount),
+    setGroupPhotoVer: async (ver, id) => changes((await groups.updateOne({ _id: id }, { $set: { photo_ver: ver } })).modifiedCount),
+    deleteGroup: async (id) => changes((await groups.deleteOne({ _id: id })).deletedCount),
+    addMember: (gid, username, admin, joined, from_seq) =>
+      insertIgnoringDupes(groupMembers, { _id: gid + '|' + username, gid, username, admin, joined, from_seq }),
+    removeMember: async (gid, u) => changes((await groupMembers.deleteOne({ _id: gid + '|' + u })).deletedCount),
+    setAdmin: async (admin, gid, u) => changes((await groupMembers.updateOne({ _id: gid + '|' + u }, { $set: { admin } })).modifiedCount),
+    getMember: async (gid, u) => (await groupMembers.findOne({ _id: gid + '|' + u })) ?? undefined,
+    groupMembers: async (gid) => {
+      const ms = await groupMembers.find({ gid }).sort({ joined: 1, username: 1 }).toArray();
+      const keys = new Map((await users.find({ _id: { $in: ms.map((m) => m.username) } }, { projection: { pubkey: 1 } }).toArray()).map((u) => [u._id, u.pubkey]));
+      return ms.filter((m) => keys.has(m.username)).map((m) => ({ username: m.username, admin: m.admin, joined: m.joined, pubkey: keys.get(m.username) }));
+    },
+    groupsOf: async (u) => {
+      const ids = (await groupMembers.find({ username: u }, { projection: { gid: 1 } }).toArray()).map((m) => m.gid);
+      return (await groups.find({ _id: { $in: ids } }).toArray()).map(groupRow);
+    },
+    shareGroup: async (a, b) => {
+      const ids = (await groupMembers.find({ username: a }, { projection: { gid: 1 } }).toArray()).map((m) => m.gid);
+      return (await groupMembers.findOne({ username: b, gid: { $in: ids } })) ? { x: 1 } : undefined;
+    },
+    getGroupPhoto: async (gid) => {
+      const d = await groupPhotos.findOne({ _id: gid });
+      return d && { data: bytes(d.data), type: d.type, ver: d.ver };
+    },
+    setGroupPhoto: async (gid, data, type, ver) => {
+      await groupPhotos.replaceOne({ _id: gid }, { data, type, ver }, { upsert: true });
+      return changes(1);
+    },
+    deleteGroupPhoto: async (gid) => changes((await groupPhotos.deleteOne({ _id: gid })).deletedCount),
 
     getConfig: (key) => config.findOne({ _id: key }),
     setConfig: async (key, value) => {

@@ -10,7 +10,7 @@ import { Shell } from './features/Shell';
 import { joinFromLink } from './features/games/store';
 import { LockScreen } from './features/lock/LockScreen';
 import { useLock } from './lib/applock';
-import { rememberInvite } from './lib/invite';
+import { rememberGroupInvite, rememberInvite } from './lib/invite';
 
 let booted = false;
 
@@ -29,6 +29,8 @@ export function App() {
     // "Join me on Chattrix": /?add=<username>, offered as a friend request once signed in.
     const add = params.get('add');
     if (add) { history.replaceState(null, '', '/'); rememberInvite(add); }
+    const group = params.get('group'); // group invite link
+    if (group) { history.replaceState(null, '', '/'); rememberGroupInvite(group); }
     boot().then(() => {
       // Opened from a notification: /?chat=username
       const chat = new URLSearchParams(location.search).get('chat');

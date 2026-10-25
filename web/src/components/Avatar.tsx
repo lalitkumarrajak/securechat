@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { loadAvatar } from '../lib/engine';
+import { Users } from 'lucide-react';
+import { isGroup } from '../lib/types';
 import { cn } from '../lib/utils';
 import { useApp } from '../state/app';
 
@@ -22,7 +24,7 @@ export function Avatar({ u, name, size = 44, online, className }: {
           style={{ background: `hsl(${hue(u)} 45% 48%)`, fontSize: size * 0.42 }}
           aria-hidden
         >
-          {label[0]?.toUpperCase() || '?'}
+          {isGroup(u) ? <Users style={{ width: size * 0.5, height: size * 0.5 }} /> : label[0]?.toUpperCase() || '?'}
         </span>
       )}
       {online && (

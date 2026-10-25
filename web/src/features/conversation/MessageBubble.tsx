@@ -5,9 +5,11 @@ import { Ticks } from '../../components/Ticks';
 import { reactionSummary } from '../../lib/controls';
 import { emojiOnly, QUICK_REACTIONS } from '../../lib/emoji';
 import { fmtClock } from '../../lib/format';
-import type { Msg } from '../../lib/types';
+import { groupIdOf, isGroup, type Group, type Msg } from '../../lib/types';
+import { senderOf } from '../../lib/controls';
+import { splitMentions } from '../../lib/mentions';
 import { cn, isTouch } from '../../lib/utils';
-import { setApp } from '../../state/app';
+import { setApp, useApp } from '../../state/app';
 import { BigEmoji, Emoji } from './BigEmoji';
 import { FileCard, LinkPreviewCard, LocationCard } from './Attachments';
 import { VoicePlayer } from './VoicePlayer';
@@ -28,7 +30,20 @@ interface Props {
   pinned: boolean;
 }
 
+// In groups, everyone's name gets its own steady colour, like WhatsApp.
+const nameHue = (u: string) => { let h = 0; for (const ch of u) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h % 360; };
+
+/** Display name of a group member (or friend) as I know them. */
+export function useMemberName() {
+  const friends = useApp((s) => s.friends);
+  return (u: string, g?: Group, me?: string) => (u === me ? 'You' : friends[u]?.name || g?.members.find((x) => x.u === u)?.n || u);
+}
+
 export const MessageBubble = memo(function MessageBubble({ m, me, peerName, first, selecting, selected, pinned }: Props) {
+  const group = useApp((s) => (isGroup(m.peer) ? s.groups[groupIdOf(m.peer)] : undefined));
+  const memberName = useMemberName();
+  const from = senderOf(m);
+  const showSender = isGroup(m.peer) && !m.out && first;
   const row = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const press = useRef<{ timer: number; x: number; y: number; dx: number; horizontal: boolean | null; long: boolean } | null>(null);
@@ -131,9 +146,12 @@ export const MessageBubble = memo(function MessageBubble({ m, me, peerName, firs
           {!selecting && !deleted && !isTouch() && (
             <DesktopMenu m={m} open={menuOpen} onOpenChange={setMenuOpen} bare={bare} />
           )}
+          {showSender && (
+            <div className="px-0.5 pb-0.5 text-[13px] font-semibold" style={{ color: `hsl(${nameHue(from)} 55% 45%)` }}>{memberName(from, group)}</div>
+          )}
           {m.fwd && <div className="flex items-center gap-1 px-0.5 text-xs text-muted italic"><Forward className="size-3" /> Forwarded</div>}
-          {m.re && <Quote re={m.re} me={me} peerName={peerName} />}
-          <Body m={m} emoji={emoji} />
+          {m.re && <Quote re={m.re} me={me} peerName={isGroup(m.peer) ? memberName(m.re.f, group) : peerName} />}
+          <Body m={m} emoji={emoji} me={me} members={group?.members.map((x) => x.u)} />
           <Meta m={m} pinned={pinned} bare={bare} />
         </div>
         {m.reacts && Object.keys(m.reacts).length > 0 && <Reactions m={m} me={me} />}
@@ -142,11 +160,17 @@ export const MessageBubble = memo(function MessageBubble({ m, me, peerName, firs
   );
 });
 
-function Body({ m, emoji }: { m: Msg; emoji: string[] | null }) {
+function Body({ m, emoji, me, members }: { m: Msg; emoji: string[] | null; me: string; members?: string[] }) {
   if (m.type === 'deleted') {
     return <span className="flex items-center gap-1.5 pr-14 text-muted italic"><Ban className="size-4" /> {m.out ? 'You deleted this message' : 'This message was deleted'}</span>;
   }
-  if (m.type === 'err') return <span className="flex items-center gap-1.5 pr-14 text-muted italic"><Lock className="size-4" /> This message couldn’t be decrypted</span>;
+  if (m.type === 'err') {
+    return (
+      <span className="flex items-center gap-1.5 pr-14 text-muted italic"><Lock className="size-4" />
+        {m.pending ? 'Waiting for this message. It appears once the sender’s phone is online.' : 'This message couldn’t be decrypted'}
+      </span>
+    );
+  }
   if (emoji) return <BigEmoji parts={emoji} />;
   if (m.type === 'img') {
     return (
@@ -179,7 +203,11 @@ function Body({ m, emoji }: { m: Msg; emoji: string[] | null }) {
   return (
     <>
       {m.lp && <LinkPreviewCard lp={m.lp} out={m.out} />}
-      <span className="whitespace-pre-wrap [overflow-wrap:anywhere]"><Linkify text={m.text || ''} /></span>
+      <span className="whitespace-pre-wrap [overflow-wrap:anywhere]">
+        {members ? splitMentions(m.text || '', members).map((part, i) => part.u ? (
+          <span key={i} className={cn('font-semibold', part.u === me ? 'rounded bg-amber-300/80 px-0.5 text-amber-950' : 'text-accent-ink')}>{part.t}</span>
+        ) : <Linkify key={i} text={part.t} />) : <Linkify text={m.text || ''} />}
+      </span>
     </>
   );
 }

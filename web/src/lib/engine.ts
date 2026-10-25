@@ -5,7 +5,8 @@ import * as C from './crypto.js';
 import * as db from './db';
 import { applyEdit, applyPin, applyReact, senderOf } from './controls';
 import { compressImage, squarePhoto } from './image';
-import type { Chat, Content, Friend, GifItem, LinkPreview, Me, Msg, Request, SearchHit, Session } from './types';
+import type { Chat, Content, Friend, GifItem, Group, LinkPreview, Me, Msg, Request, SearchHit, Session, SysEvent } from './types';
+import { groupIdOf, isGroup } from './types';
 import { prepareFile } from './files';
 import type { LocationContent } from './location';
 import { getApp, setApp } from '../state/app';
@@ -27,6 +28,8 @@ const S = {
   pingTimer: 0,
   pongTimer: 0,
   convKeys: new Map<string, CryptoKey>(),
+  groupKeys: new Map<string, { key: CryptoKey; from: string }>(), // group key id -> key and whose it is
+  inbox: Promise.resolve() as Promise<unknown>,
   inflight: new Set<string>(),
   rcpt: { 1: new Set<number>(), 2: new Set<number>() } as Record<1 | 2, Set<number>>,
   rcptTimer: 0,
@@ -36,7 +39,7 @@ const S = {
 };
 
 const visible = () => document.visibilityState === 'visible';
-const CONTROL = new Set(['react', 'edit', 'pin']);
+const CONTROL = new Set(['react', 'edit', 'pin', 'gkey']);
 
 // ---------- HTTP ----------
 export async function api<T = any>(path: string, body?: unknown): Promise<T> {
@@ -70,7 +73,8 @@ export async function boot() {
   S.hiddenTs = (await db.get('kv', 'hiddenTs')) || 0;
   const me: Me = (await db.get('kv', 'me')) || { u: sess.u, name: '', about: '', privacy: { lastSeen: true, receipts: true }, mutes: {}, av: 0 };
   const fr = (await db.get('kv', 'friends')) || {};
-  setApp({ status: 'app', me, friendsLoaded: !!fr.friends, friends: fr.friends || {}, incoming: fr.incoming || [], outgoing: fr.outgoing || [], blocked: fr.blocked || [], chats: sortChats(await db.all('chats')) });
+  const groups: Record<string, Group> | undefined = await db.get('kv', 'groups');
+  setApp({ status: 'app', me, groups: groups || {}, groupsLoaded: !!groups, friendsLoaded: !!fr.friends, friends: fr.friends || {}, incoming: fr.incoming || [], outgoing: fr.outgoing || [], blocked: fr.blocked || [], chats: sortChats(await db.all('chats')) });
   connect();
   refreshMe().catch(() => {});
   refreshFriends().catch(() => setApp({ friendsLoaded: true }));
@@ -200,7 +204,8 @@ function connect() {
     resetPong();
     let m;
     try { m = JSON.parse(e.data); } catch { return; }
-    handle(m).catch((err) => console.error(err));
+    // One frame at a time, in order: a message and the key that opens it may arrive back to back.
+    S.inbox = S.inbox.then(() => handle(m)).catch((err) => console.error(err));
   };
   ws.onclose = (e) => {
     if (S.ws !== ws) return;
@@ -269,6 +274,7 @@ async function handle(m: any) {
       flushOutbox();
       flushHides();
       wsSend({ t: 'glist' });
+      refreshGroups().catch(() => {});
       break;
     case 'batch': {
       for (const row of m.msgs) await ingest(row, true);
@@ -318,7 +324,14 @@ async function handle(m: any) {
       if (m.ts > S.hiddenTs) { S.hiddenTs = m.ts; await db.put('kv', m.ts, 'hiddenTs'); }
       break;
     case 'typ':
-      showTyping(m.f, m.r ? 'recording' : 'typing');
+      if (isGroup(m.g)) { setApp((s) => ({ typingWho: { ...s.typingWho, [m.g]: m.f } })); showTyping(m.g, m.r ? 'recording' : 'typing'); }
+      else showTyping(m.f, m.r ? 'recording' : 'typing');
+      break;
+    case 'grp': // a group I'm in (or was in) changed
+      refreshGroups().catch(() => {});
+      break;
+    case 'gkeyok':
+      if (m.ref) { S.inflight.delete(m.ref); await db.del('outbox', m.ref); }
       break;
     case 'pres':
       setApp((s) => ({ presence: { ...s.presence, [m.u]: { on: m.on, ls: m.ls, hid: m.hid } } }));
@@ -353,6 +366,8 @@ async function handle(m: any) {
         const msg = await db.getMsg(S.me + '/' + m.cid);
         if (msg) await updateStatus({ ...msg, s: -2 });
         if (m.e === 'not-friends') toast.error('Message not sent', { description: 'You can only message friends who haven’t blocked you.' });
+        if (m.e === 'not-member') toast.error('Message not sent', { description: 'You’re no longer in this group.' });
+        if (m.e === 'admins-only') toast.error('Message not sent', { description: 'Only admins can send messages in this group.' });
       }
       break;
   }
@@ -440,7 +455,8 @@ async function syncAvatar(u: string, ver: number) {
   if ((rec?.ver || 0) === ver) return;
   if (!ver) await db.del('avatars', u);
   else {
-    const res = await fetch('/api/avatar?u=' + encodeURIComponent(u), { headers: { Authorization: 'Bearer ' + S.token } });
+    const url = isGroup(u) ? '/api/groups/photo?id=' + groupIdOf(u) : '/api/avatar?u=' + encodeURIComponent(u);
+    const res = await fetch(url, { headers: { Authorization: 'Bearer ' + S.token } });
     if (!res.ok) return;
     await db.put('avatars', { u, ver, blob: await res.blob() });
   }
@@ -497,8 +513,10 @@ async function updateStatus(m: Msg) {
   if (chat?.lastK === m.k && chat.lastS !== m.s) await saveChat({ ...chat, lastS: m.s });
 }
 
-export const preview = (m: Pick<Msg, 'type' | 'text' | 'dur' | 'file'>) =>
-  m.type === 'img' ? '📷 Photo' + (m.text ? ': ' + m.text : '')
+export const preview = (m: Pick<Msg, 'type' | 'text' | 'dur' | 'file'> & Partial<Pick<Msg, 'sys' | 'pending' | 'peer'>>): string =>
+  m.type === 'sys' && m.sys ? sysText(m.sys, m.peer ? getApp().groups[groupIdOf(m.peer)] : undefined)
+    : m.pending ? '🔒 Waiting for this message'
+    : m.type === 'img' ? '📷 Photo' + (m.text ? ': ' + m.text : '')
     : m.type === 'voice' ? `🎤 Voice message`
     : m.type === 'gif' ? 'GIF'
     : m.type === 'file' ? '📄 ' + (m.file?.name || 'File')
@@ -568,9 +586,10 @@ async function convKey(peer: string) {
   return S.convKeys.get(peer)!;
 }
 
-async function ingest(row: any, fromSync: boolean) {
+async function ingest(row: any, fromSync: boolean): Promise<void> {
   const out = row.f === S.me;
-  const peer = out ? row.to : row.f;
+  const group = isGroup(row.to);
+  const peer = group ? row.to : out ? row.to : row.f;
   const k = row.f + '/' + row.cid;
   const existing = await db.getMsg(k);
 
@@ -588,9 +607,20 @@ async function ingest(row: any, fromSync: boolean) {
     return;
   }
 
+  if (group && row.b.startsWith('sys:')) return ingestSystem(row, peer, fromSync);
+
   let content: any;
-  try { content = await C.decryptMessage(await convKey(peer), row.b, row.f, row.to, row.cid); }
-  catch { content = { type: 'err' }; }
+  if (group) {
+    const kid = C.bodyKeyId(row.b);
+    const gk = await groupKey(kid);
+    if (!gk) return holdForKey(kid, row, peer, fromSync);
+    // Each member's key only opens that member's messages.
+    try { content = gk.from === row.f ? await C.decryptGroup(gk.key, row.b, row.f, row.to, row.cid) : { type: 'err' }; }
+    catch { content = { type: 'err' }; }
+  } else {
+    try { content = await C.decryptMessage(await convKey(peer), row.b, row.f, row.to, row.cid); }
+    catch { content = { type: 'err' }; }
+  }
 
   if (CONTROL.has(content?.type)) {
     await db.put('kv', 1, 'ctl/' + k); // remember it was a control, not a message
@@ -599,25 +629,149 @@ async function ingest(row: any, fromSync: boolean) {
   }
 
   const viewing = getApp().active === peer && visible();
-  const msg: Msg = { k, cid: row.cid, id: row.id, peer, out, ts: row.ts, s: !out && viewing ? 2 : row.s, ...pick(content) } as Msg;
+  const mn = group && Array.isArray(content?.mn) ? content.mn.filter((u: unknown) => typeof u === 'string').slice(0, 50) : undefined;
+  const msg: Msg = { k, cid: row.cid, id: row.id, peer, out, ts: row.ts, s: !out && viewing ? 2 : row.s, ...pick(content), ...(mn?.length && { mn }) } as Msg;
   await db.putMsg(msg);
   await bumpChat(peer, msg, !out && row.s < 2 && !viewing, fromSync);
-  if (!out && row.s < 2) queueReceipt(row.id, viewing ? 2 : 1);
+  if (!out && row.s < 2 && !group) queueReceipt(row.id, viewing ? 2 : 1); // no read receipts in groups (yet)
   if (!out) clearTyping(peer);
   if (fromSync) return;
   showMessage(msg);
   if (!out) alertIncoming(peer, msg);
 }
 
+// ---------- groups: keys and system notes ----------
+async function groupKey(kid: string) {
+  if (!S.groupKeys.has(kid)) {
+    const rec = await db.get('kv', 'gk/' + kid);
+    if (!rec) return null;
+    S.groupKeys.set(kid, { key: await C.importGroupKey(rec.raw), from: rec.from });
+  }
+  return S.groupKeys.get(kid)!;
+}
+
+// A group message whose key hasn't reached this device yet: show a placeholder, and decrypt it
+// when the key arrives.
+async function holdForKey(kid: string, row: any, peer: string, fromSync: boolean): Promise<void> {
+  const rows: any[] = (await db.get('kv', 'pend/' + kid)) || [];
+  if (!rows.some((r) => r.cid === row.cid && r.f === row.f)) rows.push(row);
+  await db.put('kv', rows.slice(-500), 'pend/' + kid);
+  if (await db.get('kv', 'gk/' + kid)) { await db.del('kv', 'pend/' + kid); return ingest(row, fromSync); } // the key just arrived
+  const msg: Msg = { k: row.f + '/' + row.cid, cid: row.cid, id: row.id, peer, out: row.f === S.me, ts: row.ts, s: row.s, type: 'err', pending: true };
+  await db.putMsg(msg);
+  await bumpChat(peer, msg, false, fromSync);
+  if (!fromSync) showMessage(msg);
+}
+
+async function storeGroupKey(c: any, from: string) {
+  if (typeof c.g !== 'string' || typeof c.kid !== 'string' || c.kid.length !== 16 || typeof c.key !== 'string' || c.key.length !== 44) return;
+  if (await db.get('kv', 'gk/' + c.kid)) return; // first one wins: nobody can replace someone else's key
+  await db.put('kv', { gid: c.g, raw: c.key, from }, 'gk/' + c.kid);
+  const rows: any[] = (await db.get('kv', 'pend/' + c.kid)) || [];
+  await db.del('kv', 'pend/' + c.kid);
+  for (const row of rows) {
+    await db.del('msgs', row.f + '/' + row.cid);
+    await ingest(row, true);
+  }
+  const active = getApp().active;
+  if (rows.length && active) await loadMessages(active);
+}
+
+const nameOf = (u: string, group?: Group) =>
+  u === S.me ? 'You' : getApp().friends[u]?.name || group?.members.find((m) => m.u === u)?.n || u;
+const names = (us: string[] = [], g?: Group) => us.map((u) => nameOf(u, g)).join(', ');
+
+/** "Lalit added Rakhi", "You changed the group name to …" */
+export function sysText(ev: SysEvent, g?: Group) {
+  const by = nameOf(ev.by, g);
+  switch (ev.e) {
+    case 'create': return `${by} created the group “${ev.name}”`;
+    case 'add': return `${by} added ${names(ev.u, g)}`;
+    case 'remove': return `${by} removed ${names(ev.u, g)}`;
+    case 'left': return `${by} left`;
+    case 'joined': return `${by} joined using the invite link`;
+    case 'admin': return ev.auto ? `${names(ev.u, g)} ${ev.u?.[0] === S.me ? 'are' : 'is'} now an admin` : `${by} made ${names(ev.u, g)} an admin`;
+    case 'unadmin': return `${by} dismissed ${names(ev.u, g)} as admin`;
+    case 'name': return `${by} changed the group name to “${ev.name}”`;
+    case 'about': return `${by} changed the group description`;
+    case 'photo': return ev.on ? `${by} changed the group photo` : `${by} removed the group photo`;
+    case 'adminsOnly': return ev.on ? `${by} set it so only admins can send messages` : `${by} let everyone send messages`;
+    default: return 'Group updated';
+  }
+}
+
+async function ingestSystem(row: any, peer: string, fromSync: boolean) {
+  let ev: SysEvent;
+  try { ev = { ...JSON.parse(row.b.slice(4)), by: row.f }; } catch { return; }
+  const msg: Msg = { k: row.f + '/' + row.cid, cid: row.cid, id: row.id, peer, out: false, ts: row.ts, s: 2, type: 'sys', sys: ev };
+  await db.putMsg(msg);
+  await bumpChat(peer, msg, false, fromSync);
+  if (!fromSync) showMessage(msg);
+}
+
+export async function refreshGroups() {
+  const { groups } = await api<{ groups: Group[] }>('/api/groups');
+  const map = Object.fromEntries(groups.map((g) => [g.id, g]));
+  setApp({ groups: map, groupsLoaded: true });
+  await db.put('kv', map, 'groups');
+  const changed: Record<string, boolean> = {};
+  for (const g of groups) {
+    // Pin group-mates' keys on first sight, like friends'; a changed key pauses handing them group keys.
+    for (const m of g.members) {
+      if (m.u === S.me || getApp().friends[m.u]) continue;
+      const p = await db.get('peers', m.u);
+      if (!p) await db.put('peers', { u: m.u, pub: m.pub });
+      else if (p.pub !== m.pub && !p.changed) { await db.put('peers', { ...p, newPub: m.pub, changed: true }); changed[m.u] = true; }
+    }
+    syncAvatar('g:' + g.id, g.photo).catch(() => {});
+    if (!(await db.getChat('g:' + g.id))) {
+      const joined = g.members.find((m) => m.u === S.me)?.joined || Date.now();
+      await saveChat({ ...newChat('g:' + g.id), ts: joined, last: '' });
+    }
+  }
+  if (Object.keys(changed).length) setApp((s) => ({ keyChanged: { ...s.keyChanged, ...changed } }));
+}
+
+// The key this device sends with in a group. Made fresh for every membership "epoch" (someone
+// left or was removed) and handed to each member, and my other devices, who don't have it yet.
+async function groupSendingKey(gid: string) {
+  const g = getApp().groups[gid];
+  if (!g) throw new Error('You’re no longer in this group');
+  let cur: { kid: string; raw: string; epoch: number; to: string[] } | undefined = await db.get('kv', 'gsend/' + gid);
+  if (!cur || cur.epoch !== g.epoch) {
+    const k = C.newGroupKey();
+    cur = { kid: k.kid, raw: k.raw, epoch: g.epoch, to: [] };
+    await db.put('kv', { gid: 'g:' + gid, raw: k.raw, from: S.me }, 'gk/' + k.kid);
+  }
+  const keys: { u: string; cid: string; b: string }[] = [];
+  for (const m of g.members) {
+    if (cur.to.includes(m.u) || (m.u !== S.me && await peerKeyChanged(m.u))) continue;
+    try {
+      const cid = C.randomId();
+      keys.push({ u: m.u, cid, b: await C.encryptMessage(await convKey(m.u), { type: 'gkey', g: 'g:' + gid, kid: cur.kid, key: cur.raw }, S.me, m.u, cid) });
+    } catch { /* their key isn't available yet: next time */ }
+  }
+  if (keys.length) {
+    // Through the outbox, ahead of the message, so it goes out even if we're offline right now.
+    await db.put('outbox', { cid: 'gk' + C.randomId(12), kind: 'gkey', g: 'g:' + gid, keys, ts: Date.now() - 1 });
+    cur.to = [...cur.to, ...keys.map((k) => k.u)];
+  }
+  await db.put('kv', cur, 'gsend/' + gid);
+  return { kid: cur.kid, key: (await groupKey(cur.kid))!.key };
+}
+
 async function bumpChat(peer: string, msg: Msg, unread: boolean, fromSync: boolean) {
   const chat = (await db.getChat(peer)) || newChat(peer);
-  if (msg.ts >= chat.ts) Object.assign(chat, { ts: msg.ts, last: preview(msg), lastOut: msg.out, lastK: msg.k, lastS: msg.s });
+  // In groups the list shows who said it: "Rakhi: see you".
+  const who = isGroup(peer) && !msg.out && msg.type !== 'sys' ? nameOf(senderOf(msg), getApp().groups[groupIdOf(peer)]) + ': ' : '';
+  if (msg.ts >= chat.ts) Object.assign(chat, { ts: msg.ts, last: who + preview(msg), lastOut: msg.out, lastK: msg.k, lastS: msg.s });
   if (unread) chat.unread++;
   if (!msg.out && chat.archived && !isMuted(peer)) chat.archived = false; // new message un-archives, like WhatsApp
   if (fromSync) await db.putChat(chat); else await saveChat(chat);
 }
 
 async function applyControl(c: any, from: string, ts: number, peer: string) {
+  if (c.type === 'gkey') return storeGroupKey(c, from);
   if (typeof c.k !== 'string') return;
   if (c.type === 'pin') {
     const target = await db.getMsg(c.k);
@@ -684,7 +838,7 @@ function flushReceipts() {
 
 export async function markRead(peer: string) {
   if (!visible()) return;
-  const msgs = await db.recentMessages(peer, 500);
+  const msgs = isGroup(peer) ? [] : await db.recentMessages(peer, 500);
   for (const m of msgs) {
     if (!m.out && m.s < 2 && m.id != null) {
       m.s = 2;
@@ -702,23 +856,33 @@ async function peerKeyChanged(peer: string) {
   return !!p?.changed;
 }
 
-async function encryptAndQueue(peer: string, content: Content, quiet: boolean) {
+async function encryptAndQueue(peer: string, content: Content, quiet: boolean, mn?: string[]) {
   const cid = C.randomId();
+  let b: string;
+  if (isGroup(peer)) {
+    const { kid, key } = await groupSendingKey(groupIdOf(peer));
+    b = await C.encryptGroup(key, kid, content, S.me, peer, cid);
+  } else b = await C.encryptMessage(await convKey(peer), content, S.me, peer, cid);
   const ts = Date.now();
-  const b = await C.encryptMessage(await convKey(peer), content, S.me, peer, cid);
-  await db.put('outbox', { cid, to: peer, b, ts, ...(quiet && { q: 1 }) });
+  await db.put('outbox', { cid, to: peer, b, ts, ...(quiet && { q: 1 }), ...(mn?.length && { mn }) });
   return { cid, ts };
 }
 
 /** Send a message bubble (text, photo or voice). */
-export async function sendContent(peer: string, content: Extract<Content, { type: 'text' | 'img' | 'voice' | 'gif' | 'sticker' | 'file' | 'location' }>) {
-  if (await peerKeyChanged(peer)) {
+export async function sendContent(peer: string, content: Extract<Content, { type: 'text' | 'img' | 'voice' | 'gif' | 'sticker' | 'file' | 'location' }>, mn?: string[]) {
+  if (isGroup(peer)) {
+    const g = getApp().groups[groupIdOf(peer)];
+    if (!g) { toast.error('You’re no longer in this group'); return; }
+    if (g.adminsOnly && !g.admin) { toast.error('Only admins can send messages in this group'); return; }
+    // Who's @mentioned rides inside the encrypted message (for highlighting) and next to it (for their notification).
+    if (mn?.length) (content as any).mn = mn;
+  } else if (await peerKeyChanged(peer)) {
     setApp((s) => ({ keyChanged: { ...s.keyChanged, [peer]: true } }));
     toast.warning('Sending is paused', { description: 'This contact’s security code changed. Verify it first.' });
     return;
   }
-  const { cid, ts } = await encryptAndQueue(peer, content, false);
-  const msg = { k: S.me + '/' + cid, cid, peer, out: true, ts, s: -1, ...pick(content) } as Msg;
+  const { cid, ts } = await encryptAndQueue(peer, content, false, mn);
+  const msg = { k: S.me + '/' + cid, cid, peer, out: true, ts, s: -1, ...pick(content), ...(mn?.length && { mn }) } as Msg;
   await db.putMsg(msg);
   await bumpChat(peer, msg, false, false);
   showMessage(msg);
@@ -738,7 +902,9 @@ async function flushOutbox() {
   const items = (await db.all('outbox')).sort((a, b) => a.ts - b.ts);
   for (const o of items) {
     if (S.inflight.has(o.cid)) continue;
-    if (!wsSend({ t: 'msg', cid: o.cid, to: o.to, b: o.b, ...(o.q && { q: 1 }) })) break;
+    const frame = o.kind === 'gkey' ? { t: 'gkey', g: o.g, keys: o.keys, ref: o.cid }
+      : { t: 'msg', cid: o.cid, to: o.to, b: o.b, ...(o.q && { q: 1 }), ...(o.mn && { mn: o.mn }) };
+    if (!wsSend(frame)) break;
     S.inflight.add(o.cid);
   }
 }
@@ -761,8 +927,8 @@ function contentOf(m: Msg): Extract<Content, { type: 'text' | 'img' | 'voice' | 
   return null;
 }
 
-export async function sendText(peer: string, text: string, re?: Msg | null, lp?: LinkPreview | null) {
-  await sendContent(peer, { type: 'text', text, ...(re && { re: replyRef(re) }), ...(lp && { lp }) });
+export async function sendText(peer: string, text: string, re?: Msg | null, lp?: LinkPreview | null, mn?: string[]) {
+  await sendContent(peer, { type: 'text', text, ...(re && { re: replyRef(re) }), ...(lp && { lp }) }, mn);
 }
 
 export async function sendFile(peer: string, file: File, re?: Msg | null) {
@@ -904,11 +1070,19 @@ export async function openChat(peer: string) {
   if (!(await db.getChat(peer))) await saveChat(newChat(peer));
   await loadMessages(peer);
   markRead(peer);
-  wsSend({ t: 'watch', u: peer });
+  if (!isGroup(peer)) wsSend({ t: 'watch', u: peer });
   askNotifyPermissionOnce();
 }
 
 const closedChat = { active: null, messages: [], replyTo: null, editing: null, selection: null, searchOpen: false, searchQuery: '', highlight: null };
+
+/** Remove a chat and its messages from this device (e.g. a group you left). */
+export async function deleteChatHere(peer: string) {
+  if (getApp().active === peer) closeChat();
+  for (const m of await db.recentMessages(peer, 1_000_000)) await db.del('msgs', m.k);
+  await db.del('chats', peer);
+  setApp((s) => ({ chats: s.chats.filter((c) => c.peer !== peer) }));
+}
 
 export function closeChat() {
   setApp(closedChat);
@@ -970,15 +1144,19 @@ function playSound() {
 }
 
 function alertIncoming(peer: string, msg: Msg) {
-  if (isMuted(peer)) return;
+  if (msg.type === 'sys') return;
+  const mentioned = !!msg.mn?.includes(S.me);
+  if (isMuted(peer) && !mentioned) return; // an @mention gets through a muted group, like WhatsApp
   const viewingThis = getApp().active === peer && visible();
   if (viewingThis) return;
   if (useSettings.getState().sound && visible()) playSound();
   // Hidden tab: if push is on the server notifies; otherwise show a notification from the page.
   if (!visible() && !useSettings.getState().push && 'Notification' in window && Notification.permission === 'granted') {
-    const name = getApp().friends[peer]?.name || peer;
+    const group = isGroup(peer) ? getApp().groups[groupIdOf(peer)] : undefined;
+    const name = group?.name || getApp().friends[peer]?.name || peer;
+    const body = group ? `${nameOf(senderOf(msg), group)}${mentioned ? ' mentioned you' : ''}: ${preview(msg)}` : preview(msg);
     navigator.serviceWorker?.ready.then((reg) => reg.showNotification(name, {
-      body: preview(msg), icon: '/icon-192.png', tag: 'chat-' + peer, data: { peer },
+      body, icon: '/icon-192.png', tag: 'chat-' + peer, data: { peer },
     })).catch(() => {});
   }
 }

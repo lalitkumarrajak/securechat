@@ -1,10 +1,10 @@
 // Runtime state for the UI. The engine (lib/engine.ts) writes to it; components read it.
 import { create } from 'zustand';
-import type { Chat, Friend, Me, Msg, Presence, Request } from '../lib/types';
+import type { Chat, Friend, Group, Me, Msg, Presence, Request } from '../lib/types';
 
 export type Status = 'loading' | 'auth' | 'app';
 export type Conn = 'online' | 'connecting' | 'offline';
-export type Panel = null | 'settings' | 'friends' | 'contact' | 'archived';
+export type Panel = null | 'settings' | 'friends' | 'contact' | 'archived' | 'group' | 'newgroup';
 
 export interface AppState {
   status: Status;
@@ -24,6 +24,9 @@ export interface AppState {
   messages: Msg[];                       // messages of the open chat, oldest first
   presence: Record<string, Presence>;
   typing: Record<string, 'typing' | 'recording'>;
+  typingWho: Record<string, string>;     // group peer -> who is typing there
+  groups: Record<string, Group>;         // my groups by id
+  groupsLoaded: boolean;
   avatars: Record<string, string | null>; // username -> object URL of their photo (null = none)
   keyChanged: Record<string, boolean>;
   replyTo: Msg | null;
@@ -54,6 +57,9 @@ export const useApp = create<AppState>(() => ({
   messages: [],
   presence: {},
   typing: {},
+  typingWho: {},
+  groups: {},
+  groupsLoaded: false,
   avatars: {},
   keyChanged: {},
   replyTo: null,

@@ -103,3 +103,21 @@ export async function safetyNumber(userA, pubA, userB, pubB) {
   }
   return groups;
 }
+
+// Groups: every member encrypts with their own random group key (a "sender key"), handed to the
+// other members pairwise. A group message body is the key's id (16 base64 characters) followed
+// by the AES-GCM ciphertext, authenticated with sender, group, message id and key id.
+export const groupKeyId = () => b64(crypto.getRandomValues(new Uint8Array(12)));
+export const importGroupKey = (rawB64) => subtle.importKey('raw', unb64(rawB64), 'AES-GCM', false, ['encrypt', 'decrypt']);
+export function newGroupKey() {
+  return { kid: groupKeyId(), raw: b64(crypto.getRandomValues(new Uint8Array(32))) };
+}
+const groupAad = (from, to, cid, kid) => `${from}>${to}|${cid}|${kid}`;
+export async function encryptGroup(key, kid, obj, from, to, cid) {
+  return kid + await seal(key, te.encode(JSON.stringify(obj)), groupAad(from, to, cid, kid));
+}
+export const bodyKeyId = (body) => body.slice(0, 16);
+export async function decryptGroup(key, body, from, to, cid) {
+  const kid = body.slice(0, 16);
+  return JSON.parse(td.decode(await open(key, body.slice(16), groupAad(from, to, cid, kid))));
+}

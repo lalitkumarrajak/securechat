@@ -13,6 +13,10 @@ import { ExpressionPanel, type PanelTab } from './ExpressionPanel';
 import { cn, isTouch } from '../../lib/utils';
 import { VoiceRecorder } from '../../lib/voice';
 import { getApp, setApp, useApp } from '../../state/app';
+import { insertMention, mentionQuery, mentioned } from '../../lib/mentions';
+import { groupIdOf, isGroup } from '../../lib/types';
+import { Avatar } from '../../components/Avatar';
+import { useMemberName } from './MessageBubble';
 import { useSettings } from '../../state/settings';
 
 export function Composer({ peer, peerName }: { peer: string; peerName: string }) {
@@ -23,6 +27,20 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
   const [text, setText] = useState(() => getApp().chats.find((c) => c.peer === peer)?.draft || '');
   const [recording, setRecording] = useState(false);
   const [panel, setPanel] = useState<PanelTab | null>(null); // emoji / GIF / sticker panel
+  // @mentions in groups: the "@na…" being typed, and which suggestion is highlighted
+  const group = useApp((s) => (isGroup(peer) ? s.groups[groupIdOf(peer)] : undefined));
+  const memberName = useMemberName();
+  const [tag, setTag] = useState<{ start: number; q: string } | null>(null);
+  const [pick, setPick] = useState(0);
+  const others = (group?.members || []).filter((m) => m.u !== me());
+  const suggestions = tag ? others.filter((m) => m.u.includes(tag.q) || memberName(m.u, group).toLowerCase().includes(tag.q)).slice(0, 6) : [];
+  function chooseMention(u: string) {
+    if (!tag) return;
+    const r = insertMention(text, input.current?.selectionStart ?? text.length, tag.start, u);
+    change(r.text);
+    setTag(null);
+    requestAnimationFrame(() => { input.current?.focus(); input.current?.setSelectionRange(r.cursor, r.cursor); });
+  }
   useEffect(() => { // Esc closes the panel before anything else
     if (!panel) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); setPanel(null); } };
@@ -48,6 +66,7 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
 
   function change(v: string) {
     setText(v);
+    if (group) { setTag(mentionQuery(v, input.current?.selectionStart ?? v.length)); setPick(0); }
     if (!editing) saveDraft(peer, v);
     if (v) sendTyping(peer);
   }
@@ -68,7 +87,9 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
     setApp({ replyTo: null });
     const lp = link.preview; // only set while the text still contains that link
     link.clear();
-    sendText(peer, t, replyTo, lp).catch((e) => toast.error(e.message));
+    const mn = group ? mentioned(t, others.map((m) => m.u)) : undefined;
+    setTag(null);
+    sendText(peer, t, replyTo, lp, mn).catch((e) => toast.error(e.message));
   }
 
   async function photo(file?: File | null) {
@@ -135,7 +156,21 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
 
   const empty = !text.trim();
   return (
-    <div className={cn('shrink-0 border-t border-line bg-panel', !panel && 'pb-[max(0.5rem,env(safe-area-inset-bottom))]')}>
+    <div className={cn('relative shrink-0 border-t border-line bg-panel', !panel && 'pb-[max(0.5rem,env(safe-area-inset-bottom))]')}>
+      {suggestions.length > 0 && (
+        <ul className="absolute bottom-full left-2 z-20 mb-1 w-[min(22rem,calc(100%-1rem))] overflow-hidden rounded-2xl border border-line bg-panel shadow-xl" role="listbox" aria-label="Mention someone">
+          {suggestions.map((m, i) => (
+            <li key={m.u} role="option" aria-selected={i === pick}>
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => chooseMention(m.u)}
+                className={cn('flex w-full items-center gap-3 px-3 py-2 text-left', i === pick ? 'bg-hover' : 'hover:bg-hover')}>
+                <Avatar u={m.u} name={m.n} size={32} />
+                <span className="min-w-0 flex-1 truncate font-medium">{memberName(m.u, group)}</span>
+                <span className="text-sm text-muted">@{m.u}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       {link.preview && !editing && <LinkCard lp={link.preview} onClose={link.dismiss} />}
       {(replyTo || editing) && <ContextBar m={(editing || replyTo)!} editing={!!editing} peerName={peerName}
         onClose={() => { if (editing) { setApp({ editing: null }); setText(getApp().chats.find((c) => c.peer === peer)?.draft || ''); } else setApp({ replyTo: null }); }} />}
@@ -153,6 +188,11 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
           value={text}
           onChange={(e) => change(e.target.value)}
           onKeyDown={(e) => {
+            if (suggestions.length) { // picking someone to @mention
+              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); setPick((i) => (i + (e.key === 'ArrowDown' ? 1 : suggestions.length - 1)) % suggestions.length); return; }
+              if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); chooseMention(suggestions[pick].u); return; }
+              if (e.key === 'Escape') { e.preventDefault(); setTag(null); return; }
+            }
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && enterToSend) { e.preventDefault(); submit(); }
             if (e.key === 'Escape' && (replyTo || editing)) { e.preventDefault(); setApp({ replyTo: null, editing: null }); }
           }}
@@ -163,7 +203,7 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
           onFocus={() => { if (isTouch()) setPanel(null); }} // typing again: keyboard replaces the panel
           rows={1}
           maxLength={8000}
-          placeholder={editing ? 'Edit message' : 'Message'}
+          placeholder={editing ? 'Edit message' : group ? 'Message · @ to mention' : 'Message'}
           aria-label="Message"
           className={cn('max-h-40 min-h-11 min-w-0 flex-1 resize-none bg-transparent py-2.5 text-[0.95rem] leading-snug outline-none placeholder:text-muted', editing && 'pl-4')}
         />
@@ -196,7 +236,9 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
 }
 
 function ContextBar({ m, editing, peerName, onClose }: { m: Msg; editing: boolean; peerName: string; onClose: () => void }) {
-  const who = senderOf(m) === me() ? 'You' : peerName;
+  const group = useApp((s) => (isGroup(m.peer) ? s.groups[groupIdOf(m.peer)] : undefined));
+  const memberName = useMemberName();
+  const who = senderOf(m) === me() ? 'You' : group ? memberName(senderOf(m), group) : peerName;
   return (
     <div className="flex items-center gap-2 px-3 pt-2">
       <div className="min-w-0 flex-1 rounded-xl border-l-4 border-accent bg-panel-2 px-3 py-1.5">

@@ -68,7 +68,7 @@ export async function migrateFriends() {
   if (await ctx.db.get('getConfig', 'friends_migrated')) return 0;
   let n = 0;
   for (const { sender, recipient } of await ctx.db.all('chatPairs')) {
-    if (sender === recipient) continue;
+    if (sender === recipient || recipient.startsWith('g:')) continue; // group messages aren't pairs
     const [a, b] = pair(sender, recipient);
     n += (await ctx.db.run('insertFriendship', a, b, 'accepted', sender, Date.now())).changes;
   }
@@ -116,7 +116,9 @@ export const routes = {
   'GET /api/key': async (req, res, me, token, url) => {
     const u = String(url.searchParams.get('u') || '');
     const f = USER_RE.test(u) && u !== me ? await ctx.db.get('getFriendship', ...pair(me, u)) : null;
-    const user = f?.status === 'accepted' ? await ctx.db.get('getUser', u) : null;
+    // Friends, and people you share a group with (group keys are handed over pairwise).
+    const ok = f?.status === 'accepted' || (USER_RE.test(u) && (u === me || await profileHooks.shareGroup(me, u)));
+    const user = ok ? await ctx.db.get('getUser', u) : null;
     if (!user) return sendJson(res, 404, { error: 'Not your friend' });
     sendJson(res, 200, { u: user.username, pub: user.pubkey });
   },
