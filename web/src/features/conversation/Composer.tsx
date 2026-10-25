@@ -23,6 +23,12 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
   const [text, setText] = useState(() => getApp().chats.find((c) => c.peer === peer)?.draft || '');
   const [recording, setRecording] = useState(false);
   const [panel, setPanel] = useState<PanelTab | null>(null); // emoji / GIF / sticker panel
+  useEffect(() => { // Esc closes the panel before anything else
+    if (!panel) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); setPanel(null); } };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [panel]);
   const camera = useRef<HTMLInputElement>(null);
   const link = useLinkPreview(editing ? '' : text);
 
@@ -148,7 +154,7 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
           onChange={(e) => change(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && enterToSend) { e.preventDefault(); submit(); }
-            if (e.key === 'Escape') setApp({ replyTo: null, editing: null });
+            if (e.key === 'Escape' && (replyTo || editing)) { e.preventDefault(); setApp({ replyTo: null, editing: null }); }
           }}
           onPaste={(e) => {
             const file = [...e.clipboardData.files].find((f) => f.type.startsWith('image/'));

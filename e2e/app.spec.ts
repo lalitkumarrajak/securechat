@@ -426,6 +426,36 @@ test('select several to forward or delete; edit from the selection bar', async (
   await A.page.getByRole('button', { name: 'Cancel selection' }).click();
 });
 
+test('Esc and the phone back button close the chat, like WhatsApp', async () => {
+  const options = A.page.locator('header').getByRole('button', { name: 'Chat options' });
+  const chatList = A.page.getByRole('heading', { level: 1, name: A.u });
+  await expect(options).toBeVisible();
+  // Esc in an open menu only closes the menu
+  await options.click();
+  await A.page.keyboard.press('Escape');
+  await expect(A.page.getByRole('menu')).toHaveCount(0);
+  await expect(options).toBeVisible();
+  // Then search closes first, then the chat (on phones the list comes back)
+  await options.click();
+  await A.page.getByRole('menuitem', { name: 'Search' }).click();
+  await expect(A.page.getByPlaceholder('Search messages')).toBeVisible();
+  await A.page.keyboard.press('Escape');
+  await expect(A.page.getByPlaceholder('Search messages')).toHaveCount(0);
+  await expect(options).toBeVisible();
+  await A.page.keyboard.press('Escape');
+  await expect(options).toHaveCount(0);
+  await expect(chatList).toBeVisible();
+  // The back button closes the chat but stays in the app
+  const row = A.page.locator('aside li').filter({ hasText: B.u }).first();
+  await row.click();
+  await expect(options).toBeVisible();
+  await A.page.goBack();
+  await expect(options).toHaveCount(0);
+  await expect(chatList).toBeVisible();
+  await row.click(); // back into the chat for the next tests
+  await expect(options).toBeVisible();
+});
+
 test('block stops messages', async () => {
   await B.page.locator('header').getByRole('button', { name: 'Chat options' }).click();
   await B.page.getByRole('menuitem', { name: 'Block' }).click();

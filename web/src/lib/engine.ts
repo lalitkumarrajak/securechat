@@ -893,6 +893,7 @@ function clearTyping(peer: string) {
 // ---------- open / close chats ----------
 export async function openChat(peer: string) {
   const prev = getApp().active;
+  if (!history.state?.chat) history.pushState({ chat: true }, '');
   setApp({
     active: peer, panel: null,
     ...(prev !== peer && { messages: [], replyTo: null, editing: null, selection: null, searchOpen: false, searchQuery: '', highlight: null }),
@@ -904,9 +905,17 @@ export async function openChat(peer: string) {
   askNotifyPermissionOnce();
 }
 
+const closedChat = { active: null, messages: [], replyTo: null, editing: null, selection: null, searchOpen: false, searchQuery: '', highlight: null };
+
 export function closeChat() {
-  setApp({ active: null, messages: [], replyTo: null, editing: null, selection: null, searchOpen: false, highlight: null });
+  setApp(closedChat);
+  if (history.state?.chat) history.back(); // drop the entry openChat added (its popstate is then a no-op)
 }
+
+// Phones: the back button closes the open chat, like WhatsApp, instead of leaving the app.
+// Opening a chat adds one history entry; going back removes it and closes the chat.
+if (history.state?.chat) history.replaceState(null, ''); // left over from before a reload
+window.addEventListener('popstate', () => { if (getApp().active) setApp(closedChat); });
 
 export async function setArchived(peer: string, archived: boolean) {
   const chat = (await db.getChat(peer)) || newChat(peer);

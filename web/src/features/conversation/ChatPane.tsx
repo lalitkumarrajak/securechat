@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
   Archive, ArchiveRestore, ArrowLeft, Bell, BellOff, ChevronDown, ChevronUp, Copy, Forward, Lock, MoreVertical, Pencil, Pin, Reply,
@@ -13,13 +13,14 @@ import {
 } from '../../lib/engine';
 import { fmtLastSeen } from '../../lib/format';
 import { displayName } from '../../lib/types';
-import { setApp, useApp } from '../../state/app';
+import { getApp, setApp, useApp } from '../../state/app';
 import { useSettings } from '../../state/settings';
 import { Composer } from './Composer';
 import { MessageList } from './MessageList';
 import { ChatDialogs } from './ChatDialogs';
 import { deleteFlow, setChatUi, startEdit, startReply } from './chatUi';
 import { openPicker } from '../games/store';
+import { useGames } from '../games/store';
 import { canEdit } from '../../lib/controls';
 
 export function EmptyPane() {
@@ -36,7 +37,27 @@ export function EmptyPane() {
   );
 }
 
+// Esc closes the top-most thing first (menus and dialogs claim it themselves), then selection,
+// search, a reply or edit being written, and finally the chat itself, like WhatsApp.
+function useEscapeToClose() {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || e.repeat) return;
+      if (useGames.getState().open || useGames.getState().picker) return; // a game screen is on top
+      const s = getApp();
+      if (s.panel) return;
+      if (s.selection) setApp({ selection: null });
+      else if (s.searchOpen) setApp({ searchOpen: false, searchQuery: '' });
+      else if (s.replyTo || s.editing) setApp({ replyTo: null, editing: null });
+      else closeChat();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+}
+
 export function ChatPane({ peer }: { peer: string }) {
+  useEscapeToClose();
   const friend = useApp((s) => s.friends[peer]);
   const selection = useApp((s) => s.selection);
   const searchOpen = useApp((s) => s.searchOpen);
@@ -206,7 +227,7 @@ function SearchBar() {
         onChange={(e) => { setApp({ searchQuery: e.target.value }); setIndex(-1); }}
         onKeyDown={(e) => {
           if (e.key === 'Enter') go(e.shiftKey ? index - 1 : index + 1); // Enter: next older match
-          if (e.key === 'Escape') setApp({ searchOpen: false, searchQuery: '' });
+          if (e.key === 'Escape') { e.preventDefault(); setApp({ searchOpen: false, searchQuery: '' }); }
         }}
         className="h-9 min-w-0 flex-1 bg-transparent px-2 text-sm outline-none" />
       <span className="text-xs text-muted tabular-nums">{query ? (hits.length ? `${Math.max(index, 0) + 1}/${hits.length}` : '0 results') : ''}</span>
