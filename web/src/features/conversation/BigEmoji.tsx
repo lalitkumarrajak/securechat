@@ -23,7 +23,7 @@ function animationData(e: string) {
 
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function Emoji({ e, size }: { e: string; size: number }) {
+export function Emoji({ e, size }: { e: string; size: number }) {
   const box = useRef<HTMLSpanElement>(null);
   const anim = useRef<Anim | null>(null);
 

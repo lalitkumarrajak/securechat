@@ -2,7 +2,7 @@
 import { create } from 'zustand';
 import { toast } from 'sonner';
 import { choose } from '../../components/ui/confirm';
-import { canDeleteForEveryone, canEdit } from '../../lib/controls';
+import { canDeleteForEveryone, canEdit, isEditable } from '../../lib/controls';
 import { copyMessages, deleteForEveryone, deleteForMe, me, react, retry, togglePin } from '../../lib/engine';
 import type { Msg } from '../../lib/types';
 import { getApp, setApp } from '../../state/app';
@@ -28,6 +28,11 @@ export function startReply(m: Msg) {
   focusComposer();
 }
 
+export function startEdit(m: Msg) {
+  setApp({ editing: m, replyTo: null });
+  focusComposer();
+}
+
 export async function deleteFlow(msgs: Msg[]) {
   if (!msgs.length) return;
   const everyone = canDeleteForEveryone(msgs);
@@ -48,7 +53,7 @@ export async function deleteFlow(msgs: Msg[]) {
   setApp({ selection: null });
 }
 
-export interface Action { key: string; label: string; danger?: boolean; run: () => void }
+export interface Action { key: string; label: string; danger?: boolean; disabled?: boolean; hint?: string; run: () => void }
 
 /** Everything you can do with one message, in menu order. */
 export function actionsFor(m: Msg): Action[] {
@@ -60,7 +65,9 @@ export function actionsFor(m: Msg): Action[] {
   if (live && m.text) list.push({ key: 'copy', label: 'Copy', run: () => copyMessages([m]).then(() => toast.success('Copied')) });
   if (live && m.s !== -2) list.push({ key: 'forward', label: 'Forward', run: () => setChatUi({ forward: [m] }) });
   if (live && m.id != null) list.push({ key: 'pin', label: pinned ? 'Unpin' : 'Pin', run: () => togglePin(m) });
-  if (canEdit(m)) list.push({ key: 'edit', label: 'Edit', run: () => { setApp({ editing: m, replyTo: null }); focusComposer(); } });
+  if (canEdit(m)) list.push({ key: 'edit', label: 'Edit', run: () => startEdit(m) });
+  // Shown but greyed out once the time limit has passed, so it's clear why you can't edit.
+  else if (isEditable(m)) list.push({ key: 'edit', label: 'Edit', disabled: true, hint: 'Only within 15 minutes of sending', run: () => {} });
   list.push({ key: 'select', label: 'Select', run: () => setApp({ selection: [m.k] }) });
   if (m.out && live) list.push({ key: 'info', label: 'Info', run: () => setChatUi({ info: m }) });
   list.push({ key: 'delete', label: 'Delete', danger: true, run: () => deleteFlow([m]) });

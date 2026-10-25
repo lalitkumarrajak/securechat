@@ -92,3 +92,30 @@ export function testPng(w = 400, h = 300) {
   const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2;
   return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
 }
+
+/** A tiny but valid one-page PDF with a heading, for file-preview tests. */
+export function testPdf(text = 'Chattrix test document') {
+  const objs = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+    null, // content stream, below
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  const stream = `BT /F1 18 Tf 20 150 Td (${text}) Tj ET`;
+  objs[3] = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
+  let out = '%PDF-1.4\n';
+  const offsets: number[] = [];
+  objs.forEach((o, i) => { offsets.push(out.length); out += `${i + 1} 0 obj\n${o}\nendobj\n`; });
+  const xref = out.length;
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n` + offsets.map((o) => String(o).padStart(10, '0') + ' 00000 n \n').join('');
+  out += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(out, 'latin1');
+}
+
+/** Serve KLIPY images and map tiles locally, so tests don't depend on the internet. */
+export async function stubExternalImages(p: Phone) {
+  const png = testPng(256, 256);
+  await p.ctx.route(/^https:\/\/(static\.klipy\.com|tile\.openstreetmap\.org)\//, (route) =>
+    route.fulfill({ status: 200, contentType: 'image/png', body: png }));
+}

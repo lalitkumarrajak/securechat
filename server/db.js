@@ -22,6 +22,14 @@ const SCHEMA = (pg) => `
     expires    BIGINT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS sessions_user ON sessions(username);
+  CREATE TABLE IF NOT EXISTS session_info (
+    token_hash TEXT PRIMARY KEY,
+    username   TEXT NOT NULL,
+    created    BIGINT NOT NULL,
+    last_seen  BIGINT NOT NULL,
+    ua         TEXT NOT NULL DEFAULT '',
+    ip         TEXT NOT NULL DEFAULT ''
+  );
   CREATE TABLE IF NOT EXISTS messages (
     id        ${pg ? 'BIGSERIAL PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT'},
     seq       BIGINT NOT NULL,
@@ -99,6 +107,13 @@ const SQL = {
   getSession: 'SELECT username FROM sessions WHERE token_hash = ? AND expires > ?',
   deleteSession: 'DELETE FROM sessions WHERE token_hash = ?',
   deleteOtherSessions: 'DELETE FROM sessions WHERE username = ? AND token_hash != ?',
+  // Device details for the "active sessions" list (sessions created before this have none).
+  insertSessionInfo: 'INSERT INTO session_info (token_hash, username, created, last_seen, ua, ip) VALUES (?, ?, ?, ?, ?, ?)',
+  touchSessionInfo: 'UPDATE session_info SET last_seen = ?, ip = ? WHERE token_hash = ?',
+  listSessions: `SELECT s.token_hash, s.expires, i.created, i.last_seen, i.ua, i.ip FROM sessions s
+                 LEFT JOIN session_info i ON i.token_hash = s.token_hash
+                 WHERE s.username = ? AND s.expires > ?`,
+  purgeSessionInfo: 'DELETE FROM session_info WHERE token_hash NOT IN (SELECT token_hash FROM sessions)',
 
   insertMsg: `INSERT INTO messages (seq, cid, sender, recipient, body, ts)
               VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (sender, cid) DO NOTHING`,
@@ -278,6 +293,12 @@ async function openMongo(uri) {
     getSession: (h, now) => sessions.findOne({ _id: h, expires: { $gt: now } }),
     deleteSession: async (h) => changes((await sessions.deleteOne({ _id: h })).deletedCount),
     deleteOtherSessions: async (u, keep) => changes((await sessions.deleteMany({ username: u, _id: { $ne: keep } })).deletedCount),
+    insertSessionInfo: async (h, _u, created, last_seen, ua, ip) =>
+      changes((await sessions.updateOne({ _id: h }, { $set: { created, last_seen, ua, ip } })).modifiedCount),
+    touchSessionInfo: async (last_seen, ip, h) => changes((await sessions.updateOne({ _id: h }, { $set: { last_seen, ip } })).modifiedCount),
+    listSessions: async (u, now) => (await sessions.find({ username: u, expires: { $gt: now } }).toArray())
+      .map((d) => ({ token_hash: d._id, expires: d.expires, created: d.created, last_seen: d.last_seen, ua: d.ua, ip: d.ip })),
+    purgeSessionInfo: async () => changes(0), // stored on the session document, removed with it
 
     // The message id is its first seq: seqs only grow, so it is unique and an integer like SQL ids.
     insertMsg: (seq, cid, sender, recipient, body, ts) =>

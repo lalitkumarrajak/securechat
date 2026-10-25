@@ -34,10 +34,10 @@ describe('basics', () => {
   });
 
   it('sign-up is open by default and can be closed with ALLOW_SIGNUP=0', async () => {
-    assert.deepEqual((await srv.api('/api/config')).data, { signup: true });
+    assert.equal((await srv.api('/api/config')).data.signup, true);
     const closed = await startServer({ ALLOW_SIGNUP: '0' });
     try {
-      assert.deepEqual((await closed.api('/api/config')).data, { signup: false });
+      assert.equal((await closed.api('/api/config')).data.signup, false);
       assert.equal((await closed.api('/api/register', {})).status, 403);
     } finally { await closed.stop(); }
   });
@@ -342,5 +342,42 @@ describe('profile & account', () => {
     assert.equal((await srv.api('/api/logout-all', {}, b.token)).status, 200);
     assert.equal((await srv.api('/api/me', undefined, b.token)).status, 401);
     assert.equal((await srv.api('/api/me', undefined, t2)).status, 401);
+  });
+});
+
+describe('active sessions', () => {
+  it('lists devices with details and signs out one of them', async () => {
+    const u = name('sess');
+    const a = await register(srv, u);
+    const { auth } = await C.deriveFromPassword(u, a.pw);
+    const login = await fetch(srv.base + '/api/login', {
+      method: 'POST', body: JSON.stringify({ u, auth }),
+      headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 (Linux; Android 14; Pixel 8) Chrome/131.0 Mobile Safari/537.36' },
+    });
+    const phoneToken = (await login.json()).token;
+    const wsPhone = await connect(srv, phoneToken);
+
+    const list = (await srv.api('/api/sessions', undefined, a.token)).data.sessions;
+    assert.equal(list.length, 2);
+    assert.equal(list[0].current, true);
+    const phone = list.find((s) => !s.current);
+    assert.match(phone.ua, /Android 14/);
+    assert.equal(phone.online, true);
+    assert.ok(phone.created > 0);
+    assert.match(phone.id, /^[0-9a-f]{16}$/);
+
+    assert.equal((await srv.api('/api/sessions/revoke', { id: 'ffffffffffffffff' }, a.token)).status, 404);
+    assert.equal((await srv.api('/api/sessions/revoke', { id: phone.id }, a.token)).status, 200);
+    assert.equal(await wsPhone.closed, 4001); // that device is disconnected right away
+    assert.equal((await srv.api('/api/me', undefined, phoneToken)).status, 401);
+    assert.equal((await srv.api('/api/me', undefined, a.token)).status, 200);
+    assert.equal((await srv.api('/api/sessions', undefined, a.token)).data.sessions.length, 1);
+  });
+
+  it("can't see or sign out someone else's sessions", async () => {
+    const [x, y] = await Promise.all([register(srv, name('sx')), register(srv, name('sy'))]);
+    const yId = (await srv.api('/api/sessions', undefined, y.token)).data.sessions[0].id;
+    assert.equal((await srv.api('/api/sessions/revoke', { id: yId }, x.token)).status, 404);
+    assert.equal((await srv.api('/api/me', undefined, y.token)).status, 200);
   });
 });

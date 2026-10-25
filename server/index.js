@@ -9,10 +9,12 @@ import { ctx } from './context.js';
 import { openDatabase } from './db.js';
 import { clientIp, loadStatic, rateLimited, sendJson, serveStatic, sha256 } from './http.js';
 import { addSocket, removeSocket, refreshPresence, send, startPresenceSweep } from './hub.js';
-import { PUBLIC_ROUTES, routes as authRoutes, userFromToken } from './auth.js';
+import { PUBLIC_ROUTES, routes as authRoutes, touchSession, userFromToken } from './auth.js';
 import { routes as profileRoutes, avatarVersion } from './profiles.js';
 import { routes as friendRoutes, migrateFriends } from './friends.js';
 import { routes as pushRoutes, initPush } from './push.js';
+import { routes as gifRoutes } from './gifs.js';
+import { routes as previewRoutes } from './preview.js';
 import { handlers } from './messages.js';
 import { EMOJI_RE, serveEmoji } from './emoji.js';
 
@@ -25,6 +27,7 @@ async function cleanup() {
   await ctx.db.run('purgeMsgs', cutoff);
   await ctx.db.run('purgeHidden', cutoff);
   await ctx.db.run('purgeSessions', Date.now());
+  await ctx.db.run('purgeSessionInfo');
 }
 await cleanup();
 setInterval(() => cleanup().catch((e) => console.error('cleanup failed', e.message)), 3600e3).unref();
@@ -35,7 +38,7 @@ await initPush();
 loadStatic();
 
 // ---------- HTTP ----------
-const routes = { ...authRoutes, ...profileRoutes, ...friendRoutes, ...pushRoutes };
+const routes = { ...authRoutes, ...profileRoutes, ...friendRoutes, ...pushRoutes, ...gifRoutes, ...previewRoutes };
 
 async function handleHttp(req, res) {
   const url = new URL(req.url, 'http://x');
@@ -54,6 +57,7 @@ async function handleHttp(req, res) {
       token = String(req.headers.authorization || '').replace(/^Bearer /, '');
       me = await userFromToken(token);
       if (!me) return sendJson(res, 401, { error: 'Not logged in' });
+      touchSession(sha256(token), clientIp(req));
       if (rateLimited('api:' + me, 240, 60e3)) return sendJson(res, 429, { error: 'Slow down' });
     }
     await route(req, res, me, token, url);
@@ -114,6 +118,7 @@ wss.on('connection', (ws, req) => {
       clearTimeout(authTimer);
       ws.user = user;
       ws.tokenHash = sha256(m.token);
+      touchSession(ws.tokenHash, ws.ip);
       ws.active = m.act !== false;
       ws.beat = Date.now();
       addSocket(ws);

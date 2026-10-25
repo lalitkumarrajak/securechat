@@ -8,7 +8,8 @@ import { fmtClock } from '../../lib/format';
 import type { Msg } from '../../lib/types';
 import { cn, isTouch } from '../../lib/utils';
 import { setApp } from '../../state/app';
-import { BigEmoji } from './BigEmoji';
+import { BigEmoji, Emoji } from './BigEmoji';
+import { FileCard, LinkPreviewCard, LocationCard } from './Attachments';
 import { VoicePlayer } from './VoicePlayer';
 import { actionsFor, canReact, myReaction, reactTo, setChatUi, startReply, type Action } from './chatUi';
 
@@ -32,7 +33,7 @@ export const MessageBubble = memo(function MessageBubble({ m, me, peerName, firs
   const [menuOpen, setMenuOpen] = useState(false);
   const press = useRef<{ timer: number; x: number; y: number; dx: number; horizontal: boolean | null; long: boolean } | null>(null);
   const emoji = m.type === 'text' && !m.re ? emojiOnly(m.text || '') : null;
-  const bare = !!emoji; // big emoji: no bubble background, like WhatsApp
+  const bare = !!emoji || m.type === 'sticker'; // big emoji and stickers: no bubble, like WhatsApp
   const deleted = m.type === 'deleted';
 
   // ---- touch: long-press opens the action sheet, swipe right replies ----
@@ -88,7 +89,8 @@ export const MessageBubble = memo(function MessageBubble({ m, me, peerName, firs
 
   const onClick = (e: React.MouseEvent) => {
     if (press.current?.long) return;
-    if (selecting) { e.preventDefault(); toggleSelect(); }
+    // Capture phase: while selecting, a tap on a link, photo or file inside selects the message instead
+    if (selecting) { e.preventDefault(); e.stopPropagation(); toggleSelect(); }
   };
 
   return (
@@ -97,7 +99,7 @@ export const MessageBubble = memo(function MessageBubble({ m, me, peerName, firs
       data-k={m.k}
       className={cn('group relative flex items-end gap-2 px-3 transition-transform md:px-[6%] pointer-coarse:select-none pointer-coarse:[-webkit-touch-callout:none]', first ? 'mt-2' : 'mt-0.5',
         m.out ? 'justify-end' : 'justify-start', selected && 'bg-accent/10', selecting && 'cursor-pointer')}
-      onClick={onClick}
+      onClickCapture={onClick}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
@@ -124,7 +126,7 @@ export const MessageBubble = memo(function MessageBubble({ m, me, peerName, firs
           'relative min-w-0 text-[0.95rem] leading-snug',
           bare ? 'px-0' : 'rounded-2xl px-2.5 pt-1.5 pb-1 shadow-bubble',
           !bare && (m.out ? 'rounded-br-md bg-bubble-out' : 'rounded-bl-md bg-bubble-in'),
-          m.type === 'img' && 'p-1',
+          (m.type === 'img' || m.type === 'gif') && 'p-1',
         )}>
           {!selecting && !deleted && !isTouch() && (
             <DesktopMenu m={m} open={menuOpen} onOpenChange={setMenuOpen} bare={bare} />
@@ -157,8 +159,29 @@ function Body({ m, emoji }: { m: Msg; emoji: string[] | null }) {
       </>
     );
   }
+  if (m.type === 'sticker') {
+    // Built-in stickers animate once (tap to replay); KLIPY stickers are animated images.
+    if (m.src!.startsWith('noto:')) return <Emoji e={m.src!.slice(5)} size={128} />;
+    return <img src={m.src} alt="Sticker" loading="lazy" referrerPolicy="no-referrer" className="block size-36 object-contain" />;
+  }
+  if (m.type === 'gif') {
+    return (
+      <span className="relative block">
+        <img src={m.src} alt="GIF" loading="lazy" referrerPolicy="no-referrer" width={m.w || undefined} height={m.h || undefined}
+          className="block h-auto max-h-72 w-auto max-w-[min(260px,65vw)] rounded-xl bg-panel-2 object-cover" />
+        <span className="absolute top-1.5 left-1.5 rounded bg-black/50 px-1 text-[10px] font-bold text-white">GIF</span>
+      </span>
+    );
+  }
+  if (m.type === 'file') return <FileCard m={m} />;
+  if (m.type === 'location') return <LocationCard m={m} />;
   if (m.type === 'voice') return <VoicePlayer src={m.src!} dur={m.dur || 0} peaks={m.peaks || []} out={m.out} />;
-  return <span className="whitespace-pre-wrap [overflow-wrap:anywhere]"><Linkify text={m.text || ''} /></span>;
+  return (
+    <>
+      {m.lp && <LinkPreviewCard lp={m.lp} out={m.out} />}
+      <span className="whitespace-pre-wrap [overflow-wrap:anywhere]"><Linkify text={m.text || ''} /></span>
+    </>
+  );
 }
 
 // Links become clickable; everything is still rendered as text (never as HTML).
@@ -170,8 +193,8 @@ function Linkify({ text }: { text: string }) {
 function Meta({ m, pinned, bare }: { m: Msg; pinned: boolean; bare: boolean }) {
   return (
     <span className={cn('float-right ml-2 flex translate-y-1 items-center gap-1 text-[11px] text-muted select-none',
-      m.type === 'img' && !m.text && 'absolute right-2 bottom-2 translate-y-0 rounded-full bg-black/45 px-1.5 py-0.5 text-white',
-      m.type === 'voice' && 'float-none -mt-1 justify-end',
+      ((m.type === 'img' && !m.text) || m.type === 'gif') && 'absolute right-2 bottom-2 translate-y-0 rounded-full bg-black/45 px-1.5 py-0.5 text-white',
+      (m.type === 'voice' || m.type === 'file' || m.type === 'location') && 'float-none mt-1 justify-end translate-y-0',
       bare && 'float-none mt-1 justify-end rounded-full bg-bubble-in px-2 py-0.5 shadow-bubble')}>
       {pinned && <Pin className="size-3" aria-label="Pinned" />}
       {m.edited && m.type === 'text' && <span>edited</span>}
@@ -249,10 +272,11 @@ function DesktopMenu({ m, open, onOpenChange, bare }: { m: Msg; open: boolean; o
 
 function ActionItem({ a }: { a: Action }) {
   return (
-    <M.Item onSelect={a.run}
-      className={cn('flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm outline-none data-[highlighted]:bg-hover [&_svg]:size-[18px]',
+    <M.Item onSelect={a.run} disabled={a.disabled}
+      className={cn('flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm outline-none data-[highlighted]:bg-hover data-[disabled]:cursor-default data-[disabled]:opacity-45 [&_svg]:size-[18px]',
         a.danger ? 'text-danger' : '[&_svg]:text-muted')}>
-      {ICONS[a.key]}{a.label}
+      {ICONS[a.key]}
+      <span>{a.label}{a.hint && <span className="block text-xs text-muted">{a.hint}</span>}</span>
     </M.Item>
   );
 }

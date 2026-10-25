@@ -24,11 +24,27 @@ async function validPublicKey(b64) {
   } catch { return false; }
 }
 
-async function createSession(username) {
+async function createSession(username, req) {
   const token = crypto.randomBytes(32).toString('base64url');
-  await ctx.db.run('insertSession', sha256(token), username, Date.now() + config.sessionMs);
+  const h = sha256(token);
+  const now = Date.now();
+  await ctx.db.run('insertSession', h, username, now + config.sessionMs);
+  await ctx.db.run('insertSessionInfo', h, username, now, now, String(req.headers['user-agent'] || '').slice(0, 300), clientIp(req));
   return token;
 }
+
+// Record when each session was last used, at most every 5 minutes (it's only for the sessions list).
+const touched = new Map();
+export function touchSession(tokenHash, ip) {
+  const now = Date.now();
+  if (now - (touched.get(tokenHash) || 0) < 5 * 60e3) return;
+  touched.set(tokenHash, now);
+  if (touched.size > 20000) touched.clear();
+  ctx.db.run('touchSessionInfo', now, ip, tokenHash).catch(() => {});
+}
+
+// A session's public id: enough of its hash to tell sessions apart, never the token itself.
+const sessionId = (tokenHash) => tokenHash.slice(0, 16);
 
 export async function userFromToken(token) {
   if (typeof token !== 'string' || token.length > 100) return null;
@@ -53,7 +69,7 @@ export const PUBLIC_ROUTES = new Set(['POST /api/register', 'POST /api/login', '
 
 export const routes = {
   // What the landing page needs to know before anyone signs in.
-  'GET /api/config': async (req, res) => sendJson(res, 200, { signup: config.allowSignup }),
+  'GET /api/config': async (req, res) => sendJson(res, 200, { signup: config.allowSignup, gifs: !!config.klipyKey }),
 
   'POST /api/register': async (req, res) => {
     if (!config.allowSignup) return sendJson(res, 403, { error: 'Sign-up is closed' });
@@ -68,7 +84,7 @@ export const routes = {
     const hash = await hashAuth(auth, salt);
     const { changes } = await ctx.db.run('insertUser', u, hash, salt, pub, encPriv, Date.now());
     if (!changes) return sendJson(res, 409, { error: 'Username taken' });
-    sendJson(res, 200, { token: await createSession(u) });
+    sendJson(res, 200, { token: await createSession(u, req) });
   },
 
   'POST /api/login': async (req, res) => {
@@ -80,11 +96,39 @@ export const routes = {
     }
     const user = await checkPassword(u, auth);
     if (!user) return sendJson(res, 401, { error: 'Wrong username or password' });
-    sendJson(res, 200, { token: await createSession(u), pub: user.pubkey, encPriv: user.enc_priv });
+    sendJson(res, 200, { token: await createSession(u, req), pub: user.pubkey, encPriv: user.enc_priv });
   },
 
   'POST /api/logout': async (req, res, me, token) => {
     await ctx.db.run('deleteSession', sha256(token));
+    sendJson(res, 200, { ok: true });
+  },
+
+  // Devices signed in to this account, newest activity first.
+  'GET /api/sessions': async (req, res, me, token) => {
+    const mine = sha256(token);
+    const rows = await ctx.db.all('listSessions', me, Date.now());
+    const live = new Set([...(online.get(me) || [])].map((ws) => ws.tokenHash));
+    const sessions = rows.map((r) => ({
+      id: sessionId(r.token_hash),
+      current: r.token_hash === mine,
+      online: live.has(r.token_hash),
+      created: r.created || 0,
+      lastSeen: r.token_hash === mine ? Date.now() : (r.last_seen || 0),
+      ua: r.ua || '',
+      ip: r.ip || '',
+    })).sort((a, b) => Number(b.current) - Number(a.current) || b.lastSeen - a.lastSeen);
+    sendJson(res, 200, { sessions });
+  },
+
+  // Sign out one device.
+  'POST /api/sessions/revoke': async (req, res, me) => {
+    const { id } = await readJson(req);
+    if (typeof id !== 'string' || !/^[0-9a-f]{16}$/.test(id)) return sendJson(res, 400, { error: 'Invalid session' });
+    const row = (await ctx.db.all('listSessions', me, Date.now())).find((r) => sessionId(r.token_hash) === id);
+    if (!row) return sendJson(res, 404, { error: 'Session not found' });
+    await ctx.db.run('deleteSession', row.token_hash);
+    for (const ws of online.get(me) || []) if (ws.tokenHash === row.token_hash) ws.close(4001, 'signed out');
     sendJson(res, 200, { ok: true });
   },
 

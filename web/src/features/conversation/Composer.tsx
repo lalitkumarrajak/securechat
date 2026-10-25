@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import * as M from '@radix-ui/react-dropdown-menu';
 import { toast } from 'sonner';
-import { Camera, Check, Image as ImageIcon, Mic, Paperclip, Pencil, Reply, SendHorizontal, Smile, Trash2, X } from 'lucide-react';
+import { Camera, Check, FileText, Image as ImageIcon, Keyboard, Link2, MapPin, Mic, Paperclip, Pencil, Reply, SendHorizontal, Smile, Trash2, X } from 'lucide-react';
+import { confirm } from '../../components/ui/confirm';
+import { currentLocation } from '../../lib/location';
 import { IconButton } from '../../components/ui/button';
 import { senderOf } from '../../lib/controls';
-import { EMOJI_PICKER } from '../../lib/emoji';
-import { editMessage, me, preview, saveDraft, sendPhoto, sendText, sendTyping, sendVoice } from '../../lib/engine';
+import { editMessage, fetchLinkPreview, me, preview, saveDraft, sendFile, sendGif, sendLocation, sendPhoto, sendSticker, sendText, sendTyping, sendVoice } from '../../lib/engine';
 import { fmtDuration } from '../../lib/format';
-import type { Msg } from '../../lib/types';
+import type { GifItem, LinkPreview, Msg } from '../../lib/types';
+import { ExpressionPanel, type PanelTab } from './ExpressionPanel';
 import { cn, isTouch } from '../../lib/utils';
 import { VoiceRecorder } from '../../lib/voice';
 import { getApp, setApp, useApp } from '../../state/app';
@@ -20,6 +22,9 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
   const input = useRef<HTMLTextAreaElement>(null);
   const [text, setText] = useState(() => getApp().chats.find((c) => c.peer === peer)?.draft || '');
   const [recording, setRecording] = useState(false);
+  const [panel, setPanel] = useState<PanelTab | null>(null); // emoji / GIF / sticker panel
+  const camera = useRef<HTMLInputElement>(null);
+  const link = useLinkPreview(editing ? '' : text);
 
   // Editing fills the box with the message; leaving edit mode restores the draft.
   useEffect(() => {
@@ -55,7 +60,9 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
     setText('');
     saveDraft(peer, '');
     setApp({ replyTo: null });
-    sendText(peer, t, replyTo).catch((e) => toast.error(e.message));
+    const lp = link.preview; // only set while the text still contains that link
+    link.clear();
+    sendText(peer, t, replyTo, lp).catch((e) => toast.error(e.message));
   }
 
   async function photo(file?: File | null) {
@@ -66,25 +73,74 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
     try { await sendPhoto(peer, file, re); } catch (e) { toast.error((e as Error).message || 'Couldn’t send that photo'); }
   }
 
+  async function document_(file?: File | null) {
+    if (!file) return;
+    if (file.type.startsWith('image/') && file.size < 15 * 1024 * 1024) return photo(file); // photos get compressed
+    const re = getApp().replyTo;
+    setApp({ replyTo: null });
+    const t = toast.loading(`Sending ${file.name}…`);
+    try { await sendFile(peer, file, re); toast.dismiss(t); } catch (e) { toast.error((e as Error).message || 'Couldn’t send that file', { id: t }); }
+  }
+
+  async function location() {
+    let loc;
+    const t = toast.loading('Finding your location…');
+    try { loc = await currentLocation(); toast.dismiss(t); } catch (e) { toast.error((e as Error).message, { id: t }); return; }
+    if (!(await confirm({ title: 'Send your current location?', description: `Accurate to about ${loc.acc} m. ${peerName} will see it on a map.`, confirmText: 'Send location' }))) return;
+    const re = getApp().replyTo;
+    setApp({ replyTo: null });
+    sendLocation(peer, loc, re).catch((e) => toast.error(e.message));
+  }
+
+  // Emoji go in at the cursor. On phones the box isn't focused while the panel is open
+  // (so the keyboard stays hidden); emoji are then added at the end.
+  const caret = useRef<number | null>(null);
   function insertEmoji(e: string) {
     const el = input.current;
-    const start = el?.selectionStart ?? text.length;
-    const end = el?.selectionEnd ?? text.length;
-    const next = text.slice(0, start) + e + text.slice(end);
-    change(next);
-    requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(start + e.length, start + e.length); });
+    const at = document.activeElement === el ? el!.selectionStart : caret.current ?? text.length;
+    const end = document.activeElement === el ? el!.selectionEnd : at;
+    change(text.slice(0, at) + e + text.slice(end));
+    caret.current = at + e.length;
+    if (!isTouch()) requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(at + e.length, at + e.length); });
+  }
+  function backspace() {
+    const chars = [...new Intl.Segmenter().segment(text)].map((s) => s.segment);
+    chars.pop();
+    change(chars.join(''));
+    caret.current = null;
+  }
+
+  function sendExpression(fn: () => Promise<void>) {
+    setApp({ replyTo: null });
+    fn().catch((e) => toast.error(e.message || 'Couldn’t send that'));
+  }
+  const pickGif = (g: GifItem) => { const re = getApp().replyTo; sendExpression(() => sendGif(peer, g, re)); };
+  const pickSticker = (s: string | GifItem) => { const re = getApp().replyTo; sendExpression(() => sendSticker(peer, s, re)); };
+
+  // The smiley button toggles the panel; the keyboard button goes back to typing.
+  function togglePanel() {
+    if (panel) { setPanel(null); input.current?.focus(); return; }
+    caret.current = input.current?.selectionStart ?? null;
+    if (isTouch()) input.current?.blur(); // hide the phone keyboard so the panel takes its place
+    setPanel('emoji');
   }
 
   if (recording) return <RecordingBar peer={peer} onDone={() => setRecording(false)} />;
 
   const empty = !text.trim();
   return (
-    <div className="shrink-0 border-t border-line bg-panel pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+    <div className={cn('shrink-0 border-t border-line bg-panel', !panel && 'pb-[max(0.5rem,env(safe-area-inset-bottom))]')}>
+      {link.preview && !editing && <LinkCard lp={link.preview} onClose={link.dismiss} />}
       {(replyTo || editing) && <ContextBar m={(editing || replyTo)!} editing={!!editing} peerName={peerName}
         onClose={() => { if (editing) { setApp({ editing: null }); setText(getApp().chats.find((c) => c.peer === peer)?.draft || ''); } else setApp({ replyTo: null }); }} />}
-      <div className="flex items-end gap-1 px-2 pt-2">
-        {!editing && <EmojiButton onPick={insertEmoji} />}
-        {!editing && <AttachButton onFile={photo} />}
+      <div className="flex items-end gap-2 px-2 pt-2 pb-2">
+        {/* Emoji, attach and camera sit inside the message box, like WhatsApp */}
+        <div className="flex min-h-11 min-w-0 flex-1 items-end rounded-3xl bg-panel-2 focus-within:ring-2 focus-within:ring-accent/25">
+          {!editing && (
+            <IconButton label={panel ? 'Keyboard' : 'Emoji, GIFs and stickers'} className="ml-0.5 shrink-0" onMouseDown={(e) => e.preventDefault()} onClick={togglePanel}>
+              {panel ? <Keyboard /> : <Smile />}
+            </IconButton>
+          )}
         <textarea
           id="composer-input"
           ref={input}
@@ -98,12 +154,19 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
             const file = [...e.clipboardData.files].find((f) => f.type.startsWith('image/'));
             if (file) { e.preventDefault(); photo(file); }
           }}
+          onFocus={() => { if (isTouch()) setPanel(null); }} // typing again: keyboard replaces the panel
           rows={1}
           maxLength={8000}
           placeholder={editing ? 'Edit message' : 'Message'}
           aria-label="Message"
-          className="max-h-40 min-h-11 flex-1 resize-none rounded-2xl bg-panel-2 px-4 py-2.5 text-[0.95rem] leading-snug outline-none placeholder:text-muted focus:ring-2 focus:ring-accent/25"
+          className={cn('max-h-40 min-h-11 min-w-0 flex-1 resize-none bg-transparent py-2.5 text-[0.95rem] leading-snug outline-none placeholder:text-muted', editing && 'pl-4')}
         />
+          {!editing && <AttachButton onPhoto={photo} onDocument={document_} onLocation={location} />}
+          {!editing && empty && (
+            <IconButton label="Camera" className="mr-0.5 shrink-0" onClick={() => camera.current?.click()}><Camera /></IconButton>
+          )}
+          <input ref={camera} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { photo(e.target.files?.[0]); e.target.value = ''; }} />
+        </div>
         {empty && !editing ? (
           <MicButton peer={peer} onStart={() => setRecording(true)} />
         ) : (
@@ -119,6 +182,9 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
           </button>
         )}
       </div>
+      {panel && !editing && (
+        <ExpressionPanel tab={panel} setTab={setPanel} onEmoji={insertEmoji} onBackspace={backspace} onGif={pickGif} onSticker={pickSticker} />
+      )}
     </div>
   );
 }
@@ -138,48 +204,32 @@ function ContextBar({ m, editing, peerName, onClose }: { m: Msg; editing: boolea
   );
 }
 
-function EmojiButton({ onPick }: { onPick: (e: string) => void }) {
-  return (
-    <M.Root modal={false}>
-      <M.Trigger asChild>
-        <IconButton label="Emoji" onMouseDown={(e) => isTouch() || e.preventDefault()}><Smile /></IconButton>
-      </M.Trigger>
-      <M.Portal>
-        <M.Content side="top" align="start" sideOffset={8} collisionPadding={8}
-          className="z-50 grid max-h-72 w-[min(22rem,calc(100vw-1rem))] grid-cols-8 gap-0.5 overflow-y-auto rounded-2xl border border-line bg-panel p-2 shadow-xl animate-fade-in">
-          {EMOJI_PICKER.map((e) => (
-            <M.Item key={e} onSelect={(ev) => { ev.preventDefault(); onPick(e); }}
-              className="grid aspect-square cursor-pointer place-items-center rounded-lg text-2xl outline-none data-[highlighted]:bg-hover">
-              {e}
-            </M.Item>
-          ))}
-        </M.Content>
-      </M.Portal>
-    </M.Root>
-  );
-}
+const ITEM = 'flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm outline-none data-[highlighted]:bg-hover';
 
-function AttachButton({ onFile }: { onFile: (f?: File | null) => void }) {
+function AttachButton({ onPhoto, onDocument, onLocation }: {
+  onPhoto: (f?: File | null) => void; onDocument: (f?: File | null) => void; onLocation: () => void;
+}) {
   const gallery = useRef<HTMLInputElement>(null);
   const camera = useRef<HTMLInputElement>(null);
+  const doc = useRef<HTMLInputElement>(null);
   const pick = (el: HTMLInputElement | null) => el?.click();
+  const icon = (bg: string, node: React.ReactNode) => <span className={`grid size-9 place-items-center rounded-full text-white ${bg}`}>{node}</span>;
   return (
     <>
       <M.Root modal={false}>
-        <M.Trigger asChild><IconButton label="Attach"><Paperclip /></IconButton></M.Trigger>
+        <M.Trigger asChild><IconButton label="Attach" className="shrink-0"><Paperclip /></IconButton></M.Trigger>
         <M.Portal>
-          <M.Content side="top" align="start" sideOffset={8} className="z-50 w-48 rounded-xl border border-line bg-panel p-1 shadow-xl animate-fade-in">
-            <M.Item onSelect={() => pick(gallery.current)} className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm outline-none data-[highlighted]:bg-hover">
-              <span className="grid size-8 place-items-center rounded-full bg-violet-500 text-white"><ImageIcon className="size-4" /></span> Photo
-            </M.Item>
-            <M.Item onSelect={() => pick(camera.current)} className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm outline-none data-[highlighted]:bg-hover">
-              <span className="grid size-8 place-items-center rounded-full bg-pink-500 text-white"><Camera className="size-4" /></span> Camera
-            </M.Item>
+          <M.Content side="top" align="end" sideOffset={8} className="z-50 w-52 rounded-xl border border-line bg-panel p-1 shadow-xl animate-fade-in">
+            <M.Item onSelect={() => pick(doc.current)} className={ITEM}>{icon('bg-indigo-500', <FileText className="size-4" />)} Document</M.Item>
+            <M.Item onSelect={() => pick(gallery.current)} className={ITEM}>{icon('bg-violet-500', <ImageIcon className="size-4" />)} Photos</M.Item>
+            <M.Item onSelect={() => pick(camera.current)} className={ITEM}>{icon('bg-pink-500', <Camera className="size-4" />)} Camera</M.Item>
+            <M.Item onSelect={onLocation} className={ITEM}>{icon('bg-emerald-500', <MapPin className="size-4" />)} Location</M.Item>
           </M.Content>
         </M.Portal>
       </M.Root>
-      <input ref={gallery} type="file" accept="image/*" hidden onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ''; }} />
-      <input ref={camera} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ''; }} />
+      <input ref={gallery} type="file" data-kind="gallery" accept="image/*" hidden onChange={(e) => { onPhoto(e.target.files?.[0]); e.target.value = ''; }} />
+      <input ref={camera} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { onPhoto(e.target.files?.[0]); e.target.value = ''; }} />
+      <input ref={doc} type="file" data-kind="document" hidden onChange={(e) => { onDocument(e.target.files?.[0]); e.target.value = ''; }} />
     </>
   );
 }
@@ -299,6 +349,42 @@ function RecordingBar({ peer, onDone }: { peer: string; onDone: () => void }) {
       ) : (
         <span className="grid size-14 -m-1.5 place-items-center rounded-full bg-accent text-white shadow-lg"><Mic className="size-6" /></span>
       )}
+    </div>
+  );
+}
+
+// ---------- link previews while typing ----------
+const URL_RE = /https?:\/\/[^\s<]+[^\s<.,;:!?)"'\]]/;
+
+/** Fetches a preview for the first link in the text (debounced). You can dismiss it. */
+function useLinkPreview(text: string) {
+  const url = URL_RE.exec(text)?.[0] || '';
+  const [state, setState] = useState<{ url: string; preview: LinkPreview | null }>({ url: '', preview: null });
+  const [dismissed, setDismissed] = useState('');
+  useEffect(() => {
+    if (!url || url === state.url || url === dismissed) return;
+    const t = setTimeout(() => { fetchLinkPreview(url).then((preview) => setState({ url, preview })); }, 600);
+    return () => clearTimeout(t);
+  }, [url]); // fetch when the link changes
+  return {
+    preview: url && url === state.url && url !== dismissed ? state.preview : null,
+    dismiss: () => setDismissed(url),
+    clear: () => { setState({ url: '', preview: null }); setDismissed(''); },
+  };
+}
+
+function LinkCard({ lp, onClose }: { lp: LinkPreview; onClose: () => void }) {
+  return (
+    <div className="flex items-center gap-2 px-3 pt-2">
+      <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-xl bg-panel-2">
+        {lp.img ? <img src={lp.img} alt="" className="size-16 shrink-0 object-cover" /> : <span className="grid size-16 shrink-0 place-items-center text-muted"><Link2 className="size-6" /></span>}
+        <span className="min-w-0 py-1.5 pr-2">
+          <span className="block truncate text-sm font-semibold">{lp.title}</span>
+          {lp.desc && <span className="line-clamp-1 text-xs text-muted">{lp.desc}</span>}
+          <span className="block truncate text-xs text-accent-ink">{lp.site}</span>
+        </span>
+      </div>
+      <IconButton label="Remove link preview" size="icon-sm" onClick={onClose}><X /></IconButton>
     </div>
   );
 }

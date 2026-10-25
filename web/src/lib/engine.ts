@@ -5,7 +5,9 @@ import * as C from './crypto.js';
 import * as db from './db';
 import { applyEdit, applyPin, applyReact, senderOf } from './controls';
 import { compressImage, squarePhoto } from './image';
-import type { Chat, Content, Friend, Me, Msg, Request, SearchHit } from './types';
+import type { Chat, Content, Friend, GifItem, LinkPreview, Me, Msg, Request, SearchHit, Session } from './types';
+import { prepareFile } from './files';
+import type { LocationContent } from './location';
 import { getApp, setApp } from '../state/app';
 import { setSettings, useSettings } from '../state/settings';
 
@@ -54,7 +56,7 @@ export async function api<T = any>(path: string, body?: unknown): Promise<T> {
 // ---------- boot & accounts ----------
 export async function boot() {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
-  fetch('/api/config').then((r) => r.json()).then((c) => setApp({ signupOpen: !!c.signup })).catch(() => {});
+  fetch('/api/config').then((r) => r.json()).then((c) => setApp({ signupOpen: !!c.signup, gifsEnabled: !!c.gifs })).catch(() => {});
   const sess = await db.get('kv', 'session');
   if (!sess) return setApp({ status: 'auth' });
   Object.assign(S, { token: sess.token, me: sess.u, priv: sess.priv, pub: sess.pub });
@@ -421,12 +423,24 @@ async function updateStatus(m: Msg) {
   if (chat?.lastK === m.k && chat.lastS !== m.s) await saveChat({ ...chat, lastS: m.s });
 }
 
-export const preview = (m: Pick<Msg, 'type' | 'text' | 'dur'>) =>
+export const preview = (m: Pick<Msg, 'type' | 'text' | 'dur' | 'file'>) =>
   m.type === 'img' ? '📷 Photo' + (m.text ? ': ' + m.text : '')
     : m.type === 'voice' ? `🎤 Voice message`
+    : m.type === 'gif' ? 'GIF'
+    : m.type === 'file' ? '📄 ' + (m.file?.name || 'File')
+    : m.type === 'location' ? '📍 Location'
+    : m.type === 'sticker' ? 'Sticker'
     : m.type === 'deleted' ? '🚫 This message was deleted'
     : m.type === 'err' ? '🔒 Unable to decrypt'
     : (m.text || '').slice(0, 100);
+
+export const KLIPY_MEDIA = 'https://static.klipy.com/';
+
+function linkPreviewOf(lp: any): LinkPreview | undefined {
+  if (!lp || typeof lp.url !== 'string' || !/^https?:\/\//.test(lp.url) || typeof lp.title !== 'string') return undefined;
+  const img = typeof lp.img === 'string' && /^data:image\/(webp|jpeg|png|gif);/.test(lp.img) ? lp.img : undefined;
+  return { url: lp.url.slice(0, 2000), title: lp.title.slice(0, 200), desc: String(lp.desc || '').slice(0, 300), site: String(lp.site || '').slice(0, 80), ...(img && { img }) };
+}
 
 const replyOf = (r: any) =>
   r && typeof r.f === 'string' && typeof r.c === 'string' && typeof r.p === 'string'
@@ -435,9 +449,30 @@ const replyOf = (r: any) =>
 /** Validate decrypted content into the fields a Msg may carry. */
 function pick(c: any): Partial<Msg> {
   const extra = { ...(replyOf(c.re) && { re: replyOf(c.re) }), ...(c.fwd === true && { fwd: true }) };
-  if (c.type === 'text' && typeof c.text === 'string') return { type: 'text', text: c.text.slice(0, 8000), ...extra };
+  if (c.type === 'text' && typeof c.text === 'string') {
+    const lp = linkPreviewOf(c.lp);
+    return { type: 'text', text: c.text.slice(0, 8000), ...extra, ...(lp && { lp }) };
+  }
+  if (c.type === 'file' && typeof c.src === 'string' && c.src.startsWith('data:') && typeof c.name === 'string') {
+    const thumb = typeof c.thumb === 'string' && /^data:image\/(webp|jpeg|png);/.test(c.thumb) ? c.thumb : undefined;
+    return {
+      type: 'file', src: c.src, ...extra,
+      file: { name: c.name.slice(0, 200), size: +c.size || 0, mime: String(c.mime || '').slice(0, 100), ...(thumb && { thumb }),
+        ...(typeof c.text === 'string' && { text: c.text.slice(0, 400) }), ...(Number.isInteger(c.pages) && { pages: c.pages }) },
+    };
+  }
+  if (c.type === 'location' && Number.isFinite(c.lat) && Number.isFinite(c.lng) && Math.abs(c.lat) <= 90 && Math.abs(c.lng) <= 180) {
+    return { type: 'location', loc: { lat: +c.lat, lng: +c.lng, acc: Math.max(0, +c.acc || 0) }, ...extra };
+  }
   if (c.type === 'img' && typeof c.src === 'string' && c.src.startsWith('data:image/')) {
     return { type: 'img', src: c.src, w: c.w | 0, h: c.h | 0, text: typeof c.text === 'string' ? c.text : '', ...extra };
+  }
+  // GIFs and KLIPY stickers are only ever loaded from KLIPY's CDN; built-in stickers are "noto:<emoji>".
+  if (c.type === 'gif' && typeof c.src === 'string' && c.src.startsWith(KLIPY_MEDIA)) {
+    return { type: 'gif', src: c.src, w: c.w | 0, h: c.h | 0, ...extra };
+  }
+  if (c.type === 'sticker' && typeof c.src === 'string' && (c.src.startsWith(KLIPY_MEDIA) || /^noto:\S{1,16}$/u.test(c.src))) {
+    return { type: 'sticker', src: c.src, w: c.w | 0, h: c.h | 0, ...extra };
   }
   if (c.type === 'voice' && typeof c.src === 'string' && c.src.startsWith('data:audio/') && Array.isArray(c.peaks)) {
     return { type: 'voice', src: c.src, dur: +c.dur || 0, peaks: c.peaks.slice(0, 64).map((v: unknown) => Math.min(1, Math.max(0, +(v as number) || 0))), ...extra };
@@ -602,7 +637,7 @@ async function encryptAndQueue(peer: string, content: Content, quiet: boolean) {
 }
 
 /** Send a message bubble (text, photo or voice). */
-export async function sendContent(peer: string, content: Extract<Content, { type: 'text' | 'img' | 'voice' }>) {
+export async function sendContent(peer: string, content: Extract<Content, { type: 'text' | 'img' | 'voice' | 'gif' | 'sticker' | 'file' | 'location' }>) {
   if (await peerKeyChanged(peer)) {
     setApp((s) => ({ keyChanged: { ...s.keyChanged, [peer]: true } }));
     toast.warning('Sending is paused', { description: 'This contact’s security code changed. Verify it first.' });
@@ -641,15 +676,40 @@ export async function retry(m: Msg) {
   if (c) await sendContent(m.peer, c);
 }
 
-function contentOf(m: Msg): Extract<Content, { type: 'text' | 'img' | 'voice' }> | null {
-  if (m.type === 'text') return { type: 'text', text: m.text || '', ...(m.re && { re: m.re }) };
+function contentOf(m: Msg): Extract<Content, { type: 'text' | 'img' | 'voice' | 'gif' | 'sticker' | 'file' | 'location' }> | null {
+  if (m.type === 'text') return { type: 'text', text: m.text || '', ...(m.re && { re: m.re }), ...(m.lp && { lp: m.lp }) };
+  if (m.type === 'file') return { type: 'file', src: m.src!, ...m.file!, ...(m.re && { re: m.re }) };
+  if (m.type === 'location') return { type: 'location', ...m.loc!, ...(m.re && { re: m.re }) };
   if (m.type === 'img') return { type: 'img', src: m.src!, w: m.w || 0, h: m.h || 0, text: m.text || '', ...(m.re && { re: m.re }) };
   if (m.type === 'voice') return { type: 'voice', src: m.src!, dur: m.dur || 0, peaks: m.peaks || [], ...(m.re && { re: m.re }) };
+  if (m.type === 'gif') return { type: 'gif', src: m.src!, w: m.w || 0, h: m.h || 0, ...(m.re && { re: m.re }) };
+  if (m.type === 'sticker') return { type: 'sticker', src: m.src!, w: m.w || 0, h: m.h || 0, ...(m.re && { re: m.re }) };
   return null;
 }
 
-export async function sendText(peer: string, text: string, re?: Msg | null) {
-  await sendContent(peer, { type: 'text', text, ...(re && { re: replyRef(re) }) });
+export async function sendText(peer: string, text: string, re?: Msg | null, lp?: LinkPreview | null) {
+  await sendContent(peer, { type: 'text', text, ...(re && { re: replyRef(re) }), ...(lp && { lp }) });
+}
+
+export async function sendFile(peer: string, file: File, re?: Msg | null) {
+  const f = await prepareFile(file);
+  await sendContent(peer, { type: 'file', ...f, ...(re && { re: replyRef(re) }) });
+}
+
+export async function sendLocation(peer: string, loc: LocationContent, re?: Msg | null) {
+  await sendContent(peer, { type: 'location', ...loc, ...(re && { re: replyRef(re) }) });
+}
+
+/** Ask the server for a link's title/image. The preview travels inside the encrypted message. */
+export async function fetchLinkPreview(url: string): Promise<LinkPreview | null> {
+  try {
+    const r = await api<{ url: string; title: string; desc: string; site: string; image: string }>('/api/preview?url=' + encodeURIComponent(url));
+    let img: string | undefined;
+    if (r.image) {
+      try { img = (await compressImage(await (await fetch(r.image)).blob(), 400)).src; } catch { /* no image */ }
+    }
+    return { url: r.url, title: r.title, desc: r.desc, site: r.site, ...(img && { img }) };
+  } catch { return null; }
 }
 
 export async function sendPhoto(peer: string, file: File, re?: Msg | null) {
@@ -660,6 +720,24 @@ export async function sendPhoto(peer: string, file: File, re?: Msg | null) {
 export async function sendVoice(peer: string, rec: { src: string; dur: number; peaks: number[] }, re?: Msg | null) {
   await sendContent(peer, { type: 'voice', ...rec, ...(re && { re: replyRef(re) }) });
 }
+
+export async function sendGif(peer: string, g: GifItem, re?: Msg | null) {
+  await sendContent(peer, { type: 'gif', src: g.src, w: g.w, h: g.h, ...(re && { re: replyRef(re) }) });
+}
+
+/** A built-in animated sticker (an emoji) or a KLIPY sticker. */
+export async function sendSticker(peer: string, s: string | GifItem, re?: Msg | null) {
+  const c = typeof s === 'string' ? { src: 'noto:' + s } : { src: s.src, w: s.w, h: s.h };
+  await sendContent(peer, { type: 'sticker', ...c, ...(re && { re: replyRef(re) }) });
+}
+
+export async function searchGifs(kind: 'gifs' | 'stickers', q: string, page = 1) {
+  return api<{ items: GifItem[]; next: number | null }>(`/api/gifs?kind=${kind}&page=${page}&q=${encodeURIComponent(q)}`);
+}
+
+// ---------- active sessions ----------
+export const listSessions = () => api<{ sessions: Session[] }>('/api/sessions').then((r) => r.sessions);
+export const revokeSession = (id: string) => api('/api/sessions/revoke', { id });
 
 const replyRef = (m: Msg) => ({ f: senderOf(m), c: m.cid, p: preview(m).slice(0, 120) });
 

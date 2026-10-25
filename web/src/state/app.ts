@@ -9,6 +9,7 @@ export type Panel = null | 'settings' | 'friends' | 'contact' | 'archived';
 export interface AppState {
   status: Status;
   signupOpen: boolean;
+  gifsEnabled: boolean;                  // server has a KLIPY key
   conn: Conn;
   me: Me | null;
   friends: Record<string, Friend>;
@@ -35,6 +36,7 @@ export interface AppState {
 export const useApp = create<AppState>(() => ({
   status: 'loading',
   signupOpen: true,
+  gifsEnabled: false,
   conn: 'connecting',
   me: null,
   friends: {},

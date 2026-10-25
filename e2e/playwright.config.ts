@@ -18,7 +18,8 @@ export default defineConfig({
     baseURL: `http://localhost:${PORT}`,
     channel: 'chrome',
     headless: true,
-    permissions: ['notifications', 'microphone', 'clipboard-read', 'clipboard-write'],
+    permissions: ['notifications', 'microphone', 'clipboard-read', 'clipboard-write', 'geolocation'],
+    geolocation: { latitude: 28.6129, longitude: 77.2295, accuracy: 12 },
     // Fake microphone for voice messages; keep every "phone" window visible (not backgrounded),
     // since presence correctly treats hidden tabs as away.
     launchOptions: {
@@ -28,11 +29,19 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
   },
-  webServer: {
+  webServer: [{
+    command: 'node e2e/fake-services.mjs',
+    cwd: path.join(import.meta.dirname, '..'),
+    url: 'http://localhost:4322/article',
+    reuseExistingServer: false,
+  }, {
     command: 'node server/index.js',
     cwd: path.join(import.meta.dirname, '..'),
     url: `http://localhost:${PORT}/`,
     reuseExistingServer: false,
-    env: { PORT: String(PORT), DATA_DIR: dataDir, SIGNUPS_PER_HOUR: '1000', PRESENCE_SWEEP_MS: '500' } // real 45 s timeout,
-  },
+    env: {
+      PORT: String(PORT), DATA_DIR: dataDir, SIGNUPS_PER_HOUR: '1000', PRESENCE_SWEEP_MS: '500', // real 45 s presence timeout
+      KLIPY_API_KEY: 'test', KLIPY_BASE_URL: 'http://localhost:4322', PREVIEW_ALLOW_PRIVATE: '1',
+    },
+  }],
 });

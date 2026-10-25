@@ -11,12 +11,12 @@ export const SECURITY_HEADERS = {
   // Scripts are strictly same-origin. Styles allow inline because the UI libraries (Radix, Sonner)
   // inject small <style> tags; worker-src blob: is for the animated-emoji player.
   'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
-    "img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; " +
+    "img-src 'self' data: blob: https://static.klipy.com https://tile.openstreetmap.org; media-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; " +
     "manifest-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'no-referrer',
-  'Permissions-Policy': 'camera=(), microphone=(self), geolocation=()',
+  'Permissions-Policy': 'camera=(), microphone=(self), geolocation=(self)',
   'Cross-Origin-Opener-Policy': 'same-origin',
   'Cross-Origin-Resource-Policy': 'same-origin',
   ...(config.tlsCert || config.trustProxy ? { 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains' } : {}),
@@ -87,7 +87,7 @@ export function compress(raw) {
 
 // ---------- static files (the built web app, pre-compressed in memory) ----------
 const MIME = {
-  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json',
   '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.ico': 'image/x-icon',
   '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8',

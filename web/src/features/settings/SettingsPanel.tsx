@@ -1,25 +1,29 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import {
-  ArrowLeft, Bell, Camera, ChevronRight, Info, KeyRound, Lock, LogOut, MessageSquare, Monitor, Moon, Palette, Shield, Sun, Trash2, UserRound,
+  ArrowLeft, Bell, Camera, ChevronRight, Info, KeyRound, Laptop, Lock, LogOut, MessageSquare, Monitor, MonitorSmartphone, Moon, Palette, Shield,
+  Smartphone, Sun, Tablet, Trash2, UserRound,
 } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
-import { Button, IconButton } from '../../components/ui/button';
+import { Button, IconButton, Spinner } from '../../components/ui/button';
 import { confirm } from '../../components/ui/confirm';
 import { Panel } from '../../components/ui/dialog';
 import { Input, Label, Textarea } from '../../components/ui/input';
 import { Switch } from '../../components/ui/switch';
 import {
-  changePassword, disablePush, enablePush, logout, pushSupported, removeAvatar, setAvatar, unblockUser, updateProfile,
+  changePassword, disablePush, enablePush, listSessions, logout, pushSupported, removeAvatar, revokeSession, setAvatar, unblockUser, updateProfile,
 } from '../../lib/engine';
+import { deviceName, parseDevice } from '../../lib/device';
+import { fmtListTime } from '../../lib/format';
+import type { Session } from '../../lib/types';
 import { cn } from '../../lib/utils';
 import { setApp, useApp } from '../../state/app';
 import { ACCENTS, setSettings, useSettings, type FontSize, type Theme, type Wallpaper } from '../../state/settings';
 
-type Page = 'main' | 'profile' | 'appearance' | 'privacy' | 'notifications' | 'chats' | 'account' | 'about';
+type Page = 'main' | 'profile' | 'appearance' | 'privacy' | 'notifications' | 'chats' | 'account' | 'sessions' | 'about';
 const TITLES: Record<Page, string> = {
   main: 'Settings', profile: 'Profile', appearance: 'Appearance', privacy: 'Privacy', notifications: 'Notifications',
-  chats: 'Chats', account: 'Account', about: 'About Chattrix',
+  chats: 'Chats', account: 'Account', sessions: 'Active sessions', about: 'About Chattrix',
 };
 
 export function SettingsPanel() {
@@ -31,7 +35,7 @@ export function SettingsPanel() {
   return (
     <Panel open={open} onOpenChange={(o) => !o && close()} title="Settings">
       <header className="flex h-16 shrink-0 items-center gap-2 bg-panel px-3">
-        <IconButton label="Back" onClick={() => (page === 'main' ? close() : setPage('main'))}><ArrowLeft /></IconButton>
+        <IconButton label="Back" onClick={() => (page === 'main' ? close() : setPage(page === 'sessions' ? 'account' : 'main'))}><ArrowLeft /></IconButton>
         <h2 className="text-lg font-semibold">{TITLES[page]}</h2>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
@@ -41,7 +45,8 @@ export function SettingsPanel() {
         {page === 'privacy' && <Privacy />}
         {page === 'notifications' && <Notifications />}
         {page === 'chats' && <Chats />}
-        {page === 'account' && <Account />}
+        {page === 'account' && <Account go={setPage} />}
+        {page === 'sessions' && <Sessions />}
         {page === 'about' && <About />}
       </div>
     </Panel>
@@ -93,6 +98,7 @@ function Main({ go }: { go: (p: Page) => void }) {
         <NavRow icon={<Shield />} label="Privacy" sub="Last seen, read receipts, blocked" onClick={() => go('privacy')} />
         <NavRow icon={<Bell />} label="Notifications" sub="Push notifications, sounds" onClick={() => go('notifications')} />
         <NavRow icon={<MessageSquare />} label="Chats" sub="Enter to send, archived chats" onClick={() => go('chats')} />
+        <NavRow icon={<MonitorSmartphone />} label="Active sessions" sub="Devices signed in to your account" onClick={() => go('sessions')} />
         <NavRow icon={<KeyRound />} label="Account" sub="Password, sign out" onClick={() => go('account')} />
         <NavRow icon={<Info />} label="About" onClick={() => go('about')} />
       </Section>
@@ -314,7 +320,7 @@ function Chats() {
 }
 
 // ---------- account ----------
-function Account() {
+function Account({ go }: { go: (p: Page) => void }) {
   const me = useApp((s) => s.me)!;
   const [cur, setCur] = useState('');
   const [next, setNext] = useState('');
@@ -350,6 +356,9 @@ function Account() {
         </form>
       </Section>
       <Section>
+        <NavRow icon={<MonitorSmartphone />} label="Active sessions" sub="See where you’re signed in and sign out devices" onClick={() => go('sessions')} />
+      </Section>
+      <Section>
         <button onClick={async () => {
           if (await confirm({ title: 'Sign out?', description: 'Messages stored on this device will be removed.', confirmText: 'Sign out', destructive: true })) logout();
         }} className="flex w-full items-center gap-4 px-5 py-3.5 text-left text-danger hover:bg-hover"><LogOut className="size-5" /> Sign out</button>
@@ -358,6 +367,75 @@ function Account() {
         }} className="flex w-full items-center gap-4 px-5 py-3.5 text-left text-danger hover:bg-hover"><UserRound className="size-5" /> Sign out of all devices</button>
       </Section>
     </>
+  );
+}
+
+// ---------- active sessions ----------
+function Sessions() {
+  const [list, setList] = useState<Session[] | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const load = () => listSessions().then(setList).catch((e) => toast.error(e.message));
+  useEffect(() => { load(); }, []);
+
+  async function signOut(s: Session) {
+    if (!(await confirm({ title: `Sign out ${deviceName(s.ua)}?`, description: 'That device will be signed out right away. Messages stored on it stay there until someone signs in again.', confirmText: 'Sign out', destructive: true }))) return;
+    setBusy(s.id);
+    try { await revokeSession(s.id); toast.success('Device signed out'); await load(); } catch (e) { toast.error((e as Error).message); }
+    setBusy(null);
+  }
+  async function signOutOthers() {
+    const others = (list || []).filter((s) => !s.current);
+    if (!(await confirm({ title: `Sign out ${others.length} other device${others.length > 1 ? 's' : ''}?`, description: 'You’ll stay signed in on this device.', confirmText: 'Sign out others', destructive: true }))) return;
+    setBusy('others');
+    try { for (const s of others) await revokeSession(s.id); toast.success('Other devices signed out'); await load(); } catch (e) { toast.error((e as Error).message); }
+    setBusy(null);
+  }
+
+  if (!list) return <div className="grid place-items-center py-16 text-accent"><Spinner className="size-6" /></div>;
+  const others = list.filter((s) => !s.current);
+  return (
+    <>
+      <Section className="px-5 py-4">
+        <p className="text-sm text-muted">These devices are signed in to your account. If you don’t recognise one, sign it out and change your password.</p>
+      </Section>
+      <Section title="This device"><ul>{list.filter((s) => s.current).map((s) => <SessionRow key={s.id} s={s} />)}</ul></Section>
+      <Section title={`Other devices (${others.length})`}>
+        {!others.length && <p className="px-5 py-4 text-sm text-muted">You’re not signed in anywhere else.</p>}
+        <ul>
+          {others.map((s) => (
+            <SessionRow key={s.id} s={s}>
+              <Button size="sm" variant="outline" className="text-danger" loading={busy === s.id} onClick={() => signOut(s)}>Sign out</Button>
+            </SessionRow>
+          ))}
+        </ul>
+        {others.length > 1 && (
+          <div className="px-5 pt-1 pb-4">
+            <Button variant="danger" className="w-full" loading={busy === 'others'} onClick={signOutOthers}><LogOut className="size-4" /> Sign out all other devices</Button>
+          </div>
+        )}
+      </Section>
+    </>
+  );
+}
+
+function SessionRow({ s, children }: { s: Session; children?: ReactNode }) {
+  const d = parseDevice(s.ua);
+  const Icon = d?.kind === 'phone' ? Smartphone : d?.kind === 'tablet' ? Tablet : d ? Laptop : MonitorSmartphone;
+  const active = s.current || s.online;
+  return (
+    <li className="flex items-center gap-4 px-5 py-3">
+      <span className="grid size-11 shrink-0 place-items-center rounded-full bg-accent/12 text-accent-ink"><Icon className="size-5" /></span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-medium">{deviceName(s.ua)}</span>
+        <span className={cn('block truncate text-sm', active ? 'text-accent-ink' : 'text-muted')}>
+          {s.current ? 'This device · active now' : s.online ? 'Active now' : s.lastSeen ? `Last active ${fmtListTime(s.lastSeen).toLowerCase()}` : 'Last active: unknown'}
+        </span>
+        <span className="block truncate text-xs text-muted">
+          {s.created ? `Signed in ${new Date(s.created).toLocaleDateString()}` : 'Signed in before session details were recorded'}{s.ip && ` · IP ${s.ip}`}
+        </span>
+      </span>
+      {children}
+    </li>
   );
 }
 

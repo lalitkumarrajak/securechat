@@ -55,9 +55,11 @@ function ActionSheet() {
               <li key={a.key}>
                 // Close the sheet right now (it traps focus while open), then run the action in the
                 // same tap, so "Reply" can focus the message box and open the keyboard.
-                <button onClick={() => { flushSync(close); a.run(); }}
-                  className={cn('flex w-full items-center gap-4 rounded-xl px-3 py-3 text-left hover:bg-hover [&_svg]:size-5', a.danger ? 'text-danger' : '[&_svg]:text-muted')}>
-                  {ICONS[a.key]}{a.label}
+                <button onClick={() => { flushSync(close); a.run(); }} disabled={a.disabled}
+                  className={cn('flex w-full items-center gap-4 rounded-xl px-3 py-3 text-left hover:bg-hover disabled:opacity-45 disabled:hover:bg-transparent [&_svg]:size-5',
+                    a.danger ? 'text-danger' : '[&_svg]:text-muted')}>
+                  {ICONS[a.key]}
+                  <span>{a.label}{a.hint && <span className="block text-xs text-muted">{a.hint}</span>}</span>
                 </button>
               </li>
             ))}

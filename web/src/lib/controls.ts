@@ -10,7 +10,7 @@ const DELETE_MARGIN_MS = 10e3;
 
 export const senderOf = (m: Pick<Msg, 'k'>) => m.k.slice(0, m.k.indexOf('/'));
 
-const isContent = (m: Msg) => m.type === 'text' || m.type === 'img' || m.type === 'voice';
+const isContent = (m: Msg) => m.type !== 'deleted' && m.type !== 'err';
 
 /** Apply an edit if it comes from the original sender, in time, and is newer than the last edit. */
 export function applyEdit(target: Msg, from: string, ts: number, text: string): Msg | null {
@@ -37,8 +37,11 @@ export function applyPin(pins: Pin[], k: string, on: boolean, ts: number): Pin[]
   return (on ? [{ k, ts }, ...rest] : rest).sort((a, b) => b.ts - a.ts).slice(0, MAX_PINS);
 }
 
+/** Your own sent text message: the kind that can be edited (if still within the time limit). */
+export const isEditable = (m: Msg) => m.out && m.type === 'text' && m.id != null;
+
 export function canEdit(m: Msg, now = Date.now()) {
-  return m.out && m.type === 'text' && m.id != null && now - m.ts < EDIT_WINDOW_MS - DELETE_MARGIN_MS;
+  return isEditable(m) && now - m.ts < EDIT_WINDOW_MS - DELETE_MARGIN_MS;
 }
 
 /** "Delete for everyone" only if every selected message is mine, sent, and recent enough. */

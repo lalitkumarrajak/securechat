@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  Archive, ArchiveRestore, ArrowLeft, Bell, BellOff, ChevronDown, ChevronUp, Copy, Forward, Lock, MoreVertical, Pin,
+  Archive, ArchiveRestore, ArrowLeft, Bell, BellOff, ChevronDown, ChevronUp, Copy, Forward, Lock, MoreVertical, Pencil, Pin, Reply,
   Search, ShieldAlert, ShieldCheck, SquareCheck, Trash2, UserMinus, UserX, X,
 } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
@@ -18,7 +18,8 @@ import { useSettings } from '../../state/settings';
 import { Composer } from './Composer';
 import { MessageList } from './MessageList';
 import { ChatDialogs } from './ChatDialogs';
-import { deleteFlow, setChatUi } from './chatUi';
+import { deleteFlow, setChatUi, startEdit, startReply } from './chatUi';
+import { canEdit } from '../../lib/controls';
 
 export function EmptyPane() {
   const wallpaper = useSettings((s) => s.wallpaper);
@@ -167,6 +168,8 @@ function SelectionBar() {
     <header className="flex h-16 shrink-0 items-center gap-1 border-b border-line bg-panel px-2">
       <IconButton label="Cancel selection" onClick={() => setApp({ selection: null })}><X /></IconButton>
       <span className="flex-1 pl-1 font-semibold">{picked.length ? `${picked.length} selected` : 'Select messages'}</span>
+      {single && <IconButton label="Reply" onClick={() => { setApp({ selection: null }); startReply(single); }}><Reply /></IconButton>}
+      {single && canEdit(single) && <IconButton label="Edit" onClick={() => { setApp({ selection: null }); startEdit(single); }}><Pencil /></IconButton>}
       {allText && <IconButton label="Copy" onClick={() => copyMessages(picked).then(() => { toast.success('Copied'); setApp({ selection: null }); })}><Copy /></IconButton>}
       {single && <IconButton label={pinned ? 'Unpin' : 'Pin'} onClick={() => { togglePin(single); setApp({ selection: null }); }}><Pin /></IconButton>}
       {content.length > 0 && content.length === picked.length && (

@@ -1,7 +1,7 @@
 // End-to-end: two (sometimes three) phones using Chattrix the way people do.
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
-import { bubble, longPress, newTab, phone, signIn, signUp, swipeRight, testPng, uname, type Phone } from './helpers';
+import { bubble, longPress, newTab, phone, signIn, signUp, stubExternalImages, swipeRight, testPdf, testPng, uname, type Phone } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -14,6 +14,7 @@ test.beforeAll(async ({ browser }) => {
   A = await phone(browser, uname('lalit'));
   B = await phone(browser, uname('rakhi'));
   C = await phone(browser, uname('chris'));
+  for (const p of [A, B, C]) await stubExternalImages(p);
 });
 
 test.afterAll(async () => {
@@ -201,7 +202,7 @@ test('photo and voice messages', async () => {
   await expect(A.page.getByRole('menuitem', { name: 'Camera' })).toBeVisible();
   await A.page.keyboard.press('Escape');
   const png = testPng();
-  await A.page.locator('input[type=file]:not([capture])').setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: png });
+  await A.page.locator('input[data-kind="gallery"]').setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: png });
   await expect(B.page.locator('img[alt="Photo"]').last()).toBeVisible();
 
   // Voice: hold the mic for ~1.5 s with Chrome's fake microphone, release to send
@@ -306,7 +307,114 @@ test('dark mode chat screen and desktop layout', async ({ browser }) => {
   await D.page.screenshot({ path: shots('11-desktop-menu') });
   await D.page.keyboard.press('Escape');
   expect(D.errors).toEqual([]);
+
+  // Active sessions: B sees both devices and signs the desktop out from the phone
+  await B.page.getByRole('button', { name: 'Back' }).first().click();
+  await B.page.getByRole('button', { name: 'Profile and settings' }).click();
+  await B.page.getByRole('button', { name: /Active sessions/ }).click();
+  await expect(B.page.getByText('This device · active now')).toBeVisible();
+  const other = B.page.locator('li').filter({ hasText: 'Chrome on Linux' }).filter({ has: B.page.getByRole('button', { name: 'Sign out' }) });
+  await expect(other).toBeVisible();
+  await B.page.waitForTimeout(350);
+  await B.page.screenshot({ path: shots('14-sessions') });
+  await other.getByRole('button', { name: 'Sign out' }).click();
+  await B.page.getByRole('alertdialog').getByRole('button', { name: 'Sign out' }).click();
+  await expect(B.page.getByText('Device signed out')).toBeVisible();
+  await expect(D.page.getByRole('tab', { name: 'Sign in' })).toBeVisible({ timeout: 10_000 }); // the desktop is back at the landing page
   await D.ctx.close();
+  await B.page.keyboard.press('Escape');
+  await B.page.locator('li').filter({ hasText: 'Lalit Rajak' }).first().click();
+});
+
+test('composer: emoji, attach and camera sit inside the message box', async () => {
+  const box = A.page.locator('div:has(> textarea#composer-input)');
+  await expect(box.getByRole('button', { name: 'Emoji, GIFs and stickers' })).toBeVisible();
+  await expect(box.getByRole('button', { name: 'Attach' })).toBeVisible();
+  await expect(box.getByRole('button', { name: 'Camera' })).toBeVisible();
+});
+
+test('emoji panel, animated stickers and GIFs', async () => {
+  const input = A.page.getByRole('textbox', { name: 'Message' });
+  await A.page.getByRole('button', { name: 'Emoji, GIFs and stickers' }).click();
+  const panel = A.page.getByRole('dialog', { name: 'Emoji, GIFs and stickers' });
+  await expect(panel).toBeVisible();
+  await panel.getByRole('button', { name: '🔥' }).first().click();
+  await panel.getByRole('button', { name: '😂' }).first().click();
+  await expect(input).toHaveValue('🔥😂');
+  await panel.getByRole('button', { name: 'Delete' }).click();
+  await expect(input).toHaveValue('🔥');
+  await panel.getByRole('button', { name: 'Delete' }).click(); // not input.fill: focusing the box swaps the panel for the keyboard
+  await expect(input).toHaveValue('');
+
+  // Built-in animated sticker
+  await panel.getByRole('button', { name: 'Stickers' }).click();
+  await panel.getByRole('button', { name: 'Sticker 🥳' }).click();
+  await expect(B.page.locator('[data-k] .big-emoji svg').last()).toBeVisible({ timeout: 15_000 });
+
+  // GIF search (KLIPY): the box must say "Search KLIPY"
+  await panel.getByRole('button', { name: 'GIFs' }).click();
+  await expect(panel.getByPlaceholder('Search KLIPY')).toBeVisible();
+  await expect(panel.getByText('Powered by KLIPY')).toBeVisible();
+  await panel.getByPlaceholder('Search KLIPY').fill('party');
+  await panel.getByRole('button', { name: 'Test GIF 2' }).click();
+  await expect(B.page.locator('img[alt="GIF"]').last()).toHaveAttribute('src', 'https://static.klipy.com/ii/test/2-md.webp');
+  await A.page.screenshot({ path: shots('12-gif-panel') });
+  await A.page.getByRole('button', { name: 'Keyboard' }).click();
+  await expect(panel).toHaveCount(0);
+  await expect(input).toBeFocused();
+});
+
+test('documents arrive with a preview; locations show on a map', async () => {
+  // PDF: first page rendered as a thumbnail on the sender's side
+  await A.page.locator('input[data-kind="document"]').setInputFiles({ name: 'Plan.pdf', mimeType: 'application/pdf', buffer: testPdf() });
+  const card = B.page.locator('[data-k]').filter({ hasText: 'Plan.pdf' }).last();
+  await expect(card).toBeVisible({ timeout: 20_000 });
+  await expect(card.getByText(/1 page/)).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Preview' })).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Download Plan.pdf' })).toBeVisible();
+  const [download] = await Promise.all([B.page.waitForEvent('download'), card.getByRole('button', { name: 'Download Plan.pdf' }).click()]);
+  expect(download.suggestedFilename()).toBe('Plan.pdf');
+
+  // Text file: the first lines are the preview
+  await A.page.locator('input[data-kind="document"]').setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('Shopping list\n- milk\n- bread') });
+  await expect(B.page.locator('[data-k]').filter({ hasText: 'notes.txt' }).last().getByText('Shopping list')).toBeVisible();
+
+  // Location
+  await A.page.getByRole('button', { name: 'Attach' }).click();
+  await A.page.getByRole('menuitem', { name: 'Location' }).click();
+  await A.page.getByRole('alertdialog').getByRole('button', { name: 'Send location' }).click();
+  const loc = B.page.locator('[data-k]').filter({ hasText: 'Open in Maps' }).last();
+  await expect(loc).toBeVisible();
+  await expect(loc.getByRole('link')).toHaveAttribute('href', /query=28\.6129,77\.2295/);
+  await expect(loc.locator('img[src*="tile.openstreetmap.org/15/"]')).toHaveCount(4);
+  await B.page.screenshot({ path: shots('13-file-location') });
+});
+
+test('links get a preview card', async () => {
+  const input = A.page.getByRole('textbox', { name: 'Message' });
+  await input.fill('Look at this http://localhost:4322/article');
+  await expect(A.page.getByText('Chattrix launches link previews')).toBeVisible();
+  await A.page.getByRole('button', { name: 'Send' }).click();
+  const msg = B.page.locator('[data-k]').filter({ hasText: 'Look at this' }).last();
+  await expect(msg.getByText('Chattrix launches link previews')).toBeVisible();
+  await expect(msg.getByText('Chattrix Blog')).toBeVisible();
+  // Dismissing the preview sends the link without one
+  await input.fill('No card please http://localhost:4322/article');
+  await A.page.getByRole('button', { name: 'Remove link preview' }).click();
+  await A.page.getByRole('button', { name: 'Send' }).click();
+  await expect(B.page.locator('[data-k]').filter({ hasText: 'No card please' }).last().getByText('Chattrix Blog')).toHaveCount(0);
+});
+
+test('select several to forward or delete; edit from the selection bar', async () => {
+  await longPress(A, bubble(A, 'No card please').locator('div').first());
+  await A.page.getByRole('dialog').getByRole('button', { name: 'Select' }).click();
+  await expect(A.page.getByRole('button', { name: 'Edit' })).toBeVisible(); // one own recent text message
+  await bubble(A, 'Look at this').locator('div').first().click(); // tap to add a second
+  await expect(A.page.getByText('2 selected')).toBeVisible();
+  await expect(A.page.getByRole('button', { name: 'Forward' })).toBeVisible();
+  await expect(A.page.getByRole('button', { name: 'Delete' })).toBeVisible();
+  await expect(A.page.getByRole('button', { name: 'Edit' })).toHaveCount(0); // only for a single message
+  await A.page.getByRole('button', { name: 'Cancel selection' }).click();
 });
 
 test('block stops messages', async () => {

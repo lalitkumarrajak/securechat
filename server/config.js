@@ -25,10 +25,13 @@ export const config = {
   presenceTimeoutMs: num(process.env.PRESENCE_TIMEOUT_MS, 45e3), // no heartbeat for this long = offline
   presenceSweepMs: num(process.env.PRESENCE_SWEEP_MS, 10e3),
   publicUrl: process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || '',
+  klipyKey: process.env.KLIPY_API_KEY || '',
+  klipyBase: process.env.KLIPY_BASE_URL || 'https://api.klipy.com', // overridable for tests
   vapid: { publicKey: process.env.VAPID_PUBLIC_KEY, privateKey: process.env.VAPID_PRIVATE_KEY },
 };
 
 export const USER_RE = /^[a-z0-9_.]{3,24}$/;
 export const CID_RE = /^[A-Za-z0-9_-]{8,40}$/;
 export const B64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
-export const MAX_BODY = 2_000_000; // max ciphertext length (chars) per message
+// Max ciphertext length (chars) per message: a 5 MB file, base64'd inside the JSON and again after encryption.
+export const MAX_BODY = 10_000_000;
