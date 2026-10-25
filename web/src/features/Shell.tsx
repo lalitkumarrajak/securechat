@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { cn } from '../lib/utils';
 import { useApp } from '../state/app';
 import { Sidebar } from './sidebar/Sidebar';
@@ -7,10 +8,12 @@ import { SettingsPanel } from './settings/SettingsPanel';
 import { ContactPanel } from './conversation/ContactPanel';
 import { GameScreen } from './games/GameScreen';
 import { NewGameDialog } from './games/NewGameDialog';
+import { handleInvite } from '../lib/invite';
 
 /** Two panes on desktop; on phones, the chat list or the open chat. */
 export function Shell() {
   const active = useApp((s) => s.active);
+  useEffect(() => { handleInvite(); }, []); // opened from someone's invite link
   return (
     <div className="mx-auto flex h-dvh max-w-[1600px] overflow-hidden bg-panel md:border-x md:border-line">
       <aside className={cn('flex w-full flex-col border-line bg-panel md:w-[360px] md:shrink-0 md:border-r lg:w-[400px]', active && 'hidden md:flex')}>

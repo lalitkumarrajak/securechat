@@ -59,6 +59,11 @@ export async function boot() {
   fetch('/api/config').then((r) => r.json()).then((c) => setApp({ signupOpen: !!c.signup, gifsEnabled: !!c.gifs })).catch(() => {});
   const sess = await db.get('kv', 'session');
   if (!sess) return setApp({ status: 'auth' });
+  if (useSettings.getState().signOutOnClose && await tabWasClosed()) {
+    await wipe(sess.token);
+    return setApp({ status: 'auth' });
+  }
+  markAlive();
   Object.assign(S, { token: sess.token, me: sess.u, priv: sess.priv, pub: sess.pub });
   S.lastSeq = (await db.get('kv', 'lastSeq')) || 0;
   S.hiddenTs = (await db.get('kv', 'hiddenTs')) || 0;
@@ -94,6 +99,7 @@ async function startSession(u: string, token: string, priv: CryptoKey, pub: stri
   if (prev && prev !== u) await db.clearAll();
   await db.put('kv', u, 'session-user');
   await db.put('kv', { u, token, priv, pub }, 'session');
+  markAlive();
   await boot();
 }
 
@@ -104,6 +110,53 @@ export async function logout(everywhere = false) {
   await db.clearAll();
   location.reload();
 }
+
+// ---------- "sign out when I close the tab" (Settings → Privacy, this device only) ----------
+// sessionStorage survives a reload but not closing the tab, so a tab that opens without our
+// marker was closed, unless another Chattrix tab is still open (asked over a BroadcastChannel).
+// A tab restored after being closed for a while ("reopen closed tab" brings sessionStorage back)
+// is caught by the time of the last close. Closing also tells the server to end the sign-in,
+// unless a tab with it reconnects within a few seconds (a reload).
+const ALIVE = 'chattrix-alive';
+const CLOSED_AT = 'chattrix-closed-at';
+const RELOAD_MS = 10_000;
+const tabs = typeof BroadcastChannel === 'function' ? new BroadcastChannel('chattrix-tabs') : null;
+tabs?.addEventListener('message', (e) => { if (e.data === 'ping' && S.token) tabs.postMessage('pong'); });
+
+const ss = {
+  get: (k: string) => { try { return sessionStorage.getItem(k); } catch { return null; } },
+  set: (k: string, v: string) => { try { sessionStorage.setItem(k, v); } catch { /* storage blocked */ } },
+  del: (k: string) => { try { sessionStorage.removeItem(k); } catch { /* storage blocked */ } },
+};
+const markAlive = () => { ss.set(ALIVE, '1'); ss.del(CLOSED_AT); };
+
+async function tabWasClosed() {
+  const closedAt = Number(ss.get(CLOSED_AT) || 0);
+  if (ss.get(ALIVE) && (!closedAt || Date.now() - closedAt < RELOAD_MS)) return false; // a reload
+  if (!tabs) return true;
+  return new Promise<boolean>((resolve) => {
+    const onMsg = (e: MessageEvent) => { if (e.data === 'pong') { tabs.removeEventListener('message', onMsg); resolve(false); } };
+    tabs.addEventListener('message', onMsg);
+    tabs.postMessage('ping');
+    setTimeout(() => { tabs.removeEventListener('message', onMsg); resolve(true); }, 250);
+  });
+}
+
+// Sign out and erase everything this device holds, without reloading.
+async function wipe(token: string) {
+  S.token = token;
+  await disablePush().catch(() => {});
+  await api('/api/logout', {}).catch(() => {});
+  S.token = null;
+  await db.clearAll();
+  ss.del(ALIVE);
+}
+
+window.addEventListener('pagehide', (e) => {
+  if (e.persisted || !S.token || !useSettings.getState().signOutOnClose) return;
+  ss.set(CLOSED_AT, String(Date.now()));
+  navigator.sendBeacon?.('/api/session/closing', JSON.stringify({ token: S.token }));
+});
 
 function teardown() {
   S.token = null;

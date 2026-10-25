@@ -8,6 +8,7 @@ import { useSettings } from './state/settings';
 import { Landing } from './features/auth/Landing';
 import { Shell } from './features/Shell';
 import { joinFromLink } from './features/games/store';
+import { rememberInvite } from './lib/invite';
 
 let booted = false;
 
@@ -19,8 +20,12 @@ export function App() {
     if (booted) return; // StrictMode runs effects twice in development
     booted = true;
     // A shared game link: /?play=<id>. Kept through sign-in; joined once connected.
-    const play = new URLSearchParams(location.search).get('play');
+    const params = new URLSearchParams(location.search);
+    const play = params.get('play');
     if (play) { history.replaceState(null, '', '/'); joinFromLink(play); }
+    // "Join me on Chattrix": /?add=<username>, offered as a friend request once signed in.
+    const add = params.get('add');
+    if (add) { history.replaceState(null, '', '/'); rememberInvite(add); }
     boot().then(() => {
       // Opened from a notification: /?chat=username
       const chat = new URLSearchParams(location.search).get('chat');

@@ -5,6 +5,7 @@ import { Input, Label } from '../../components/ui/input';
 import { Tabs, TabsContent, TabsList } from '../../components/ui/tabs';
 import { login, register } from '../../lib/engine';
 import { hasPendingLink } from '../games/store';
+import { pendingInviter } from '../../lib/invite';
 import { useApp } from '../../state/app';
 
 const FEATURES = [
@@ -23,6 +24,11 @@ export function Landing() {
       {hasPendingLink() && (
         <div className="bg-accent px-4 py-3 text-center text-sm font-medium text-accent-ink" role="status">
           🎲 You’ve been invited to a game. Sign in, or create a free account, to join.
+        </div>
+      )}
+      {!hasPendingLink() && pendingInviter() && (
+        <div className="bg-accent px-4 py-3 text-center text-sm font-medium text-accent-ink" role="status">
+          👋 @{pendingInviter()} invited you to Chattrix. Create a free account, or sign in, to chat.
         </div>
       )}
       <div className="mx-auto grid min-h-full max-w-6xl items-center gap-10 px-5 py-8 md:grid-cols-[1.1fr_1fr] md:gap-16 md:px-10">

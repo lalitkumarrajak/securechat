@@ -16,7 +16,7 @@ test.beforeAll(async ({ browser }) => {
   A = await phone(browser, uname('host'));
   B = await phone(browser, uname('bina'));
   C = await phone(browser, uname('chet'));
-  // No share sheet in headless Chrome: the app falls back to copying the link.
+  // No share sheet, so only the Copy button shows (as on most computers).
   for (const p of [A, B, C]) await p.page.addInitScript(() => { Object.defineProperty(Navigator.prototype, 'share', { value: undefined }); });
 });
 
@@ -33,8 +33,9 @@ test('host creates a game and shares its link', async () => {
   await expect(dlg.getByRole('button', { name: /Ludo/ })).toBeVisible();
   await dlg.getByRole('button', { name: 'Create game and share link' }).click();
   await expect(A.page.getByRole('heading', { name: 'Waiting for players' })).toBeVisible();
-  await A.page.getByRole('button', { name: 'Share invite link' }).click();
-  await expect(A.page.getByText('Link copied')).toBeVisible();
+  await expect(A.page.getByText('Invite anyone with this link')).toBeVisible();
+  await A.page.getByRole('button', { name: 'Copy link' }).click();
+  await expect(A.page.getByText('Link copied').first()).toBeVisible();
   link = await A.page.evaluate(() => navigator.clipboard.readText());
   expect(link).toMatch(/\/\?play=[A-Za-z0-9_-]{12}$/);
   await expect(A.page.getByText(/Anyone with the link can join/)).toBeVisible();
@@ -122,7 +123,7 @@ test('5 or 6 players use the six-arm board', async ({ browser }) => {
   try {
     await A.page.getByRole('button', { name: 'Play games' }).click();
     await A.page.getByRole('dialog', { name: 'Play a game' }).getByRole('button', { name: 'Create game and share link' }).click();
-    await A.page.getByRole('button', { name: 'Share invite link' }).click();
+    await A.page.getByRole('button', { name: 'Copy link' }).click();
     const l2 = await A.page.evaluate(() => navigator.clipboard.readText());
     for (const p of [B, C]) await p.page.goto(l2);
     for (const p of more) { await signUp(p); await p.page.goto(l2); }

@@ -65,7 +65,7 @@ function dropSockets(user, keepTokenHash) {
   }
 }
 
-export const PUBLIC_ROUTES = new Set(['POST /api/register', 'POST /api/login', 'GET /api/config']);
+export const PUBLIC_ROUTES = new Set(['POST /api/register', 'POST /api/login', 'GET /api/config', 'POST /api/session/closing']);
 
 export const routes = {
   // What the landing page needs to know before anyone signs in.
@@ -102,6 +102,22 @@ export const routes = {
   'POST /api/logout': async (req, res, me, token) => {
     await ctx.db.run('deleteSession', sha256(token));
     sendJson(res, 200, { ok: true });
+  },
+
+  // "Sign out when I close the tab": a closing tab sends its token (navigator.sendBeacon can't set
+  // headers). Unless a tab using the same sign-in is connected again shortly after (a reload, or
+  // another open tab), the sign-in ends.
+  'POST /api/session/closing': async (req, res) => {
+    if (rateLimited('closing:' + clientIp(req), 30, 60e3)) return sendJson(res, 429, { error: 'Slow down' });
+    const { token } = await readJson(req, 1024);
+    const user = await userFromToken(token);
+    sendJson(res, 200, { ok: true });
+    if (!user) return;
+    const hash = sha256(token);
+    setTimeout(async () => {
+      const stillOpen = [...(online.get(user) || [])].some((ws) => ws.tokenHash === hash);
+      if (!stillOpen) await ctx.db.run('deleteSession', hash).catch((err) => console.error('closing sign-out failed', err.message));
+    }, config.closeGraceMs).unref();
   },
 
   // Devices signed in to this account, newest activity first.

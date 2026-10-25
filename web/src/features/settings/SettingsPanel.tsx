@@ -95,7 +95,7 @@ function Main({ go }: { go: (p: Page) => void }) {
       </button>
       <Section>
         <NavRow icon={<Palette />} label="Appearance" sub="Theme, colour, wallpaper, text size" onClick={() => go('appearance')} />
-        <NavRow icon={<Shield />} label="Privacy" sub="Last seen, read receipts, blocked" onClick={() => go('privacy')} />
+        <NavRow icon={<Shield />} label="Privacy" sub="Last seen, read receipts, sign out on close, blocked" onClick={() => go('privacy')} />
         <NavRow icon={<Bell />} label="Notifications" sub="Push notifications, sounds" onClick={() => go('notifications')} />
         <NavRow icon={<MessageSquare />} label="Chats" sub="Enter to send, archived chats" onClick={() => go('chats')} />
         <NavRow icon={<MonitorSmartphone />} label="Active sessions" sub="Devices signed in to your account" onClick={() => go('sessions')} />
@@ -248,6 +248,7 @@ function Appearance() {
 function Privacy() {
   const me = useApp((s) => s.me)!;
   const blocked = useApp((s) => s.blocked);
+  const signOutOnClose = useSettings((s) => s.signOutOnClose);
   const set = (privacy: Partial<typeof me.privacy>) => updateProfile({ privacy }).catch((e) => toast.error(e.message));
   return (
     <>
@@ -256,6 +257,14 @@ function Privacy() {
           checked={me.privacy.lastSeen} onChange={(v) => set({ lastSeen: v })} />
         <ToggleRow label="Read receipts" sub="If you turn this off, you won’t send or see blue ticks."
           checked={me.privacy.receipts} onChange={(v) => set({ receipts: v })} />
+      </Section>
+      <Section title="On this device">
+        <ToggleRow label="Sign out when I close the tab"
+          sub="For shared computers or a quick exit: closing Chattrix signs you out and erases chats saved on this device. Reloading keeps you signed in. Your chats come back when you sign in again."
+          checked={signOutOnClose} onChange={(v) => {
+            setSettings({ signOutOnClose: v });
+            toast(v ? 'You’ll be signed out when you close this tab' : 'You’ll stay signed in on this device');
+          }} />
       </Section>
       <Section title={`Blocked (${blocked.length})`}>
         {!blocked.length && <p className="px-5 py-4 text-sm text-muted">You haven’t blocked anyone.</p>}

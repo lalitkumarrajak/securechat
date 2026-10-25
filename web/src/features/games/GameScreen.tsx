@@ -1,8 +1,9 @@
 // The full-screen game view every game shares: header, lobby, the game's own board, in-game
 // chat with emoji and quick phrases, and the results.
 import { Suspense, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Check, Clock, Crown, LogOut, Share2, MessageCircle, MoreVertical, SendHorizontal, Smile, Volume2, VolumeX, X } from 'lucide-react';
+import { ArrowLeft, Check, Clock, Crown, LogOut, MessageCircle, MoreVertical, SendHorizontal, Smile, Volume2, VolumeX, X } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
+import { LinkBox } from '../../components/LinkBox';
 import { Button, IconButton, Spinner } from '../../components/ui/button';
 import { confirm } from '../../components/ui/confirm';
 import { Dialog } from '../../components/ui/dialog';
@@ -13,7 +14,7 @@ import { useApp } from '../../state/app';
 import { setSettings, useSettings } from '../../state/settings';
 import { GAME_UI } from './registry';
 import {
-  act, createGame, decline, dismiss, join, leave, nameOf, openGame, say, setChatOpen, share, startNow, useGames, type ChatLine, type Game,
+  act, createGame, decline, dismiss, gameName, join, leave, linkShared, nameOf, openGame, say, setChatOpen, shareLink, startNow, useGames, type ChatLine, type Game,
 } from './store';
 
 export const QUICK_EMOJI = ['😂', '😍', '😎', '😡', '😭', '🔥', '👏', '🙏', '😈', '🤞'];
@@ -209,9 +210,12 @@ function Lobby({ g, me, onLeave }: { g: Game; me: string; onLeave: () => void })
         </div>
       ) : null}
       {mine?.state === 'joined' && (
-        <Button variant="secondary" className="w-full gap-2" onClick={() => share(g)}>
-          <Share2 className="size-4" /> Share invite link
-        </Button>
+        <div className="w-full rounded-2xl bg-white/10 p-3 text-left">
+          <p className="mb-2 text-sm font-semibold">Invite anyone with this link</p>
+          <LinkBox dark url={shareLink(g.id)} title={gameName(g.type)} text={`Play ${gameName(g.type)} with me on Chattrix!`}
+            onUse={() => linkShared(g)} />
+          <p className="mt-2 text-xs text-white/60">They don’t need to be your friend. New people can sign up from the link.</p>
+        </div>
       )}
       {mine?.state === 'invited' ? null : g.host === me ? (
         <div className="w-full space-y-2">

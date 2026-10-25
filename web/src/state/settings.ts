@@ -17,6 +17,7 @@ export interface Settings {
   sound: boolean;
   gameSound: boolean;
   push: boolean;
+  signOutOnClose: boolean; // this device only: closing the tab signs out and erases local data
 }
 
 export const ACCENTS: { id: Accent; label: string; color: string }[] = [
@@ -37,6 +38,7 @@ const defaults: Settings = {
   sound: true,
   gameSound: true,
   push: false,
+  signOutOnClose: false,
 };
 
 export const useSettings = create<Settings>()(persist(() => defaults, { name: 'chattrix-settings', version: 1 }));

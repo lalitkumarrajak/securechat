@@ -24,6 +24,7 @@ export const config = {
   deleteWindowMs: num(process.env.DELETE_WINDOW_MS, 5 * 60e3), // "delete for everyone" limit
   presenceTimeoutMs: num(process.env.PRESENCE_TIMEOUT_MS, 45e3), // no heartbeat for this long = offline
   presenceSweepMs: num(process.env.PRESENCE_SWEEP_MS, 10e3),
+  closeGraceMs: num(process.env.CLOSE_GRACE_MS, 15e3), // "sign out on tab close": time for a reload to reconnect
   gameLobbyMs: num(process.env.GAME_LOBBY_MS, 10 * 60e3), // unanswered game invites expire
   gameTurnMs: num(process.env.GAME_TURN_MS, 0),   // 0: each game's own turn time (tests shorten it)
   gameAnimMs: num(process.env.GAME_ANIM_MS, 3000), // extra time per turn for animations to finish

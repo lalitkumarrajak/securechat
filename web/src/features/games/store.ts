@@ -137,17 +137,8 @@ export const leave = (id: string) => sendOrWarn({ t: 'gleave', id });
 export const act = (id: string, a: object) => sendOrWarn({ t: 'gact', id, a });
 export const say = (id: string, x: string) => sendOrWarn({ t: 'gsay', id, x });
 
-/** Share the game's link (phone share sheet, or copy). Joining by link stays open until the game starts. */
-export async function share(g: Game) {
-  sendOrWarn({ t: 'glink', id: g.id });
-  const url = shareLink(g.id);
-  const text = `Play ${gameName(g.type)} with me on Chattrix!`;
-  try {
-    if (navigator.share) { await navigator.share({ title: gameName(g.type), text, url }); return; }
-  } catch (e) { if ((e as Error).name === 'AbortError') return; }
-  try { await navigator.clipboard.writeText(url); toast.success('Link copied', { description: 'Send it to anyone you want to play with.' }); }
-  catch { toast(url, { description: 'Copy this link and send it.', duration: 20_000 }); }
-}
+/** The game's link was copied or shared: from now on anyone with it can join until the game starts. */
+export const linkShared = (g: Game) => { if (!g.open) sendOrWarn({ t: 'glink', id: g.id }); };
 
 export const openGame = (id: string | null) => set({ open: id, chatOpen: false });
 export const openPicker = (friends: string[] = []) => set({ picker: friends });
