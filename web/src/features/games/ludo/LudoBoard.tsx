@@ -8,7 +8,8 @@ import { homeAt } from '../../../../../shared/games/ludo.js';
 import { playSound } from '../sounds';
 import type { Game, GameEvent } from '../store';
 import type { GameBoardProps } from '../registry';
-import { COLORS, COLOR_NAMES, DARK, makeLayout, pathOf, poly, type Layout, type Pt } from './geometry';
+import { MISSES_OUT } from '../../../../../shared/games/core.js';
+import { COLORS, COLOR_NAMES, DARK, LIGHT, makeLayout, pathOf, poly, type Layout, type Pt } from './geometry';
 
 interface LudoState { arms: number; arm: number[]; tokens: number[][]; phase: 'roll' | 'move'; dice: number; sixes: number; moves: number[] }
 interface Shown { tokens: number[][]; turn: number; dice: { s: number; d: number; rolling: boolean } | null }
@@ -137,6 +138,7 @@ function Board({ L, g, shown, home, movable, meIdx, onMove }: {
   const vb = `${L.box.x - pad} ${L.box.y - pad} ${L.box.w + pad * 2} ${L.box.h + pad * 2}`;
   const used = new Set(g.s.arm);
   const colorOfArm = (a: number) => (used.has(a) ? COLORS[a] : '#cfd6e4');
+  const fillOf = (a: number) => (used.has(a) ? `url(#fill-${a})` : 'url(#fill-off)');
 
   // Tokens grouped by spot, so several on one square sit side by side, smaller.
   const tokens: { i: number; t: number; at: Pt; key: string }[] = [];
@@ -167,37 +169,61 @@ function Board({ L, g, shown, home, movable, meIdx, onMove }: {
           <stop offset="0" stopColor="#fff" stopOpacity="0.75" />
           <stop offset="0.5" stopColor="#fff" stopOpacity="0" />
         </radialGradient>
+        {/* glossy colour fills: light top-left to deep bottom-right */}
+        {COLORS.map((c, a) => (
+          <linearGradient key={a} id={`fill-${a}`} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor={LIGHT[a]} />
+            <stop offset="0.55" stopColor={c} />
+            <stop offset="1" stopColor={DARK[a]} />
+          </linearGradient>
+        ))}
+        <linearGradient id="fill-off" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#e4e9f2" /><stop offset="1" stopColor="#b9c2d3" /></linearGradient>
+        <linearGradient id="frame" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#f3d79a" /><stop offset="0.35" stopColor="#c48a3f" /><stop offset="0.7" stopColor="#8a5a22" /><stop offset="1" stopColor="#e3b968" />
+        </linearGradient>
+        <linearGradient id="cell" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#ffffff" /><stop offset="1" stopColor="#eef1f6" /></linearGradient>
+        <filter id="board-shadow" x="-10%" y="-10%" width="120%" height="120%">
+          <feDropShadow dx="0" dy="0.25" stdDeviation="0.35" floodColor="#000" floodOpacity="0.55" />
+        </filter>
+        <filter id="inset" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="0.05" stdDeviation="0.06" floodOpacity="0.35" />
+        </filter>
       </defs>
 
       {/* board base */}
       {L.n === 4 ? (
-        <rect x={L.box.x - 0.15} y={L.box.y - 0.15} width={L.box.w + 0.3} height={L.box.h + 0.3} rx="0.35" fill="#fff" stroke="#c9a46a" strokeWidth="0.22" />
+        <rect x={L.box.x - 0.15} y={L.box.y - 0.15} width={L.box.w + 0.3} height={L.box.h + 0.3} rx="0.35" fill="#fdfcf8" stroke="url(#frame)" strokeWidth="0.3" filter="url(#board-shadow)" />
       ) : (
-        <circle r={Math.max(L.box.w, L.box.h) / 2 + 0.1} fill="#fff" stroke="#c9a46a" strokeWidth="0.22" opacity="0.97" />
+        <circle r={Math.max(L.box.w, L.box.h) / 2 + 0.1} fill="#fdfcf8" stroke="url(#frame)" strokeWidth="0.3" filter="url(#board-shadow)" />
       )}
 
       {/* yards */}
       {Array.from({ length: L.n }, (_, a) => {
         const y = L.yard(a);
         const h = y.size / 2;
-        const c = colorOfArm(a);
+        const c = fillOf(a);
         return (
           <g key={'y' + a}>
-            {y.round ? <circle cx={y.c.x} cy={y.c.y} r={h} fill={c} stroke={DARK[a]} strokeWidth="0.06" />
-              : <rect x={y.c.x - h} y={y.c.y - h} width={y.size} height={y.size} fill={c} />}
-            {y.round ? <circle cx={y.c.x} cy={y.c.y} r={h * 0.72} fill="#fff" />
-              : <rect x={y.c.x - h * 0.66} y={y.c.y - h * 0.66} width={h * 1.32} height={h * 1.32} rx="0.45" fill="#fff" />}
-            {y.spots.map((s, k) => <circle key={k} cx={s.x} cy={s.y} r="0.4" fill={c} opacity={used.has(a) ? 1 : 0.5} />)}
+            {y.round ? <circle cx={y.c.x} cy={y.c.y} r={h} fill={c} stroke={used.has(a) ? DARK[a] : '#9aa5b8'} strokeWidth="0.06" />
+              : <rect x={y.c.x - h} y={y.c.y - h} width={y.size} height={y.size} rx="0.2" fill={c} />}
+            {y.round ? <circle cx={y.c.x} cy={y.c.y} r={h * 0.72} fill="#fff" filter="url(#inset)" />
+              : <rect x={y.c.x - h * 0.66} y={y.c.y - h * 0.66} width={h * 1.32} height={h * 1.32} rx="0.45" fill="#fff" filter="url(#inset)" />}
+            {y.spots.map((s, k) => (
+              <g key={k} opacity={used.has(a) ? 1 : 0.5}>
+                <circle cx={s.x} cy={s.y} r="0.42" fill={c} />
+                <circle cx={s.x} cy={s.y} r="0.42" fill="none" stroke="#000" strokeOpacity="0.15" strokeWidth="0.05" />
+              </g>
+            ))}
           </g>
         );
       })}
 
       {/* track */}
-      {L.track.map((c, sq) => <polygon key={'t' + sq} points={poly(c.poly)} fill="#fff" stroke="#8a8a8a" strokeWidth="0.035" />)}
+      {L.track.map((c, sq) => <polygon key={'t' + sq} points={poly(c.poly)} fill="url(#cell)" stroke="#9aa3b2" strokeWidth="0.035" />)}
       {Array.from({ length: L.n }, (_, a) => (
         <g key={'a' + a}>
-          {L.homeCol(a).map((c, k) => <polygon key={k} points={poly(c.poly)} fill={colorOfArm(a)} stroke="#8a8a8a" strokeWidth="0.035" />)}
-          <polygon points={poly(L.startCell(a).poly)} fill={colorOfArm(a)} stroke="#8a8a8a" strokeWidth="0.035" />
+          {L.homeCol(a).map((c, k) => <polygon key={k} points={poly(c.poly)} fill={fillOf(a)} stroke="#9aa3b2" strokeWidth="0.035" />)}
+          <polygon points={poly(L.startCell(a).poly)} fill={fillOf(a)} stroke="#9aa3b2" strokeWidth="0.035" />
           <Arrow at={L.startCell(a)} ang={L.armAng(a) + Math.PI} color="#fff" />
           <Arrow at={L.entryCell(a)} ang={L.armAng(a) + Math.PI} color={colorOfArm(a)} />
           <Star at={L.starCell(a)} />
@@ -205,7 +231,8 @@ function Board({ L, g, shown, home, movable, meIdx, onMove }: {
       ))}
 
       {/* centre */}
-      {Array.from({ length: L.n }, (_, a) => <polygon key={'c' + a} points={poly(L.homeTri(a))} fill={colorOfArm(a)} stroke="#fff" strokeWidth="0.04" />)}
+      {Array.from({ length: L.n }, (_, a) => <polygon key={'c' + a} points={poly(L.homeTri(a))} fill={fillOf(a)} stroke="#fff" strokeWidth="0.05" />)}
+      <Crown />
 
       {/* tokens */}
       {placed.map((tk) => {
@@ -250,7 +277,17 @@ function Star({ at }: { at: Pt }) {
     const r = k % 2 ? 0.16 : 0.36, a = -Math.PI / 2 + (k * Math.PI) / 5;
     return { x: at.x + Math.cos(a) * r, y: at.y + Math.sin(a) * r };
   });
-  return <polygon points={poly(pts)} fill="none" stroke="#9aa3ad" strokeWidth="0.06" strokeLinejoin="round" />;
+  return <polygon points={poly(pts)} fill="#d7dce5" stroke="#8f99a8" strokeWidth="0.05" strokeLinejoin="round" />;
+}
+
+// A small gold crown in the middle of the board, where tokens finish.
+function Crown() {
+  return (
+    <g transform="translate(0 0.05) scale(0.55)" opacity="0.95">
+      <circle r="0.95" fill="#fff" fillOpacity="0.92" stroke="#e1b448" strokeWidth="0.1" />
+      <path d="M-0.55 0.3 L-0.62 -0.32 L-0.28 -0.05 L0 -0.45 L0.28 -0.05 L0.62 -0.32 L0.55 0.3 Z" fill="#f2b81b" stroke="#b9820a" strokeWidth="0.06" strokeLinejoin="round" />
+    </g>
+  );
 }
 
 function PlayerPanel({ g, i, me, shown, canRoll, onRoll, spinning, bubble, right, below }: {
@@ -264,6 +301,7 @@ function PlayerPanel({ g, i, me, shown, canRoll, onRoll, spinning, bubble, right
   const gone = pl.state === 'left' || pl.state === 'out';
   const dice = spinning ? { s: i, d: 6, rolling: true } : shown.dice?.s === i ? shown.dice : null;
   const homeCount = g.s.tokens[i].filter((p) => p === homeAt(g.s.arms)).length;
+  const away = pl.state === 'playing' && (pl.missed || 0) > 0; // the server has been playing for them
 
   const avatar = (
     <div className="relative">
@@ -284,11 +322,15 @@ function PlayerPanel({ g, i, me, shown, canRoll, onRoll, spinning, bubble, right
   );
 
   const diceBox = (
-    <div className={cn('grid size-12 place-items-center rounded-xl', active ? 'bg-white/15' : 'bg-transparent')}>
+    <div className={cn('relative grid size-12 place-items-center rounded-xl', active ? 'bg-white/15 shadow-[0_0_18px_rgba(255,255,255,0.25)]' : 'bg-transparent')}>
       {active && (canRoll || dice) ? (
         <button type="button" disabled={!canRoll} onClick={onRoll} aria-label={canRoll ? 'Roll dice' : `Rolled ${dice?.d ?? ''}`}
           className="rounded-lg">
           <span className={cn('block', canRoll && 'ludo-roll-hint')}><Dice value={dice?.d || 6} rolling={!!dice?.rolling} /></span>
+          {canRoll && (
+            <span className={cn('ludo-your-turn pointer-events-none absolute z-10 rounded-full bg-amber-400 px-2 py-0.5 text-[11px] font-bold whitespace-nowrap text-amber-950 shadow-lg',
+              below ? 'bottom-full mb-1' : 'top-full mt-1')}>Your turn!</span>
+          )}
         </button>
       ) : active ? <Dice value={6} rolling={false} dim /> : null}
     </div>
@@ -302,8 +344,8 @@ function PlayerPanel({ g, i, me, shown, canRoll, onRoll, spinning, bubble, right
       </div>
       <div className={cn('min-w-0 px-0.5 text-[11px] leading-tight text-white/90', right && 'text-right')}>
         <div className="max-w-[100px] truncate font-semibold">{i === me ? 'You' : pl.n || pl.u}</div>
-        <div className="text-white/60">
-          {gone ? (pl.state === 'out' ? 'Removed' : 'Left') : pl.rank ? ordinal(pl.rank) : `${COLOR_NAMES[arm]}${homeCount ? ` · ${homeCount}/4 home` : ''}`}
+        <div className={cn(away ? 'font-medium text-amber-300' : 'text-white/60')}>
+          {away ? `Auto-playing · missed ${pl.missed}/${MISSES_OUT}` : gone ? (pl.state === 'out' ? 'Removed' : 'Left') : pl.rank ? ordinal(pl.rank) : `${COLOR_NAMES[arm]}${homeCount ? ` · ${homeCount}/4 home` : ''}`}
         </div>
       </div>
     </div>
@@ -344,7 +386,11 @@ function Dice({ value, rolling, dim }: { value: number; rolling: boolean; dim?: 
   }, [rolling, value]);
   return (
     <svg viewBox="0 0 100 100" className={cn('size-10 drop-shadow-md', rolling && 'ludo-dice-roll', dim && 'opacity-40')} aria-hidden data-face={rolling ? undefined : face}>
-      <rect x="4" y="4" width="92" height="92" rx="20" fill="#fff" stroke="#d6d9e0" strokeWidth="3" />
+      <defs>
+        <linearGradient id="dice-face" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#ffffff" /><stop offset="1" stopColor="#dfe3ea" /></linearGradient>
+      </defs>
+      <rect x="4" y="7" width="92" height="92" rx="22" fill="#9aa3b2" />
+      <rect x="4" y="2" width="92" height="92" rx="22" fill="url(#dice-face)" stroke="#c9ced8" strokeWidth="2" />
       {PIPS[face].map(([x, y], k) => <circle key={k} cx={x} cy={y} r={face === 1 ? 12 : 9} fill={face === 1 ? '#e8322f' : '#1d2433'} />)}
     </svg>
   );

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Archive, ArrowLeft, BellOff, Clock, Gamepad2, LogOut, MessageSquarePlus, MoreVertical, Search, Settings, UserPlus, WifiOff, X } from 'lucide-react';
+import { Archive, ArrowLeft, BellOff, Clock, Gamepad2, Lock, LogOut, MessageSquarePlus, MoreVertical, Search, Settings, UserPlus, WifiOff, X } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
 import { Ticks } from '../../components/Ticks';
 import { IconButton } from '../../components/ui/button';
@@ -13,6 +13,7 @@ import { setApp, useApp } from '../../state/app';
 import { GamesStrip } from '../games/GamesStrip';
 import { ChatListSkeleton } from '../../components/Skeleton';
 import { useSettings } from '../../state/settings';
+import { lockNow } from '../../lib/applock';
 import { openPicker } from '../games/store';
 
 export function Sidebar() {
@@ -26,6 +27,7 @@ export function Sidebar() {
   const [waited, setWaited] = useState(false); // stop showing placeholders if the server is slow to answer
   useEffect(() => { const t = setTimeout(() => setWaited(true), 10_000); return () => clearTimeout(t); }, []);
   const headerTitle = useSettings((s) => s.headerTitle);
+  const appLock = useSettings((s) => !!s.appLock);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const archivedView = panel === 'archived';
@@ -59,6 +61,7 @@ export function Sidebar() {
               <Avatar u={me.u} name={me.name} size={40} />
             </button>
             <h1 className="min-w-0 flex-1 truncate pl-1 text-xl font-bold tracking-tight">{headerTitle.trim() || me.u}</h1>
+            {appLock && <IconButton label="Lock Chattrix" onClick={lockNow}><Lock /></IconButton>}
             <IconButton label="Play games" onClick={() => openPicker()}><Gamepad2 /></IconButton>
             <div className="relative">
               <IconButton label="Friends" onClick={() => setApp({ panel: 'friends', friendsTab: incoming ? 'requests' : 'friends' })}>

@@ -46,6 +46,7 @@ self.addEventListener('push', (e) => {
   const title = d.t === 'fr' ? 'New friend request' : d.t === 'signin' ? 'New sign-in to your account' : name;
   const body = d.t === 'fr' ? `${name} wants to be your friend`
     : d.t === 'game' ? `invited you to play ${d.game || 'a game'} 🎲`
+    : d.t === 'gmention' ? `mentioned you in ${d.game || 'a game'}`
     : d.t === 'signin' ? `A device signed in${d.where || ''}. If this wasn’t you, open Chattrix → Settings → Active sessions.`
     : 'New message';
   e.waitUntil((async () => {

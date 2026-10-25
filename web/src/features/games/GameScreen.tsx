@@ -13,6 +13,7 @@ import { cn } from '../../lib/utils';
 import { useApp } from '../../state/app';
 import { setSettings, useSettings } from '../../state/settings';
 import { GAME_UI } from './registry';
+import { insertMention, mentionQuery, splitMentions } from '../../lib/mentions';
 import {
   act, createGame, decline, dismiss, gameName, join, leave, linkShared, nameOf, openGame, say, setChatOpen, shareLink, startNow, useGames, type ChatLine, type Game,
 } from './store';
@@ -142,9 +143,24 @@ function ChatSheet({ g, open, onOpenChange }: { g: Game; open: boolean; onOpenCh
   const lines = useGames((s) => s.chat[g.id] || NO_LINES);
   const me = myName();
   const [text, setText] = useState('');
+  const [tag, setTag] = useState<{ start: number; q: string } | null>(null); // "@na…" being typed
+  const [pick, setPick] = useState(0);
   const end = useRef<HTMLDivElement>(null);
+  const box = useRef<HTMLInputElement>(null);
   useEffect(() => { if (open) end.current?.scrollIntoView({ block: 'end' }); }, [open, lines.length]);
-  const send = (x: string) => { const v = x.trim(); if (v) { say(g.id, v); setText(''); } };
+  const send = (x: string) => { const v = x.trim(); if (v) { say(g.id, v); setText(''); setTag(null); } };
+
+  const users = g.players.filter((p) => p.state !== 'declined').map((p) => p.u);
+  const others = g.players.filter((p) => p.u !== me && p.state !== 'declined');
+  const matches = tag ? others.filter((p) => p.u.includes(tag.q) || (p.n || '').toLowerCase().includes(tag.q)).slice(0, 6) : [];
+  const typed = (v: string, cursor: number) => { setText(v); setTag(mentionQuery(v, cursor)); setPick(0); };
+  const choose = (u: string) => {
+    if (!tag) return;
+    const r = insertMention(text, box.current?.selectionStart ?? text.length, tag.start, u);
+    setText(r.text);
+    setTag(null);
+    requestAnimationFrame(() => { box.current?.focus(); box.current?.setSelectionRange(r.cursor, r.cursor); });
+  };
   return (
     <Dialog open={open} onOpenChange={onOpenChange} title="Game chat"
       description="Seen by everyone in this game. Not end-to-end encrypted; deleted when the game ends.">
@@ -160,14 +176,38 @@ function ChatSheet({ g, open, onOpenChange }: { g: Game; open: boolean; onOpenCh
           <div key={k} className={cn('flex', l.f === me ? 'justify-end' : 'justify-start')}>
             <div className={cn('max-w-[80%] rounded-2xl px-3 py-1.5 text-sm', l.f === me ? 'bg-accent text-accent-ink' : 'bg-panel shadow-bubble')}>
               {l.f !== me && <div className="text-xs font-semibold text-accent">{nameOf(g, l.f)}</div>}
-              {l.x}
+              {splitMentions(l.x, users).map((part, i) => part.u ? (
+                <span key={i} className={cn('font-semibold', part.u === me ? 'rounded bg-amber-300/90 px-0.5 text-amber-950' : l.f === me ? 'underline' : 'text-accent')}>{part.t}</span>
+              ) : <span key={i}>{part.t}</span>)}
             </div>
           </div>
         ))}
         <div ref={end} />
       </div>
-      <form className="mt-3 flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); send(text); }}>
-        <input value={text} onChange={(e) => setText(e.target.value)} maxLength={200} placeholder="Message everyone" aria-label="Game message"
+      <form className="relative mt-3 flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); if (matches.length) choose(matches[pick].u); else send(text); }}>
+        {matches.length > 0 && (
+          <ul className="absolute bottom-full left-0 z-10 mb-2 w-full overflow-hidden rounded-2xl border border-line bg-panel shadow-xl" role="listbox" aria-label="Mention a player">
+            {matches.map((p, i) => (
+              <li key={p.u} role="option" aria-selected={i === pick}>
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => choose(p.u)}
+                  className={cn('flex w-full items-center gap-3 px-3 py-2 text-left', i === pick ? 'bg-hover' : 'hover:bg-hover')}>
+                  <Avatar u={p.u} name={p.n} size={32} />
+                  <span className="min-w-0 flex-1 truncate font-medium">{p.n || p.u}</span>
+                  <span className="text-sm text-muted">@{p.u}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <input ref={box} value={text} maxLength={200} placeholder="Message everyone · @ to tag" aria-label="Game message"
+          onChange={(e) => typed(e.target.value, e.target.selectionStart ?? e.target.value.length)}
+          onKeyDown={(e) => {
+            if (!matches.length) return;
+            if (e.key === 'ArrowDown') { e.preventDefault(); setPick((i) => (i + 1) % matches.length); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); setPick((i) => (i - 1 + matches.length) % matches.length); }
+            else if (e.key === 'Tab') { e.preventDefault(); choose(matches[pick].u); }
+            else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setTag(null); }
+          }}
           className="h-11 min-w-0 flex-1 rounded-full border border-line bg-panel px-4 outline-none focus:border-accent" />
         <IconButton label="Send" type="submit" variant="primary" disabled={!text.trim()}><SendHorizontal /></IconButton>
       </form>
@@ -238,6 +278,23 @@ function Lobby({ g, me, onLeave }: { g: Game; me: string; onLeave: () => void })
 }
 
 const MEDALS = ['🥇', '🥈', '🥉'];
+const CONFETTI = ['#f5c518', '#e8322f', '#2fa24a', '#1f7fe0', '#9b3fd1', '#f5821f', '#ffffff'];
+
+function Confetti() {
+  // Fixed per mount, so it doesn't reshuffle on re-render.
+  const [pieces] = useState(() => Array.from({ length: 60 }, (_, i) => ({
+    left: Math.random() * 100, delay: Math.random() * 0.8, dur: 2.2 + Math.random() * 1.8,
+    color: CONFETTI[i % CONFETTI.length], tilt: Math.random() * 360,
+  })));
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return null;
+  return (
+    <div className="pointer-events-none absolute inset-0" aria-hidden>
+      {pieces.map((p, i) => (
+        <span key={i} className="confetti" style={{ left: `${p.left}%`, background: p.color, animationDelay: `${p.delay}s`, animationDuration: `${p.dur}s`, rotate: `${p.tilt}deg` }} />
+      ))}
+    </div>
+  );
+}
 
 function Results({ g, me }: { g: Game; me: string }) {
   const friends = useApp((s) => s.friends);
@@ -246,8 +303,9 @@ function Results({ g, me }: { g: Game; me: string }) {
   const cancelled = g.ev.some((e) => e.k === 'cancelled' || e.k === 'expired');
   const again = g.players.filter((p) => p.u !== me && friends[p.u]).map((p) => p.u);
   return (
-    <div className="absolute inset-0 z-30 grid place-items-center bg-black/60 p-5 animate-fade-in">
-      <div className="w-full max-w-sm rounded-3xl bg-white p-6 text-center text-slate-900 shadow-2xl">
+    <div className="absolute inset-0 z-30 grid place-items-center overflow-hidden bg-black/60 p-5 animate-fade-in">
+      {mine?.rank === 1 && !cancelled && <Confetti />}
+      <div className="relative w-full max-w-sm rounded-3xl bg-white p-6 text-center text-slate-900 shadow-2xl">
         {cancelled ? (
           <><div className="text-5xl">🕓</div><h2 className="mt-2 text-xl font-bold">Game called off</h2>
             <p className="mt-1 text-sm text-slate-500">Not enough players joined.</p></>

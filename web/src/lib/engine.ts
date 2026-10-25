@@ -108,6 +108,7 @@ export async function logout(everywhere = false) {
   await disablePush().catch(() => {});
   await api(everywhere ? '/api/logout-all' : '/api/logout', {}).catch(() => {});
   teardown();
+  setSettings({ appLock: null }); // the next person to sign in here sets their own
   await db.clearAll();
   location.reload();
 }
@@ -149,6 +150,7 @@ async function wipe(token: string) {
   await disablePush().catch(() => {});
   await api('/api/logout', {}).catch(() => {});
   S.token = null;
+  setSettings({ appLock: null });
   await db.clearAll();
   ss.del(ALIVE);
 }
@@ -167,6 +169,7 @@ function teardown() {
 
 async function sessionExpired() {
   teardown();
+  setSettings({ appLock: null });
   await db.clearAll();
   location.reload();
 }

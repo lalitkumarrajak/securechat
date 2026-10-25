@@ -8,6 +8,8 @@ import { useSettings } from './state/settings';
 import { Landing } from './features/auth/Landing';
 import { Shell } from './features/Shell';
 import { joinFromLink } from './features/games/store';
+import { LockScreen } from './features/lock/LockScreen';
+import { useLock } from './lib/applock';
 import { rememberInvite } from './lib/invite';
 
 let booted = false;
@@ -15,6 +17,7 @@ let booted = false;
 export function App() {
   const status = useApp((s) => s.status);
   const theme = useSettings((s) => s.theme);
+  const locked = useLock((s) => s.locked); // app lock: only the PIN screen is on the page
 
   useEffect(() => {
     if (booted) return; // StrictMode runs effects twice in development
@@ -40,10 +43,10 @@ export function App() {
     <>
       {status === 'loading' && <ShellSkeleton />}
       {status === 'auth' && <Landing />}
-      {status === 'app' && <Shell />}
+      {status === 'app' && (locked ? <LockScreen /> : <Shell />)}
       <ConfirmHost />
-      <Toaster position="top-center" theme={theme === 'system' ? 'system' : theme} richColors closeButton
-        toastOptions={{ className: 'rounded-xl!' }} />
+      {!(status === 'app' && locked) && <Toaster position="top-center" theme={theme === 'system' ? 'system' : theme} richColors closeButton
+        toastOptions={{ className: 'rounded-xl!' }} />}
     </>
   );
 }

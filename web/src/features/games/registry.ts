@@ -27,7 +27,7 @@ export const GAME_UI: Record<string, GameUi> = {
   ludo: {
     type: ludo.type, name: ludo.name, emoji: '🎲', blurb: 'Classic rules · 2 to 6 players',
     min: ludo.min, max: ludo.max,
-    background: 'radial-gradient(120% 90% at 50% 40%, #1b4fb8 0%, #0c2c79 55%, #061a4a 100%)',
+    background: 'radial-gradient(circle, rgba(255,255,255,0.07) 0 1.5px, transparent 2px) 0 0 / 34px 34px, radial-gradient(120% 90% at 50% 38%, #2a66df 0%, #0f3394 45%, #071a55 80%, #040d33 100%)',
     Board: lazy(() => import('./ludo/LudoBoard')),
   },
 };

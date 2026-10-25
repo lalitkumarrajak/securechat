@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { cn } from '../lib/utils';
 import { useApp } from '../state/app';
 import { Sidebar } from './sidebar/Sidebar';
@@ -6,13 +6,17 @@ import { ChatPane, EmptyPane } from './conversation/ChatPane';
 import { FriendsPanel } from './friends/FriendsPanel';
 import { SettingsPanel } from './settings/SettingsPanel';
 import { ContactPanel } from './conversation/ContactPanel';
-import { GameScreen } from './games/GameScreen';
 import { NewGameDialog } from './games/NewGameDialog';
+import { useGames } from './games/store';
+
+// Loaded when a game is opened, so the app starts faster.
+const GameScreen = lazy(() => import('./games/GameScreen').then((m) => ({ default: m.GameScreen })));
 import { handleInvite } from '../lib/invite';
 
 /** Two panes on desktop; on phones, the chat list or the open chat. */
 export function Shell() {
   const active = useApp((s) => s.active);
+  const gameOpen = useGames((s) => !!s.open);
   useEffect(() => { handleInvite(); }, []); // opened from someone's invite link
   return (
     <div className="mx-auto flex h-dvh max-w-[1600px] overflow-hidden bg-panel md:border-x md:border-line">
@@ -26,7 +30,7 @@ export function Shell() {
       <SettingsPanel />
       <ContactPanel />
       <NewGameDialog />
-      <GameScreen />
+      {gameOpen && <Suspense fallback={null}><GameScreen /></Suspense>}
     </div>
   );
 }

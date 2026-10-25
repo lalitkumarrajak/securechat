@@ -22,7 +22,6 @@ const games = new Map();  // id -> game
 const timers = new Map(); // id -> timeout
 const MAX_OPEN = 5;       // unfinished games per person
 const CHAT_KEEP = 50;
-const MISSES_OUT = 3;     // turns in a row the server played for you before you're removed
 const KEEP_OVER_MS = 10 * 60e3;
 const rand = (n) => (n === 6 && config.gameTestDice.length ? config.gameTestDice.shift() - 1 : crypto.randomInt(n));
 const ID_RE = /^[A-Za-z0-9_-]{12}$/;
@@ -80,15 +79,19 @@ function cancel(g, why) {
 }
 
 // The player whose turn it is ran out of time: the server plays for them, and removes them
-// after MISSES_OUT turns in a row, like Ludo King.
+// after MISSES_OUT turns in a row. A turn counts once, however many bonus rolls it has; once
+// someone has timed out, the rest of that turn is played for them after a short pause.
 function timeout(g) {
   if (g.status !== 'play') return;
   const i = g.turn;
   const pl = g.players[i];
   g.ev = [{ k: 'timeout', s: i }];
-  if (++pl.missed >= MISSES_OUT) core.remove(g, def(g), i, 'out');
+  const turnNo = g.turnNo || 0; // turns so far (unset before the first change of turn)
+  if (g.missTurn !== turnNo) { pl.missed++; g.missTurn = turnNo; }
+  if (pl.missed >= core.MISSES_OUT) core.remove(g, def(g), i, 'out');
   else def(g).auto(g, rand);
-  turnDeadline(g);
+  if (g.status === 'play' && g.turn === i) g.deadline = Date.now() + config.gameAnimMs + 500; // their bonus roll
+  else turnDeadline(g);
   return commit(g);
 }
 
@@ -237,6 +240,14 @@ export const handlers = {
     g.chat.push(line);
     if (g.chat.length > CHAT_KEEP) g.chat.splice(0, g.chat.length - CHAT_KEEP);
     for (const u of members(g)) sendTo(u, { t: 'gc', id: g.id, ...line });
+    // @mentions reach people who aren't looking at the app
+    const tagged = new Set([...x.matchAll(/@([a-z0-9_.]{3,24})/gi)].map((m) => m[1].toLowerCase().replace(/\.+$/, '')));
+    const name = g.players[seat(g, ws.user)].n || ws.user;
+    for (const u of members(g)) {
+      if (u !== ws.user && tagged.has(u) && !isActive(u)) {
+        notify(u, { t: 'gmention', from: ws.user, name, game: def(g).name }, `${u}|gm|${g.id}`).catch(() => {});
+      }
+    }
   },
 
   async glist(ws) {

@@ -8,6 +8,8 @@ export type Accent = 'teal' | 'blue' | 'violet' | 'pink' | 'orange' | 'green';
 export type FontSize = 'sm' | 'md' | 'lg';
 export type Wallpaper = 'doodle' | 'dots' | 'grid' | 'gradient' | 'plain';
 
+import type { PinHash } from '../lib/pin';
+
 export interface Settings {
   theme: Theme;
   accent: Accent;
@@ -19,6 +21,8 @@ export interface Settings {
   push: boolean;
   signOutOnClose: boolean; // this device only: closing the tab signs out and erases local data
   headerTitle: string;     // shown at the top of the chat list; empty = your username
+  appLock: PinHash | null; // app lock PIN (this device only); see lib/applock.ts
+  lockAfterMs: number;     // lock after being away this long (0 = as soon as you leave)
 }
 
 export const ACCENTS: { id: Accent; label: string; color: string }[] = [
@@ -41,6 +45,8 @@ const defaults: Settings = {
   push: false,
   signOutOnClose: false,
   headerTitle: '',
+  appLock: null,
+  lockAfterMs: 0,
 };
 
 export const useSettings = create<Settings>()(persist(() => defaults, { name: 'chattrix-settings', version: 1 }));

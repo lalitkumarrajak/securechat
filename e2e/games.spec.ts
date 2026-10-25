@@ -95,11 +95,21 @@ test('emoji, quick phrases and chat during the game', async () => {
   await expect(A.page.locator(`[data-player="${C.u}"] .ludo-bubble`)).toHaveText('Nice move!');
   await A.page.screenshot({ path: shots('23-ludo-bubbles') });
   await B.page.getByRole('button', { name: 'Game chat' }).click();
-  await B.page.getByRole('textbox', { name: 'Game message' }).fill('Good game everyone');
+  // @ suggests players; picking one completes the tag
+  const msg = B.page.getByRole('textbox', { name: 'Game message' });
+  await msg.pressSequentially('Your move @' + A.u.slice(0, 3));
+  await B.page.getByRole('listbox', { name: 'Mention a player' }).getByRole('option').filter({ hasText: '@' + A.u }).click();
+  await expect(msg).toHaveValue(`Your move @${A.u} `);
+  await msg.pressSequentially('hurry!');
+  await B.page.getByRole('button', { name: 'Send', exact: true }).click();
+  // The tagged player is alerted even with the chat closed
+  await expect(A.page.getByText(/mentioned you/).first()).toBeVisible();
+  await msg.fill('Good game everyone');
   await B.page.getByRole('button', { name: 'Send', exact: true }).click();
   await expect(A.page.getByRole('button', { name: 'Game chat' })).toContainText(/\d/); // unread count
   await A.page.getByRole('button', { name: 'Game chat' }).click();
   await expect(A.page.getByRole('dialog', { name: 'Game chat' }).getByText('Good game everyone')).toBeVisible();
+  await expect(A.page.getByRole('dialog', { name: 'Game chat' }).locator('span.bg-amber-300\\/90', { hasText: '@' + A.u })).toBeVisible(); // my tag stands out
   await A.page.screenshot({ path: shots('24-ludo-chat') });
   await A.page.keyboard.press('Escape');
   await B.page.keyboard.press('Escape');
@@ -113,7 +123,7 @@ test('leaving: the last one left wins', async () => {
   }
   await expect(A.page.getByRole('heading', { name: 'You won!' })).toBeVisible({ timeout: 10_000 });
   await A.page.screenshot({ path: shots('25-ludo-results') });
-  await A.page.getByRole('button', { name: 'Close' }).click();
+  await A.page.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(A.page.getByRole('img', { name: 'Ludo board' })).toHaveCount(0);
   for (const p of [A, B, C]) expect(p.errors).toEqual([]);
 });

@@ -60,11 +60,30 @@ describe('games', () => {
     assert.equal(await C.gets('gc', (m) => m.id === id), false); // C declined
   });
 
-  it('plays for a player who runs out of time, and removes them after 3 missed turns', async () => {
-    // Nobody acts: turns time out (700 ms each) until someone has missed 3 in a row.
-    const over = await frame(A, (x) => x.id === id && x.status === 'over', 15_000);
+  it('plays for a player who runs out of time, and removes them after 5 missed turns', async () => {
+    // Nobody acts: turns time out (700 ms each) until someone has missed 5 in a row.
+    const over = await frame(A, (x) => x.id === id && x.status === 'over', 30_000);
+    const out = over.players.find((p) => p.state === 'out');
+    assert.equal(out.missed, 5);
     assert.ok(over.players.some((p) => p.state === 'out'));
     assert.ok(over.players.some((p) => p.rank === 1));
+  });
+
+  it('a missed turn with bonus rolls counts once, and the bonus rolls are played quickly', async () => {
+    const s2 = await startServer({ GAME_TURN_MS: '600', GAME_ANIM_MS: '0', GAME_TEST_DICE: '6,6,1' });
+    try {
+      const [x, y] = await Promise.all(['bx', 'by'].map((v) => register(s2, name(v))));
+      await befriend(s2, x, y);
+      const [X, Y] = await Promise.all([connect(s2, x.token), connect(s2, y.token)]);
+      X.sendJson({ t: 'gnew', type: 'ludo', to: [y.u], ref: 'b' });
+      const gid = (await X.next('g', (m) => m.ref === 'b')).g.id;
+      Y.sendJson({ t: 'gjoin', id: gid });
+      // X never plays: 6 (comes out), 6 (a second token comes out), 1 (moves): one turn, then Y's
+      const g = await frame(Y, (v) => v.id === gid && v.status === 'play' && v.turn === 1, 5000);
+      assert.equal(g.players[0].missed, 1);
+      assert.deepEqual(g.s.tokens[0], [1, 0, -1, -1]);
+      X.close(); Y.close();
+    } finally { await s2.stop(); }
   });
 
   it('lists my games after reconnecting, with the chat', async () => {

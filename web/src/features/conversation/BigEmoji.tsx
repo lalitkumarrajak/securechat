@@ -23,6 +23,19 @@ function animationData(e: string) {
 
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+// Extra whole-emoji motion layered on Google's animation where theirs is too subtle in a chat
+// bubble, like WhatsApp's: 🥺 bobs up and down, pleading. Add more here (class in index.css).
+const MOTION: Record<string, string> = { '🥺': 'emoji-plead' };
+
+function playMotion(el: HTMLElement, e: string) {
+  const cls = MOTION[e];
+  if (!cls || reduceMotion()) return;
+  el.classList.remove(cls);
+  void el.offsetWidth; // restart the CSS animation
+  el.classList.add(cls);
+  el.addEventListener('animationend', () => el.classList.remove(cls), { once: true });
+}
+
 export function Emoji({ e, size }: { e: string; size: number }) {
   const box = useRef<HTMLSpanElement>(null);
   const anim = useRef<Anim | null>(null);
@@ -36,12 +49,15 @@ export function Emoji({ e, size }: { e: string; size: number }) {
       io.disconnect();
       const [data, L] = await Promise.all([animationData(e), loadLottie().catch(() => null)]);
       if (cancelled) return;
-      if (!data || !L) { el.classList.add('animate-pop'); return; } // no animated version: a little pop
+      if (!data || !L) { // no animated version: a little pop (or this emoji's own motion)
+        if (MOTION[e]) playMotion(el, e); else el.classList.add('animate-pop');
+        return;
+      }
       el.textContent = '';
       const a = L.loadAnimation({ container: el, renderer: 'svg', loop: false, autoplay: false, animationData: data });
       anim.current = a;
       if (reduceMotion()) a.goToAndStop(a.totalFrames - 1, true);
-      else a.play();
+      else { a.play(); playMotion(el, e); }
     });
     io.observe(el);
     return () => { cancelled = true; io.disconnect(); anim.current?.destroy(); anim.current = null; };
@@ -49,8 +65,9 @@ export function Emoji({ e, size }: { e: string; size: number }) {
 
   const replay = (ev: React.MouseEvent) => {
     ev.stopPropagation();
+    if (box.current) playMotion(box.current, e);
     if (anim.current) anim.current.goToAndPlay(0, true);
-    else { box.current?.classList.remove('animate-pop'); void box.current?.offsetWidth; box.current?.classList.add('animate-pop'); }
+    else if (!MOTION[e]) { box.current?.classList.remove('animate-pop'); void box.current?.offsetWidth; box.current?.classList.add('animate-pop'); }
   };
 
   return (

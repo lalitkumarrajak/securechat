@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { create } from 'zustand';
 import { frameHooks, myName, sendFrame } from '../../lib/engine';
 import { randomId } from '../../lib/crypto.js';
+import { mentioned } from '../../lib/mentions';
 import { playSound } from './sounds';
 
 export type PlayerState = 'invited' | 'joined' | 'declined' | 'playing' | 'done' | 'left' | 'out';
@@ -108,6 +109,14 @@ frameHooks.gc = (m) => {
     };
   });
   if (m.f !== myName()) playSound('chat');
+  const g = get().games[m.id];
+  if (g && m.f !== myName() && mentioned(m.x, [myName()]).length && !(get().open === m.id && get().chatOpen)) {
+    navigator.vibrate?.([30, 50, 30]);
+    toast(`${nameOf(g, m.f)} mentioned you`, {
+      description: m.x, duration: 8000,
+      action: { label: 'Reply', onClick: () => set({ open: m.id, chatOpen: true }) },
+    });
+  }
 };
 
 frameHooks.gerr = (m) => {

@@ -127,6 +127,23 @@ test('emoji-only messages are big, animate once, and replay on tap', async () =>
   await A.page.waitForTimeout(300);
   expect(await emoji.innerHTML()).not.toBe(still1);
   await A.page.screenshot({ path: shots('04-chat-emoji') });
+
+  // 🥺 bobs up and down (pleading), like WhatsApp: its top edge rises and comes back
+  await B.page.getByRole('textbox', { name: 'Message' }).fill('🥺');
+  await B.page.getByRole('button', { name: 'Send' }).tap();
+  const plead = A.page.locator('.big-emoji[aria-label="🥺"]').last();
+  await expect(plead).toHaveClass(/emoji-plead/, { timeout: 15_000 });
+  const travel = await plead.evaluate((el) => new Promise<number>((done) => {
+    const tops: number[] = [];
+    const t0 = performance.now();
+    const tick = () => {
+      tops.push(el.getBoundingClientRect().top);
+      if (performance.now() - t0 < 1200) requestAnimationFrame(tick); else done(Math.max(...tops) - Math.min(...tops));
+    };
+    tick();
+  }));
+  expect(travel).toBeGreaterThan(4); // px of vertical movement
+  await expect(plead).not.toHaveClass(/emoji-plead/, { timeout: 5000 }); // then it rests
 });
 
 // Phones only open the keyboard if focus() happens while handling the tap/swipe itself.

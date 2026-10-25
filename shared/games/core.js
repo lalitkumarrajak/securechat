@@ -21,6 +21,9 @@
 
 export const playing = (pl) => pl.state === 'playing';
 
+// Turns in a row the server may play for someone who isn't playing before they're removed.
+export const MISSES_OUT = 5;
+
 /** Start the game with the players who joined. */
 export function begin(g, def) {
   g.players = g.players.filter((pl) => pl.state === 'joined');
@@ -40,6 +43,7 @@ export function nextTurn(g) {
     const j = (g.turn + k) % n;
     if (playing(g.players[j])) { g.turn = j; break; }
   }
+  g.turnNo = (g.turnNo || 0) + 1; // a turn with bonus rolls is still one turn
   g.ev.push({ k: 'turn', s: g.turn });
 }
 
