@@ -2,6 +2,7 @@
 // the middle, tokens hopping square by square. Server updates arrive as events (roll, move,
 // capture…) which are played back in order before the next update is shown.
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Heart } from 'lucide-react';
 import { Avatar } from '../../../components/Avatar';
 import { cn } from '../../../lib/utils';
 import { homeAt } from '../../../../../shared/games/ludo.js';
@@ -15,7 +16,11 @@ interface LudoState { arms: number; arm: number[]; tokens: number[][]; phase: 'r
 interface Shown { tokens: number[][]; turn: number; dice: { s: number; d: number; rolling: boolean } | null }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const TURN_TOTAL = 33_000; // 30 s per turn + the server's allowance for animations
+const TURN_TOTAL = 35_000; // 30 s per turn + the server's allowance for animations (GAME_ANIM_MS)
+const TURN_SECS = 30;
+// Ludo King's rhythm: the dice rattles for about a second, the result stays a moment, tokens hop
+// a square at a time, and a captured token visibly zips back to its yard.
+const PACE = { roll: 950, reveal: 450, step: 260, hit: 320, rewind: 38, settle: 300, burn: 900, turn: 350 };
 
 // Plays each update's events (dice, hops, captures) before showing the next update.
 function usePlayback(g: Game<LudoState>, me: number) {
@@ -57,29 +62,32 @@ async function playEvents(ev: GameEvent[], home: number, setShown: (fn: (s: Show
       case 'roll':
         setShown((x) => ({ ...x, turn: e.s!, dice: { s: e.s!, d: e.d, rolling: true } }));
         playSound('roll');
-        await sleep(600);
+        await sleep(PACE.roll);
         setShown((x) => ({ ...x, dice: { s: e.s!, d: e.d, rolling: false } }));
-        await sleep(250);
+        await sleep(PACE.reveal);
         break;
       case 'move': {
-        for (const p of pathOf(e.from, e.to)) { setTok(e.s!, e.t, p); playSound('step'); await sleep(150); }
+        for (const p of pathOf(e.from, e.to)) { setTok(e.s!, e.t, p); playSound('step'); await sleep(PACE.step); }
         if (e.cap?.length) {
           playSound('capture');
-          await sleep(120);
+          navigator.vibrate?.(60);
+          await sleep(PACE.hit);
+          playSound('zip');
           // Captured tokens rewind along the track to their yard, like Ludo King.
           const caps = e.cap as { s: number; t: number; from: number }[];
           const longest = Math.max(...caps.map((c) => c.from));
           for (let back = 1; back <= longest + 1; back++) {
             for (const c of caps) if (c.from - back >= -1) setTok(c.s, c.t, c.from - back);
-            await sleep(22);
+            await sleep(PACE.rewind);
           }
         }
         if (e.to === home) playSound('home');
-        await sleep(120);
+        await sleep(PACE.settle);
         break;
       }
-      case 'burn': await sleep(700); break;
+      case 'burn': await sleep(PACE.burn); break;
       case 'turn':
+        await sleep(PACE.turn);
         setShown((x) => ({ ...x, turn: e.s!, dice: null }));
         if (e.s === me) { playSound('turn'); navigator.vibrate?.(30); }
         break;
@@ -120,7 +128,15 @@ export default function LudoBoard({ g: game, me, act, bubble }: GameBoardProps) 
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col items-center justify-between gap-1 px-2 py-2">
+    <div className="relative flex h-full min-h-0 flex-col items-center justify-between gap-1 px-2 py-2">
+      {meIdx >= 0 && g.players[meIdx].state === 'playing' && (g.players[meIdx].missed || 0) > 0 && (
+        <div className="pointer-events-none absolute top-1/2 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-black/75 px-4 py-2 text-center text-sm font-medium text-white shadow-xl"
+          role="status">
+          You missed {g.players[meIdx].missed} turn{g.players[meIdx].missed === 1 ? '' : 's'} ·{' '}
+          <span className="text-amber-300">{MISSES_OUT - (g.players[meIdx].missed || 0)} chance{MISSES_OUT - (g.players[meIdx].missed || 0) === 1 ? '' : 's'} left</span>
+          <div className="text-xs text-white/70">Roll the dice to stay in the game</div>
+        </div>
+      )}
       <div className="flex w-full max-w-[560px] items-start justify-between gap-1">{row(true).map(panel)}</div>
       <div className="flex min-h-0 w-full flex-1 items-center justify-center">
         <Board L={L} g={g} shown={shown} home={home} movable={movable} meIdx={meIdx}
@@ -301,7 +317,8 @@ function PlayerPanel({ g, i, me, shown, canRoll, onRoll, spinning, bubble, right
   const gone = pl.state === 'left' || pl.state === 'out';
   const dice = spinning ? { s: i, d: 6, rolling: true } : shown.dice?.s === i ? shown.dice : null;
   const homeCount = g.s.tokens[i].filter((p) => p === homeAt(g.s.arms)).length;
-  const away = pl.state === 'playing' && (pl.missed || 0) > 0; // the server has been playing for them
+  const missed = pl.missed || 0;
+  const away = pl.state === 'playing' && missed > 0; // the server has been playing for them
 
   const avatar = (
     <div className="relative">
@@ -337,7 +354,8 @@ function PlayerPanel({ g, i, me, shown, canRoll, onRoll, spinning, bubble, right
   );
 
   return (
-    <div className={cn('flex min-w-0 flex-col gap-0.5', right ? 'items-end' : 'items-start')} data-player={pl.u}>
+    <div className={cn('flex min-w-0 flex-col gap-1 rounded-2xl border-2 bg-black/25 p-1.5 shadow-lg backdrop-blur-sm transition-colors',
+      right ? 'items-end' : 'items-start', active ? '' : 'border-transparent')} style={active ? { borderColor: color } : undefined} data-player={pl.u}>
       <div className={cn('flex items-center gap-1.5', right && 'flex-row-reverse')}>
         {avatar}
         {diceBox}
@@ -345,8 +363,16 @@ function PlayerPanel({ g, i, me, shown, canRoll, onRoll, spinning, bubble, right
       <div className={cn('min-w-0 px-0.5 text-[11px] leading-tight text-white/90', right && 'text-right')}>
         <div className="max-w-[100px] truncate font-semibold">{i === me ? 'You' : pl.n || pl.u}</div>
         <div className={cn(away ? 'font-medium text-amber-300' : 'text-white/60')}>
-          {away ? `Auto-playing · missed ${pl.missed}/${MISSES_OUT}` : gone ? (pl.state === 'out' ? 'Removed' : 'Left') : pl.rank ? ordinal(pl.rank) : `${COLOR_NAMES[arm]}${homeCount ? ` · ${homeCount}/4 home` : ''}`}
+          {away ? 'Auto-playing' : gone ? (pl.state === 'out' ? 'Removed' : 'Left') : pl.rank ? ordinal(pl.rank) : `${COLOR_NAMES[arm]}${homeCount ? ` · ${homeCount}/4 home` : ''}`}
         </div>
+        {pl.state === 'playing' && (
+          <div className={cn('mt-0.5 flex gap-0.5', right && 'justify-end')} role="img" aria-label={`${MISSES_OUT - missed} of ${MISSES_OUT} chances left`}
+            title={`Missed turns: ${missed} of ${MISSES_OUT}. At ${MISSES_OUT} they're removed.`}>
+            {Array.from({ length: MISSES_OUT }, (_, k) => (
+              <Heart key={k} className={cn('size-2.5', k < MISSES_OUT - missed ? 'fill-red-500 text-red-500' : 'text-white/35')} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -363,10 +389,15 @@ function TurnRing({ active, deadline, color, children }: { active: boolean; dead
   }, [active]);
   const frac = active ? Math.max(0, Math.min(1, (deadline - now) / TURN_TOTAL)) : 0;
   const low = frac < 0.25;
+  const secs = Math.min(TURN_SECS, Math.max(0, Math.ceil((deadline - now) / 1000)));
   return (
     <div className="relative rounded-[14px] p-[3px]" data-turn={active || undefined}
       style={active ? { background: `conic-gradient(${low ? '#ef4444' : color} ${frac * 360}deg, rgba(255,255,255,0.15) 0)` } : undefined}>
       {children}
+      {active && (
+        <span className={cn('absolute -bottom-1.5 left-1/2 -translate-x-1/2 rounded-full px-1.5 text-[10px] font-bold tabular-nums text-white shadow', low ? 'bg-red-500' : 'bg-black/70')}
+          aria-label={`${secs} seconds left`}>{secs}s</span>
+      )}
     </div>
   );
 }

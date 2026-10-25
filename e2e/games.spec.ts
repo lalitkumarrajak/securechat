@@ -56,6 +56,7 @@ test('people who aren’t friends open the link, sign up and land in the game', 
   await expect(A.page.getByText('Ready', { exact: true })).toHaveCount(3);
   await A.page.getByRole('button', { name: 'Start with 3 players' }).click();
   for (const p of [A, B, C]) await expect(p.page.getByRole('img', { name: 'Ludo board' })).toBeVisible();
+  await expect(A.page.getByRole('img', { name: '5 of 5 chances left' })).toHaveCount(3); // hearts: missed turns allowed
   await A.page.waitForTimeout(400);
   await A.page.screenshot({ path: shots('21-ludo-start') });
 });
