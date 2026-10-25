@@ -1,20 +1,23 @@
 // Tiny IndexedDB wrapper. Messages live on the device so chats open instantly and work offline.
 const DB_NAME = 'securechat';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 let dbPromise;
 
 function openDb() {
   return (dbPromise ??= new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
+    req.onupgradeneeded = (e) => {
       const d = req.result;
-      d.createObjectStore('kv');
-      const msgs = d.createObjectStore('msgs', { keyPath: 'k' });
-      msgs.createIndex('peer_ts', ['peer', 'ts']);
-      msgs.createIndex('id', 'id');
-      d.createObjectStore('outbox', { keyPath: 'cid' });
-      d.createObjectStore('chats', { keyPath: 'peer' });
-      d.createObjectStore('peers', { keyPath: 'u' });
+      if (e.oldVersion < 1) {
+        d.createObjectStore('kv');
+        const msgs = d.createObjectStore('msgs', { keyPath: 'k' });
+        msgs.createIndex('peer_ts', ['peer', 'ts']);
+        msgs.createIndex('id', 'id');
+        d.createObjectStore('outbox', { keyPath: 'cid' });
+        d.createObjectStore('chats', { keyPath: 'peer' });
+        d.createObjectStore('peers', { keyPath: 'u' });
+      }
+      if (e.oldVersion < 2) d.createObjectStore('avatars', { keyPath: 'u' }); // profile photos: { u, ver, blob }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);

@@ -32,6 +32,12 @@ const SCHEMA = (pg) => `
   CREATE INDEX IF NOT EXISTS msg_recipient ON messages(recipient, seq);
   CREATE INDEX IF NOT EXISTS msg_sender ON messages(sender, seq);
   CREATE INDEX IF NOT EXISTS msg_ts ON messages(ts);
+  CREATE TABLE IF NOT EXISTS avatars (
+    username TEXT PRIMARY KEY REFERENCES users(username) ON DELETE CASCADE,
+    data     ${pg ? 'BYTEA' : 'BLOB'} NOT NULL,
+    type     TEXT NOT NULL,
+    ver      BIGINT NOT NULL
+  );
 `;
 
 // Queries written once with `?` placeholders; converted to $1, $2… for Postgres.
@@ -55,6 +61,11 @@ const SQL = {
   maxSeq: 'SELECT COALESCE(MAX(seq), 0) AS s FROM messages',
   purgeMsgs: 'DELETE FROM messages WHERE ts < ?',
   purgeSessions: 'DELETE FROM sessions WHERE expires < ?',
+  getAvatar: 'SELECT data, type, ver FROM avatars WHERE username = ?',
+  avatarVer: 'SELECT ver FROM avatars WHERE username = ?',
+  setAvatar: `INSERT INTO avatars (username, data, type, ver) VALUES (?, ?, ?, ?)
+              ON CONFLICT (username) DO UPDATE SET data = excluded.data, type = excluded.type, ver = excluded.ver`,
+  deleteAvatar: 'DELETE FROM avatars WHERE username = ?',
 };
 
 async function openSqlite(dataDir) {
@@ -137,6 +148,7 @@ async function openMongo(uri) {
   const users = mdb.collection('users');
   const sessions = mdb.collection('sessions');
   const messages = mdb.collection('messages');
+  const avatars = mdb.collection('avatars');
   await Promise.all([
     messages.createIndex({ sender: 1, cid: 1 }, { unique: true }),
     messages.createIndex({ recipient: 1, seq: 1 }),
@@ -184,6 +196,16 @@ async function openMongo(uri) {
     maxSeq: async () => ({ s: (await messages.find().sort({ seq: -1 }).limit(1).next())?.seq ?? 0 }),
     purgeMsgs: async (cutoff) => changes((await messages.deleteMany({ ts: { $lt: cutoff } })).deletedCount),
     purgeSessions: async (now) => changes((await sessions.deleteMany({ expires: { $lt: now } })).deletedCount),
+    getAvatar: async (u) => {
+      const d = await avatars.findOne({ _id: u });
+      return d && { data: bytes(d.data), type: d.type, ver: d.ver };
+    },
+    avatarVer: (u) => avatars.findOne({ _id: u }, { projection: { ver: 1 } }),
+    setAvatar: async (u, data, type, ver) => {
+      await avatars.replaceOne({ _id: u }, { data, type, ver }, { upsert: true });
+      return changes(1);
+    },
+    deleteAvatar: async (u) => changes((await avatars.deleteOne({ _id: u })).deletedCount),
   };
   const call = (name, ...args) => ops[name](...args);
   return {

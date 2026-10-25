@@ -38,7 +38,7 @@
   <main id="app" class="app" hidden>
     <aside class="sidebar">
       <header class="bar">
-        <div class="avatar" id="me-avatar"></div>
+        <button class="avatar avatar-btn" id="me-avatar" type="button" title="Profile photo" aria-label="Profile photo"></button>
         <strong id="me-name" class="grow"></strong>
         <button id="logout-btn" class="icon-btn" title="Sign out" aria-label="Sign out">
           <svg viewBox="0 0 24 24"><path d="M16 17v-3H9v-4h7V7l5 5-5 5zM14 2a2 2 0 0 1 2 2v2h-2V4H5v16h9v-2h2v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9z"/></svg>
@@ -67,7 +67,7 @@
           <button id="back-btn" class="icon-btn back" aria-label="Back">
             <svg viewBox="0 0 24 24"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z"/></svg>
           </button>
-          <div class="avatar" id="peer-avatar"></div>
+          <button class="avatar avatar-btn" id="peer-avatar" type="button" aria-label="Contact photo"></button>
           <div class="grow peer-info">
             <strong id="peer-name"></strong>
             <span id="peer-status" class="muted small"></span>
@@ -81,6 +81,15 @@
           <button id="key-warning-btn" class="btn small">Review</button>
         </div>
         <div id="messages" class="messages" aria-live="polite"></div>
+        <div id="reply-bar" class="reply-bar" hidden>
+          <div class="quote">
+            <strong id="reply-name"></strong>
+            <span id="reply-text"></span>
+          </div>
+          <button id="reply-cancel" class="icon-btn" type="button" aria-label="Cancel reply">
+            <svg viewBox="0 0 24 24"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4l5.6 5.6 1.4-1.4-5.6-5.6z"/></svg>
+          </button>
+        </div>
         <form id="composer" class="composer">
           <label class="icon-btn" title="Send photo" aria-label="Send photo">
             <svg viewBox="0 0 24 24"><path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5l2.5 3 3.5-4.5 4.5 6H5l3.5-4.5z"/></svg>
@@ -105,6 +114,21 @@
       <button id="accept-key-btn" class="btn danger">Accept new code</button>
     </div>
     <form method="dialog"><button class="btn primary">Close</button></form>
+  </dialog>
+
+  <dialog id="profile-dialog" class="dialog profile-dialog">
+    <h3>Profile photo</h3>
+    <div id="profile-avatar" class="avatar avatar-xl"></div>
+    <strong id="profile-name"></strong>
+    <p id="profile-msg" class="muted small" role="status"></p>
+    <div class="profile-actions">
+      <label class="btn primary">Change photo
+        <input id="avatar-input" type="file" accept="image/*" hidden>
+      </label>
+      <button id="avatar-remove" class="btn" type="button">Remove</button>
+    </div>
+    <p class="muted small">Your profile photo is visible to people you chat with.</p>
+    <form method="dialog"><button class="btn">Close</button></form>
   </dialog>
 
   <dialog id="image-dialog" class="dialog image-dialog">

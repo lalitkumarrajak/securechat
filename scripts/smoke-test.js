@@ -54,6 +54,8 @@ function connect(token) {
   });
 }
 
+const post2 = (port) => fetch(`http://localhost:${port}/api/register`, { method: 'POST', body: '{}', headers: { 'Content-Type': 'application/json' } });
+
 async function waitForServer() {
   for (let i = 0; i < 50; i++) {
     try { await fetch(BASE + '/'); return; } catch { await new Promise((r) => setTimeout(r, 100)); }
@@ -134,7 +136,45 @@ try {
   assert.equal(code, 4001);
   console.log('✓ invalid WebSocket token rejected');
 
+  // Profile photo: upload, contacts watching you get the new version, download, remove.
+  wsA.sendJson({ t: 'watch', u: 'bob' });
+  assert.equal((await wsA.next('pres')).av, 0);
+  const tinyPng = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  const authed = (t) => ({ 'Content-Type': 'application/json', Authorization: 'Bearer ' + t });
+  const up = await fetch(BASE + '/api/avatar', { method: 'POST', headers: authed(bob.token), body: JSON.stringify({ img: tinyPng }) });
+  const { av } = await up.json();
+  assert.ok(av > 0);
+  assert.equal((await wsA.next('pres')).av, av);
+  const pic = await fetch(BASE + '/api/avatar?u=bob', { headers: authed(alice.token) });
+  assert.equal(pic.headers.get('content-type'), 'image/png');
+  assert.equal(Buffer.from(await pic.arrayBuffer()).toString('base64'), tinyPng);
+  assert.equal((await fetch(BASE + '/api/avatar?u=bob')).status, 401);
+  const notImage = await fetch(BASE + '/api/avatar', { method: 'POST', headers: authed(bob.token), body: JSON.stringify({ img: 'aGVsbG8gd29ybGQh' }) });
+  assert.equal(notImage.status, 400);
+  await fetch(BASE + '/api/avatar', { method: 'POST', headers: authed(bob.token), body: JSON.stringify({ img: null }) });
+  assert.equal((await wsA.next('pres')).av, 0);
+  assert.equal((await fetch(BASE + '/api/avatar?u=bob', { headers: authed(alice.token) })).status, 404);
+  console.log('✓ profile photos: upload, live update to contacts, download, remove');
+
+  assert.equal((await fetch(BASE + '/emoji/..%2fsecret.json')).status, 404);
+  const emoji = await fetch(BASE + '/emoji/1f600.json');
+  if (emoji.status === 502) console.log('- animated emoji relay skipped (no internet)');
+  else {
+    assert.equal(emoji.status, 200);
+    assert.ok((await emoji.json()).layers, 'is a Lottie animation');
+    assert.equal((await fetch(BASE + '/emoji/1f1ee_1f1f3.json')).status, 404); // no animated version
+    console.log('✓ animated emoji relayed and cached');
+  }
+
   [wsA, wsB, wsB2].forEach((w) => w.close());
+  const closed = spawn(process.execPath, ['server.js'], { env: { ...process.env, PORT: PORT + 1, DATA_DIR: dataDir, ALLOW_SIGNUP: '' }, stdio: 'pipe' });
+  try {
+    let res;
+    for (let i = 0; i < 50 && !res; i++) res = await post2(PORT + 1).catch(() => new Promise((r) => setTimeout(r, 100)));
+    assert.equal(res.status, 403);
+    console.log('✓ sign-up closed unless ALLOW_SIGNUP=1');
+  } finally { closed.kill(); }
+
   console.log('\nAll tests passed');
 } catch (err) {
   console.error('✗', err);

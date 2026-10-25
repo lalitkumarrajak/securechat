@@ -120,8 +120,9 @@ function loadStatic() {
 loadStatic();
 
 const SECURITY_HEADERS = {
+  // worker-src blob: is for the animated-emoji player, which parses animations in a blob: worker.
   'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; " +
-    "connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+    "connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'no-referrer',
@@ -134,22 +135,63 @@ const SECURITY_HEADERS = {
 function serveStatic(req, res, pathname) {
   const file = staticFiles.get(pathname === '/' ? '/index.html' : pathname);
   if (!file) return sendJson(res, 404, { error: 'not found' });
-  const headers = {
-    ...SECURITY_HEADERS, 'Content-Type': file.type, ETag: file.etag,
-    'Cache-Control': 'no-cache', Vary: 'Accept-Encoding',
-  };
-  if (req.headers['if-none-match'] === file.etag) { res.writeHead(304, headers); return res.end(); }
-  const ae = String(req.headers['accept-encoding'] || '');
-  let body = file.raw;
-  if (/\bbr\b/.test(ae)) { body = file.br; headers['Content-Encoding'] = 'br'; }
-  else if (/\bgzip\b/.test(ae)) { body = file.gz; headers['Content-Encoding'] = 'gzip'; }
-  res.writeHead(200, headers);
-  res.end(req.method === 'HEAD' ? undefined : body);
+  sendBody(req, res, { body: file.raw, gz: file.gz, br: file.br, type: file.type, etag: file.etag, cache: 'no-cache' });
 }
 
 function sendJson(res, code, obj) {
   res.writeHead(code, { ...SECURITY_HEADERS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
   res.end(JSON.stringify(obj));
+}
+
+function sendBody(req, res, { body, gz, br, type, etag, cache }) {
+  const headers = { ...SECURITY_HEADERS, 'Content-Type': type, 'Cache-Control': cache, Vary: 'Accept-Encoding' };
+  if (etag) {
+    headers.ETag = etag;
+    if (req.headers['if-none-match'] === etag) { res.writeHead(304, headers); return res.end(); }
+  }
+  const ae = String(req.headers['accept-encoding'] || '');
+  if (br && /\bbr\b/.test(ae)) { body = br; headers['Content-Encoding'] = 'br'; }
+  else if (gz && /\bgzip\b/.test(ae)) { body = gz; headers['Content-Encoding'] = 'gzip'; }
+  res.writeHead(200, headers);
+  res.end(req.method === 'HEAD' ? undefined : body);
+}
+
+// ---------- animated emoji ----------
+// Google's Noto animated emoji (Lottie JSON, ~4 KB compressed each), fetched once and cached here
+// so clients only ever talk to this server: no third-party requests, and the CSP stays 'self'.
+const EMOJI_RE = /^\/emoji\/([0-9a-f]{2,6}(?:_[0-9a-f]{2,6}){0,9})\.json$/;
+const emojiCache = new Map(); // codepoints -> Promise<{ body, gz, br, etag } | null>
+function loadEmoji(cp) {
+  let p = emojiCache.get(cp);
+  if (!p) {
+    p = fetch(`https://fonts.gstatic.com/s/e/notoemoji/latest/${cp}/lottie.json`, { signal: AbortSignal.timeout(8000) })
+      .then(async (r) => {
+        if (r.status === 404) return null; // no animated version of this emoji
+        if (!r.ok) throw new Error('upstream ' + r.status);
+        const body = Buffer.from(await r.arrayBuffer());
+        JSON.parse(body); // only cache real animations
+        return {
+          body, gz: zlib.gzipSync(body, { level: 9 }),
+          br: zlib.brotliCompressSync(body, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 11 } }),
+          etag: '"' + sha256(body).slice(0, 16) + '"',
+        };
+      });
+    p.catch(() => emojiCache.delete(cp)); // retry transient failures next time
+    emojiCache.set(cp, p);
+    if (emojiCache.size > 1000) emojiCache.delete(emojiCache.keys().next().value);
+  }
+  return p;
+}
+
+async function serveEmoji(req, res, cp) {
+  if (rateLimited('emoji:' + clientIp(req), 300, 60e3)) return sendJson(res, 429, { error: 'Slow down' });
+  let anim;
+  try { anim = await loadEmoji(cp); } catch { return sendJson(res, 502, { error: 'emoji unavailable' }); }
+  if (!anim) {
+    res.writeHead(404, { ...SECURITY_HEADERS, 'Cache-Control': 'public, max-age=86400' });
+    return res.end();
+  }
+  sendBody(req, res, { ...anim, type: 'application/json', cache: 'public, max-age=31536000, immutable' });
 }
 
 function readJson(req, limit = 8192) {
@@ -217,6 +259,31 @@ const routes = {
     sendJson(res, 200, { users });
   },
 
+  // Profile photos are small square images resized on the device. Like WhatsApp's, they are
+  // visible to other users and not end-to-end encrypted.
+  'POST /api/avatar': async (req, res, me) => {
+    const { img } = await readJson(req, 200_000);
+    if (img === null) {
+      await db.run('deleteAvatar', me);
+    } else {
+      if (typeof img !== 'string' || img.length > 180_000 || !B64_RE.test(img)) return sendJson(res, 400, { error: 'Invalid image' });
+      const data = Buffer.from(img, 'base64');
+      const type = imageType(data);
+      if (!type) return sendJson(res, 400, { error: 'Use a JPEG, PNG or WebP image' });
+      await db.run('setAvatar', me, data, type, Date.now());
+    }
+    const pres = await presence(me);
+    sendTo(me, pres); // my other devices
+    for (const ws of watchers.get(me) || []) send(ws, pres);
+    sendJson(res, 200, { av: pres.av });
+  },
+
+  'GET /api/avatar': async (req, res, me, token, url) => {
+    const row = await db.get('getAvatar', String(url.searchParams.get('u') || ''));
+    if (!row) return sendJson(res, 404, { error: 'No photo' });
+    sendBody(req, res, { body: Buffer.from(row.data), type: row.type, etag: `"${row.ver}"`, cache: 'private, no-cache' });
+  },
+
   'GET /api/key': async (req, res, me, token, url) => {
     const user = await db.get('getUser', String(url.searchParams.get('u') || ''));
     if (!user) return sendJson(res, 404, { error: 'No such user' });
@@ -225,6 +292,13 @@ const routes = {
 };
 const PUBLIC_ROUTES = new Set(['POST /api/register', 'POST /api/login']);
 
+function imageType(b) {
+  if (b.length > 4 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  if (b.length > 8 && b.toString('latin1', 0, 8) === '\x89PNG\r\n\x1a\n') return 'image/png';
+  if (b.length > 12 && b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 8, 12) === 'WEBP') return 'image/webp';
+  return null;
+}
+
 async function handleHttp(req, res) {
   const url = new URL(req.url, 'http://x');
   const key = `${req.method} ${url.pathname}`;
@@ -232,6 +306,8 @@ async function handleHttp(req, res) {
   if (!route) {
     if (url.pathname.startsWith('/api/')) return sendJson(res, 404, { error: 'not found' });
     if (req.method !== 'GET' && req.method !== 'HEAD') return sendJson(res, 405, { error: 'method not allowed' });
+    const emoji = EMOJI_RE.exec(url.pathname);
+    if (emoji) return serveEmoji(req, res, emoji[1]);
     return serveStatic(req, res, url.pathname);
   }
   try {
@@ -279,7 +355,8 @@ const rowOut = (r) => ({ id: r.id, cid: r.cid, f: r.sender, to: r.recipient, b: 
 
 async function presence(user) {
   const isOn = online.has(user);
-  return { t: 'pres', u: user, on: isOn, ls: isOn ? 0 : ((await db.get('getUser', user))?.last_seen || 0) };
+  const av = (await db.get('avatarVer', user))?.ver || 0;
+  return { t: 'pres', u: user, on: isOn, ls: isOn ? 0 : ((await db.get('getUser', user))?.last_seen || 0), av };
 }
 async function broadcastPresence(user) {
   const msg = await presence(user);
@@ -384,7 +461,7 @@ wss.on('connection', (ws, req) => {
       const first = !online.has(user);
       if (first) online.set(user, new Set());
       online.get(user).add(ws);
-      send(ws, { t: 'ok', u: user });
+      send(ws, { t: 'ok', u: user, av: (await db.get('avatarVer', user))?.ver || 0 });
       if (first) await broadcastPresence(user);
       return;
     }

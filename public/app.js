@@ -21,7 +21,10 @@ const S = {
   rendered: new Map(),   // msg key -> element (active chat only)
   rcpt: { 1: new Set(), 2: new Set() }, rcptTimer: 0,
   lastTypingSent: 0,
+  replyTo: null,         // { f, c, p } of the message being replied to
+  avUrls: new Map(),     // username -> object URL of their profile photo (or null)
 };
+const msgOf = new WeakMap(); // rendered .msg element -> message
 
 // ---------- boot / auth ----------
 async function boot() {
@@ -192,7 +195,8 @@ async function handle(m) {
       clearInterval(S.pingTimer);
       S.pingTimer = setInterval(() => wsSend({ t: 'p' }), 25000);
       wsSend({ t: 'sync', after: S.lastSeq });
-      if (S.active) wsSend({ t: 'watch', u: S.active });
+      watchChats();
+      syncAvatar(S.me, m.av || 0).catch(() => {});
       flushOutbox();
       break;
     case 'batch': {
@@ -238,6 +242,7 @@ async function handle(m) {
     case 'pres':
       S.presence.set(m.u, { on: m.on, ls: m.ls });
       if (m.u === S.active) renderPeerStatus();
+      syncAvatar(m.u, m.av || 0).catch(() => {});
       break;
     case 'err':
       if (m.cid) {
@@ -249,6 +254,13 @@ async function handle(m) {
       console.warn('server:', m.e);
       break;
   }
+}
+
+// Watch recent contacts so their online status and profile photo stay current.
+async function watchChats() {
+  const peers = (await db.all('chats')).sort((a, b) => b.ts - a.ts).slice(0, 40).map((c) => c.peer);
+  if (S.active && !peers.includes(S.active)) peers.push(S.active);
+  for (const u of peers) wsSend({ t: 'watch', u });
 }
 
 // Only advance the sync cursor from live events once the initial sync finished,
@@ -309,7 +321,8 @@ async function ingest(row, fromSync) {
   const msg = { k, cid: row.cid, id: row.id, peer, out, ts: row.ts, s: !out && viewing ? 2 : row.s, ...pick(content) };
   await db.put('msgs', msg);
 
-  const chat = (await db.get('chats', peer)) || { peer, unread: 0, ts: 0 };
+  let chat = await db.get('chats', peer);
+  if (!chat) { chat = { peer, unread: 0, ts: 0 }; wsSend({ t: 'watch', u: peer }); }
   if (msg.ts >= chat.ts) Object.assign(chat, { ts: msg.ts, last: preview(msg), lastOut: out });
   if (!out && row.s < 2 && !viewing) chat.unread++;
   await db.put('chats', chat);
@@ -324,11 +337,18 @@ async function ingest(row, fromSync) {
 }
 
 function pick(c) {
-  if (c.type === 'text' && typeof c.text === 'string') return { type: 'text', text: c.text };
+  const re = pickReply(c.re);
+  if (c.type === 'text' && typeof c.text === 'string') return { type: 'text', text: c.text, ...(re && { re }) };
   if (c.type === 'img' && typeof c.src === 'string' && c.src.startsWith('data:image/')) {
-    return { type: 'img', src: c.src, w: c.w | 0, h: c.h | 0, text: typeof c.text === 'string' ? c.text : '' };
+    return { type: 'img', src: c.src, w: c.w | 0, h: c.h | 0, text: typeof c.text === 'string' ? c.text : '', ...(re && { re }) };
   }
   return { type: 'err' };
+}
+
+// A reply carries the quoted message's sender, id and a short preview inside the encrypted body.
+function pickReply(r) {
+  if (!r || typeof r.f !== 'string' || typeof r.c !== 'string' || typeof r.p !== 'string') return undefined;
+  return { f: r.f.slice(0, 24), c: r.c.slice(0, 40), p: r.p.slice(0, 120) };
 }
 
 const preview = (m) => (m.type === 'img' ? '📷 Photo' : m.type === 'err' ? '🔒 Unable to decrypt' : m.text.slice(0, 80));
@@ -390,10 +410,51 @@ async function flushOutbox() {
 
 // ---------- UI: chat list ----------
 function avatar(node, name) {
+  node.dataset.u = name;
   node.textContent = name[0]?.toUpperCase() || '?';
   let h = 0;
   for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   node.style.background = `hsl(${h % 360} 45% 45%)`;
+  paintAvatar(node, name);
+}
+
+// ---------- profile photos ----------
+// Photos are cached in IndexedDB by version, so they show instantly and offline.
+async function avatarUrl(u) {
+  if (!S.avUrls.has(u)) {
+    const rec = await db.get('avatars', u);
+    if (!S.avUrls.has(u)) S.avUrls.set(u, rec ? URL.createObjectURL(rec.blob) : null);
+  }
+  return S.avUrls.get(u);
+}
+
+async function paintAvatar(node, u) {
+  const url = await avatarUrl(u);
+  if (node.dataset.u !== u) return; // reused for someone else meanwhile
+  if (url) {
+    const img = el('img');
+    img.src = url;
+    img.alt = '';
+    node.replaceChildren(img);
+  } else {
+    node.textContent = u[0]?.toUpperCase() || '?';
+  }
+}
+
+async function syncAvatar(u, ver) {
+  const rec = await db.get('avatars', u);
+  if ((rec?.ver || 0) === ver) return;
+  if (!ver) {
+    await db.del('avatars', u);
+  } else {
+    const res = await fetch('/api/avatar?u=' + encodeURIComponent(u), { headers: { Authorization: 'Bearer ' + S.token } });
+    if (!res.ok) return;
+    await db.put('avatars', { u, ver, blob: await res.blob() });
+  }
+  const old = S.avUrls.get(u);
+  if (old) URL.revokeObjectURL(old);
+  S.avUrls.delete(u);
+  for (const node of document.querySelectorAll(`.avatar[data-u="${u}"]`)) paintAvatar(node, u);
 }
 
 function fmtTime(ts) {
@@ -468,6 +529,7 @@ $('search').addEventListener('input', () => {
 
 // ---------- UI: conversation ----------
 async function openChat(peer) {
+  if (S.active !== peer) cancelReply();
   S.active = peer;
   document.body.classList.add('in-chat');
   $('no-chat').hidden = true;
@@ -480,6 +542,7 @@ async function openChat(peer) {
   await renderConversation();
   renderChatList();
   markRead(peer);
+  askNotifyPermission();
   if (matchMedia('(min-width: 800px)').matches) $('input').focus();
   getPeer(peer, true).then((p) => showKeyWarning(!!p.changed)).catch(() => {});
 }
@@ -524,8 +587,14 @@ function appendMessage(m, scroll = true) {
 
 function messageNode(m) {
   const wrap = el('div', 'msg ' + (m.out ? 'out' : 'in'));
+  msgOf.set(wrap, m);
   const bubble = el('div', 'bubble');
-  if (m.type === 'img') {
+  if (m.re) bubble.append(quoteNode(m.re));
+  const emoji = m.type === 'text' ? emojiOnly(m.text) : null;
+  if (emoji) {
+    if (!m.re) wrap.classList.add('emoji-msg');
+    bubble.append(emojiNode(emoji));
+  } else if (m.type === 'img') {
     const img = el('img', 'photo');
     img.src = m.src;
     img.alt = 'Photo';
@@ -544,6 +613,15 @@ function messageNode(m) {
   if (m.out) meta.append(ticks(m.s));
   bubble.append(meta);
   wrap.append(bubble);
+  if (m.type !== 'err' && m.s !== -2) {
+    const btn = el('button', 'reply-btn');
+    btn.type = 'button';
+    btn.title = 'Reply';
+    btn.setAttribute('aria-label', 'Reply');
+    btn.innerHTML = REPLY_ICON;
+    btn.addEventListener('click', () => startReply(m));
+    wrap.append(btn);
+  }
   return wrap;
 }
 
@@ -602,15 +680,18 @@ input.addEventListener('keydown', (e) => {
     $('composer').requestSubmit();
   }
 });
+// Tapping Send must not take focus away from the text box: on phones that closes the
+// keyboard after every message.
+$('send-btn').addEventListener('mousedown', (e) => e.preventDefault());
 $('composer').addEventListener('submit', (e) => {
   e.preventDefault();
   const text = input.value.trim();
   if (!text || !S.active) return;
   input.value = '';
   input.style.height = 'auto';
+  input.focus(); // still inside the tap, so mobile browsers keep the keyboard up
   S.lastTypingSent = 0;
-  askNotifyPermission();
-  sendMessage(S.active, { type: 'text', text });
+  sendMessage(S.active, { type: 'text', text, ...takeReply() });
 });
 
 // Photos are downscaled and re-encoded on the device before encryption: a 4 MB camera
@@ -621,7 +702,7 @@ $('file-input').addEventListener('change', async (e) => {
   if (!file || !S.active) return;
   try {
     const img = await compressImage(file);
-    sendMessage(S.active, { type: 'img', ...img, text: '' });
+    sendMessage(S.active, { type: 'img', ...img, text: '', ...takeReply() });
   } catch {
     alert('Could not read that image.');
   }
@@ -646,6 +727,196 @@ async function compressImage(file, maxDim = 1280) {
   if (src.length > 1_400_000) throw new Error('too large');
   return { src, w, h };
 }
+
+// ---------- replies ----------
+const REPLY_ICON = '<svg viewBox="0 0 24 24"><path d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z"/></svg>';
+
+function startReply(m) {
+  S.replyTo = { f: m.out ? S.me : m.peer, c: m.cid, p: preview(m).slice(0, 120) };
+  $('reply-name').textContent = m.out ? 'You' : m.peer;
+  $('reply-text').textContent = S.replyTo.p;
+  $('reply-bar').hidden = false;
+  input.focus();
+}
+function cancelReply() {
+  S.replyTo = null;
+  $('reply-bar').hidden = true;
+}
+function takeReply() {
+  const re = S.replyTo;
+  cancelReply();
+  return re ? { re } : {};
+}
+$('reply-cancel').addEventListener('click', () => { cancelReply(); input.focus(); });
+input.addEventListener('keydown', (e) => { if (e.key === 'Escape' && S.replyTo) cancelReply(); });
+
+function quoteNode(re) {
+  const q = el('div', 'quote');
+  q.append(el('strong', null, re.f === S.me ? 'You' : re.f), el('span', null, re.p));
+  q.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const target = S.rendered.get(re.f + '/' + re.c);
+    if (!target) return;
+    target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    target.classList.remove('flash');
+    void target.offsetWidth; // restart the highlight animation
+    target.classList.add('flash');
+  });
+  return q;
+}
+
+// Swipe a message to the right to reply, like WhatsApp.
+{
+  const box = $('messages');
+  let row = null, x0 = 0, y0 = 0, dx = 0, horizontal = null;
+  box.addEventListener('touchstart', (e) => {
+    row = e.target.closest('.msg');
+    if (!row || !msgOf.has(row) || e.touches.length > 1) { row = null; return; }
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = 0; horizontal = null;
+  }, { passive: true });
+  box.addEventListener('touchmove', (e) => {
+    if (!row) return;
+    const mx = e.touches[0].clientX - x0, my = e.touches[0].clientY - y0;
+    if (horizontal === null) {
+      if (Math.abs(mx) < 10 && Math.abs(my) < 10) return;
+      horizontal = mx > 0 && Math.abs(mx) > Math.abs(my) * 1.5;
+      if (horizontal) row.classList.add('swiping');
+    }
+    if (!horizontal) return;
+    dx = Math.min(Math.max(mx, 0), 90);
+    row.style.transform = `translateX(${dx}px)`;
+    row.classList.toggle('swipe-ready', dx > 60);
+  }, { passive: true });
+  const end = () => {
+    if (!row) return;
+    if (horizontal && dx > 60) startReply(msgOf.get(row));
+    row.classList.remove('swiping', 'swipe-ready');
+    row.style.transform = '';
+    row = null;
+  };
+  box.addEventListener('touchend', end);
+  box.addEventListener('touchcancel', end);
+}
+
+// ---------- animated emoji ----------
+// Messages that are just 1–3 emoji are shown large and animated, like in WhatsApp.
+// Animations are Google's Noto animated emoji (Lottie), relayed and cached by our server.
+const segmenter = new Intl.Segmenter();
+function emojiOnly(text) {
+  const t = text.trim();
+  if (!t || t.length > 40) return null;
+  const parts = [...segmenter.segment(t)].map((s) => s.segment).filter((s) => s.trim());
+  if (parts.length > 3) return null;
+  const isEmoji = (s) => /^(?:\p{Extended_Pictographic}|\p{Emoji_Component}|\u200d|\ufe0f)+$/u.test(s) &&
+    /\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(s);
+  return parts.every(isEmoji) ? parts : null;
+}
+
+let lottiePromise = null;
+function loadLottie() {
+  return (lottiePromise ??= new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = '/lottie_light.min.js';
+    s.onload = () => resolve(window.lottie);
+    s.onerror = () => { lottiePromise = null; reject(new Error('player failed to load')); };
+    document.head.append(s);
+  }));
+}
+
+const animations = new Map(); // codepoints -> Promise<animation JSON | null>
+function emojiAnimation(e) {
+  const cp = [...e].map((c) => c.codePointAt(0).toString(16)).filter((h) => h !== 'fe0f').join('_');
+  if (!animations.has(cp)) {
+    animations.set(cp, fetch(`/emoji/${cp}.json`)
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => { animations.delete(cp); return null; }));
+  }
+  return animations.get(cp);
+}
+
+// Only animate what's on screen, so long chats full of emoji stay smooth.
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const emojiObserver = new IntersectionObserver((entries) => {
+  for (const { target, isIntersecting } of entries) {
+    if (target.anim) isIntersecting && !reduceMotion.matches ? target.anim.play() : target.anim.pause();
+  }
+});
+
+function emojiNode(parts) {
+  const row = el('div', 'emoji-row' + (parts.length === 1 ? ' single' : ''));
+  for (const e of parts) {
+    const span = el('span', 'big-emoji', e); // static emoji until (or unless) the animation loads
+    span.setAttribute('role', 'img');
+    span.setAttribute('aria-label', e);
+    row.append(span);
+    Promise.all([emojiAnimation(e), loadLottie()]).then(([data, lottie]) => {
+      if (!data) { span.classList.add('pop'); return; }
+      span.textContent = '';
+      span.anim = lottie.loadAnimation({ container: span, renderer: 'svg', loop: true, autoplay: false, animationData: data });
+      emojiObserver.observe(span);
+    }).catch(() => span.classList.add('pop'));
+  }
+  return row;
+}
+
+// ---------- profile ----------
+$('me-avatar').addEventListener('click', async () => {
+  avatar($('profile-avatar'), S.me);
+  $('profile-name').textContent = S.me;
+  $('profile-msg').textContent = '';
+  $('avatar-remove').hidden = !(await avatarUrl(S.me));
+  $('profile-dialog').showModal();
+});
+
+$('avatar-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  const msg = $('profile-msg');
+  msg.textContent = 'Uploading…';
+  try {
+    const { av } = await api('/api/avatar', { img: await squarePhoto(file) });
+    await syncAvatar(S.me, av);
+    $('avatar-remove').hidden = false;
+    msg.textContent = 'Profile photo updated';
+  } catch (err) {
+    msg.textContent = err.message === 'bad image' ? 'Could not read that image.' : err.message;
+  }
+});
+
+$('avatar-remove').addEventListener('click', async () => {
+  const msg = $('profile-msg');
+  try {
+    await api('/api/avatar', { img: null });
+    await syncAvatar(S.me, 0);
+    $('avatar-remove').hidden = true;
+    msg.textContent = 'Profile photo removed';
+  } catch (err) {
+    msg.textContent = err.message;
+  }
+});
+
+// Centre-crop to a square and shrink to 320 px: usually 10–25 KB.
+async function squarePhoto(file, size = 320) {
+  let bmp;
+  try { bmp = await createImageBitmap(file); } catch { throw new Error('bad image'); }
+  const side = Math.min(bmp.width, bmp.height);
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  canvas.getContext('2d').drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, size, size);
+  bmp.close?.();
+  let url = canvas.toDataURL('image/webp', 0.8);
+  if (!url.startsWith('data:image/webp')) url = canvas.toDataURL('image/jpeg', 0.85);
+  return url.slice(url.indexOf(',') + 1);
+}
+
+// Tap a contact's photo to see it full size.
+$('peer-avatar').addEventListener('click', async () => {
+  const url = S.active && (await avatarUrl(S.active));
+  if (!url) return;
+  $('image-full').src = url;
+  $('image-dialog').showModal();
+});
 
 // ---------- security code ----------
 function showKeyWarning(show) {
