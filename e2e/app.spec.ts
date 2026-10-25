@@ -160,6 +160,7 @@ test('long-press: react, edit, pin', async () => {
   // B reacts ❤️ to A's message via the action sheet
   await longPress(B, bubble(B, 'Second message').locator('div').first());
   await expect(B.page.getByRole('dialog', { name: 'Message options' })).toBeVisible();
+  await expect(B.page.getByRole('dialog', { name: 'Message options' })).not.toContainText('//'); // no stray code comments
   await settle(B);
   await B.page.screenshot({ path: shots('06-action-sheet') });
   await B.page.getByRole('button', { name: 'React ❤️' }).click();
