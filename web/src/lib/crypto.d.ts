@@ -1,0 +1,12 @@
+// Types for crypto.js (plain JS so the Node tests can import the exact same code).
+export function b64(buf: ArrayBuffer | Uint8Array): string;
+export function unb64(s: string): Uint8Array;
+export function randomId(bytes?: number): string;
+export function deriveFromPassword(username: string, password: string): Promise<{ auth: string; wrapKey: CryptoKey }>;
+export function generateIdentity(wrapKey: CryptoKey): Promise<{ pub: string; encPriv: string; priv: CryptoKey }>;
+export function rewrapIdentity(encPriv: string, oldWrapKey: CryptoKey, newWrapKey: CryptoKey): Promise<string>;
+export function unwrapIdentity(encPriv: string, wrapKey: CryptoKey): Promise<CryptoKey>;
+export function conversationKey(myPriv: CryptoKey, theirPub: string, me: string, them: string): Promise<CryptoKey>;
+export function encryptMessage(key: CryptoKey, obj: unknown, from: string, to: string, cid: string): Promise<string>;
+export function decryptMessage(key: CryptoKey, body: string, from: string, to: string, cid: string): Promise<any>;
+export function safetyNumber(userA: string, pubA: string, userB: string, pubB: string): Promise<string[]>;
