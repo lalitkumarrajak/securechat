@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deviceName, parseDevice } from './device';
+import { deviceName, osVersion, parseDevice, placeName } from './device';
 
 describe('device names', () => {
   it('recognises common phones and computers', () => {
@@ -13,5 +13,25 @@ describe('device names', () => {
   });
   it('handles sessions without details', () => {
     expect(deviceName('')).toBe('Unknown device');
+  });
+});
+
+describe('device names with client hints', () => {
+  const android = 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36';
+  const windows = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
+  it('uses the phone model when the browser shares it', () => {
+    expect(deviceName(android, { model: 'SM-S918B', pv: '14.0.0' })).toBe('Chrome on SM-S918B');
+    expect(osVersion(android, { model: 'SM-S918B', pv: '14.0.0' })).toBe('Android 14');
+    expect(deviceName(android, null)).toBe('Chrome on Android');
+  });
+  it('tells Windows 11 from Windows 10', () => {
+    expect(deviceName(windows, { model: '', pv: '15.0.0' })).toBe('Chrome on Windows 11');
+    expect(deviceName(windows, { model: '', pv: '10.0.0' })).toBe('Chrome on Windows 10');
+  });
+  it('names places', () => {
+    expect(placeName({ city: 'Mumbai', region: 'Maharashtra', country: 'India' })).toBe('Mumbai, Maharashtra, India');
+    expect(placeName({ city: 'Delhi', region: 'Delhi', country: 'India' })).toBe('Delhi, India');
+    expect(placeName({ local: true })).toBe('Local network');
+    expect(placeName(null)).toBe('');
   });
 });

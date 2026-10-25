@@ -34,7 +34,7 @@ export async function signUp(p: Phone) {
   await form.getByLabel('Password', { exact: true }).fill(PASSWORD);
   await form.getByLabel('Confirm password').fill(PASSWORD);
   await form.getByRole('button', { name: 'Create account' }).click();
-  await expect(p.page.getByRole('heading', { name: 'Chattrix', level: 1 })).toBeVisible({ timeout: 20_000 });
+  await expect(p.page.getByRole('heading', { name: p.u, level: 1 })).toBeVisible({ timeout: 20_000 });
 }
 
 export async function signIn(p: Phone) {
@@ -43,7 +43,7 @@ export async function signIn(p: Phone) {
   await form.getByLabel('Username').fill(p.u);
   await form.getByLabel('Password', { exact: true }).fill(PASSWORD);
   await form.getByRole('button', { name: 'Sign in' }).click();
-  await expect(p.page.getByRole('heading', { name: 'Chattrix', level: 1 })).toBeVisible({ timeout: 20_000 });
+  await expect(p.page.getByRole('heading', { name: p.u, level: 1 })).toBeVisible({ timeout: 20_000 });
 }
 
 async function center(l: Locator) {

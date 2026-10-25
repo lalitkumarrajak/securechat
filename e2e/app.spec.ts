@@ -299,6 +299,12 @@ test('dark mode chat screen and desktop layout', async ({ browser }) => {
   await A.page.screenshot({ path: shots('10-chat-dark') });
   const D = await phone(browser, B.u, { viewport: { width: 1280, height: 800 } });
   await signIn(D);
+  // B's phone is told about the new sign-in, with where it happened
+  const alert = B.page.locator('[data-sonner-toast]').filter({ hasText: 'New sign-in: Chrome on Linux' });
+  await expect(alert).toBeVisible();
+  await expect(alert).toContainText('Mumbai, Maharashtra, India');
+  await B.page.screenshot({ path: shots('15-signin-alert') });
+  await alert.getByRole('button', { name: 'Close toast' }).click().catch(() => {});
   await D.page.locator('li').filter({ hasText: 'Lalit Rajak' }).first().click();
   // Hover menu on desktop
   const msg = D.page.locator('[data-k]').filter({ hasText: 'Hi Rakhi!' }).first();
@@ -316,6 +322,8 @@ test('dark mode chat screen and desktop layout', async ({ browser }) => {
   await expect(B.page.getByText('This device · active now')).toBeVisible();
   const other = B.page.locator('li').filter({ hasText: 'Chrome on Linux' }).filter({ has: B.page.getByRole('button', { name: 'Sign out' }) });
   await expect(other).toBeVisible();
+  await expect(other).toContainText('Mumbai, Maharashtra, India');
+  await expect(other).toContainText('Reliance Jio');
   await B.page.waitForTimeout(350);
   await B.page.screenshot({ path: shots('14-sessions') });
   await other.getByRole('button', { name: 'Sign out' }).click();

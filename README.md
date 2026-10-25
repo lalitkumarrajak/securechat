@@ -6,6 +6,7 @@ Private, end-to-end encrypted messaging with the people you choose. Built to wor
 - **Messages:** text, photos, voice messages (hold the mic), big animated emoji, replies (swipe right), reactions, edit (15 min), forward, copy, pin (up to 3 per chat), select several, delete for me or for everyone (5 min).
 - **Chats:** unread divider, search inside a chat, drafts, mute (8 h / 1 week / always), archive, sent / delivered / read ticks, typing and "recording audio…".
 - **Presence that's honest:** you show as online only while Chattrix is open in front of you; closing the tab switches you to "last seen" immediately.
+- **Account security:** Active sessions shows each device (phone model where the browser shares it) and its approximate location and network; a new sign-in alerts your other devices straight away.
 - **Quick exit:** turn on *Sign out when I close the tab* (Settings → Privacy, per device) and closing the tab ends your sign-in on the server and erases chats saved on that device. Reloading keeps you signed in.
 - **Invite links:** share a link anywhere; people sign up from it and send you a friend request. Game links let anyone join a game.
 - **Settings:** theme (system / light / dark), 6 accent colours, 5 chat wallpapers, text size, profile photo, name and about, last-seen and read-receipt privacy, push notifications, sounds, Enter to send, change password, sign out of all devices.
@@ -62,6 +63,7 @@ Caddy gets a free HTTPS certificate automatically.
 | `ALLOW_SIGNUP` | open | Set to `0` to close sign-up |
 | `RETENTION_DAYS` | `30` | Encrypted messages are deleted from the server after this (they stay on devices) |
 | `GAME_LOBBY_MS` | `600000` | How long a game waits for players before it's called off |
+| `GEOIP_URL` | `https://ipwho.is/{ip}` | Looks up the approximate location of sign-ins for Active sessions; set empty to turn off |
 | `KLIPY_API_KEY` | – | Turns on GIF and sticker search ([KLIPY](https://docs.klipy.com)) |
 
 ## Adding a game

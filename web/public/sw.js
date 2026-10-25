@@ -1,6 +1,6 @@
 // Service worker: offline app shell and push notifications.
-const CACHE = 'chattrix-v1';
-const SHELL = ['/', '/theme-boot.js', '/icon.svg', '/icon-192.png', '/manifest.webmanifest'];
+const CACHE = 'chattrix-v2'; // bump when the shell files change
+const SHELL = ['/', '/theme-boot.js', '/logo-mark.png', '/icon-192.png', '/manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -43,8 +43,11 @@ self.addEventListener('push', (e) => {
   let d = {};
   try { d = e.data.json(); } catch {}
   const name = d.name || d.from || 'Someone';
-  const title = d.t === 'fr' ? 'New friend request' : name;
-  const body = d.t === 'fr' ? `${name} wants to be your friend` : d.t === 'game' ? `invited you to play ${d.game || 'a game'} 🎲` : 'New message';
+  const title = d.t === 'fr' ? 'New friend request' : d.t === 'signin' ? 'New sign-in to your account' : name;
+  const body = d.t === 'fr' ? `${name} wants to be your friend`
+    : d.t === 'game' ? `invited you to play ${d.game || 'a game'} 🎲`
+    : d.t === 'signin' ? `A device signed in${d.where || ''}. If this wasn’t you, open Chattrix → Settings → Active sessions.`
+    : 'New message';
   e.waitUntil((async () => {
     // Don't notify if the app is open and visible: the page shows the message itself.
     const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });

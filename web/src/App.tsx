@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { Toaster } from 'sonner';
 import { ConfirmHost } from './components/ui/confirm';
-import { Spinner } from './components/ui/button';
+import { ShellSkeleton } from './components/Skeleton';
 import { boot, openChat } from './lib/engine';
 import { useApp } from './state/app';
 import { useSettings } from './state/settings';
@@ -38,9 +38,7 @@ export function App() {
 
   return (
     <>
-      {status === 'loading' && (
-        <div className="grid h-full place-items-center text-accent"><Spinner className="size-8" /></div>
-      )}
+      {status === 'loading' && <ShellSkeleton />}
       {status === 'auth' && <Landing />}
       {status === 'app' && <Shell />}
       <ConfirmHost />

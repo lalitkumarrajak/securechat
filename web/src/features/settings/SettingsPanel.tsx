@@ -2,8 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'rea
 import { toast } from 'sonner';
 import {
   ArrowLeft, Bell, Camera, ChevronRight, Info, KeyRound, Laptop, Lock, LogOut, MessageSquare, Monitor, MonitorSmartphone, Moon, Palette, Shield,
-  Smartphone, Sun, Tablet, Trash2, UserRound,
-} from 'lucide-react';
+  Smartphone, Sun, Tablet, Trash2, UserRound, MapPin } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
 import { Button, IconButton, Spinner } from '../../components/ui/button';
 import { confirm } from '../../components/ui/confirm';
@@ -13,11 +12,11 @@ import { Switch } from '../../components/ui/switch';
 import {
   changePassword, disablePush, enablePush, listSessions, logout, pushSupported, removeAvatar, revokeSession, setAvatar, unblockUser, updateProfile,
 } from '../../lib/engine';
-import { deviceName, parseDevice } from '../../lib/device';
+import { deviceName, osVersion, parseDevice, placeName } from '../../lib/device';
 import { fmtListTime } from '../../lib/format';
 import type { Session } from '../../lib/types';
 import { cn } from '../../lib/utils';
-import { setApp, useApp } from '../../state/app';
+import { getApp, setApp, useApp } from '../../state/app';
 import { ACCENTS, setSettings, useSettings, type FontSize, type Theme, type Wallpaper } from '../../state/settings';
 
 type Page = 'main' | 'profile' | 'appearance' | 'privacy' | 'notifications' | 'chats' | 'account' | 'sessions' | 'about';
@@ -29,7 +28,11 @@ const TITLES: Record<Page, string> = {
 export function SettingsPanel() {
   const open = useApp((s) => s.panel === 'settings');
   const [page, setPage] = useState<Page>('main');
-  useEffect(() => { if (open) setPage('main'); }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    setPage((getApp().settingsPage as Page) || 'main');
+    setApp({ settingsPage: null });
+  }, [open]);
   const close = () => setApp({ panel: null });
 
   return (
@@ -112,15 +115,22 @@ function Profile() {
   const hasPhoto = useApp((s) => !!s.avatars[me.u]);
   const [name, setName] = useState(me.name);
   const [about, setAbout] = useState(me.about);
+  const savedTitle = useSettings((s) => s.headerTitle);
+  const [title, setTitle] = useState(savedTitle);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const file = useRef<HTMLInputElement>(null);
-  const dirty = name.trim() !== me.name || about.trim() !== me.about;
+  const profileDirty = name.trim() !== me.name || about.trim() !== me.about;
+  const dirty = profileDirty || title.trim() !== savedTitle;
 
   async function save(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
-    try { await updateProfile({ name: name.trim(), about: about.trim() }); toast.success('Profile saved'); }
+    try {
+      setSettings({ headerTitle: title.trim() });
+      if (profileDirty) await updateProfile({ name: name.trim(), about: about.trim() });
+      toast.success('Profile saved');
+    }
     catch (err) { toast.error((err as Error).message); }
     setBusy(false);
   }
@@ -160,6 +170,11 @@ function Profile() {
           <div>
             <Label htmlFor="p-about" hint={`${about.length}/140`}>About</Label>
             <Textarea id="p-about" value={about} maxLength={140} rows={2} onChange={(e) => setAbout(e.target.value)} placeholder="Hey there! I’m using Chattrix." />
+          </div>
+          <div>
+            <Label htmlFor="p-title" hint={`${title.length}/30`}>Title at the top</Label>
+            <Input id="p-title" value={title} maxLength={30} onChange={(e) => setTitle(e.target.value)} placeholder={me.u} />
+            <p className="mt-1 text-xs text-muted">Shown above your chats, only to you. Leave it empty to show your username.</p>
           </div>
           <div className="flex items-center justify-between text-sm text-muted">
             <span>Username: <b className="text-ink">@{me.u}</b></span>
@@ -387,7 +402,7 @@ function Sessions() {
   useEffect(() => { load(); }, []);
 
   async function signOut(s: Session) {
-    if (!(await confirm({ title: `Sign out ${deviceName(s.ua)}?`, description: 'That device will be signed out right away. Messages stored on it stay there until someone signs in again.', confirmText: 'Sign out', destructive: true }))) return;
+    if (!(await confirm({ title: `Sign out ${deviceName(s.ua, s.device)}?`, description: 'That device will be signed out right away. Messages stored on it stay there until someone signs in again.', confirmText: 'Sign out', destructive: true }))) return;
     setBusy(s.id);
     try { await revokeSession(s.id); toast.success('Device signed out'); await load(); } catch (e) { toast.error((e as Error).message); }
     setBusy(null);
@@ -406,6 +421,7 @@ function Sessions() {
     <>
       <Section className="px-5 py-4">
         <p className="text-sm text-muted">These devices are signed in to your account. If you don’t recognise one, sign it out and change your password.</p>
+        <p className="mt-2 text-xs text-muted">Locations are approximate, worked out from each device’s internet address (IP).</p>
       </Section>
       <Section title="This device"><ul>{list.filter((s) => s.current).map((s) => <SessionRow key={s.id} s={s} />)}</ul></Section>
       <Section title={`Other devices (${others.length})`}>
@@ -431,16 +447,25 @@ function SessionRow({ s, children }: { s: Session; children?: ReactNode }) {
   const d = parseDevice(s.ua);
   const Icon = d?.kind === 'phone' ? Smartphone : d?.kind === 'tablet' ? Tablet : d ? Laptop : MonitorSmartphone;
   const active = s.current || s.online;
+  const place = placeName(s.loc);
+  const detail = s.device?.model ? osVersion(s.ua, s.device) : ''; // model in the title: OS version here
   return (
     <li className="flex items-center gap-4 px-5 py-3">
       <span className="grid size-11 shrink-0 place-items-center rounded-full bg-accent/12 text-accent-ink"><Icon className="size-5" /></span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-medium">{deviceName(s.ua)}</span>
+        <span className="block truncate font-medium">{deviceName(s.ua, s.device)}</span>
         <span className={cn('block truncate text-sm', active ? 'text-accent-ink' : 'text-muted')}>
           {s.current ? 'This device · active now' : s.online ? 'Active now' : s.lastSeen ? `Last active ${fmtListTime(s.lastSeen).toLowerCase()}` : 'Last active: unknown'}
         </span>
+        {(place || detail) && (
+          <span className="mt-0.5 flex items-center gap-1 truncate text-sm">
+            {place && <MapPin className="size-3.5 shrink-0 text-muted" />}
+            <span className="truncate">{[place, detail].filter(Boolean).join(' · ')}</span>
+          </span>
+        )}
         <span className="block truncate text-xs text-muted">
-          {s.created ? `Signed in ${new Date(s.created).toLocaleDateString()}` : 'Signed in before session details were recorded'}{s.ip && ` · IP ${s.ip}`}
+          {s.created ? `Signed in ${new Date(s.created).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}` : 'Signed in before session details were recorded'}
+          {s.ip && ` · IP ${s.ip}`}{s.loc?.isp && ` · ${s.loc.isp}`}
         </span>
       </span>
       {children}
@@ -451,7 +476,7 @@ function SessionRow({ s, children }: { s: Session; children?: ReactNode }) {
 function About() {
   return (
     <Section className="px-5 py-6 text-center">
-      <img src="/icon.svg" alt="" className="mx-auto size-16" />
+      <img src="/logo-mark.png" alt="" className="mx-auto size-16 rounded-2xl" />
       <h3 className="mt-3 text-xl font-semibold">Chattrix</h3>
       <p className="text-sm text-muted">Version 2.0</p>
       <p className="mx-auto mt-4 max-w-xs text-sm text-muted">

@@ -68,7 +68,12 @@ export type Content =
   | { type: 'pin'; k: string; on: boolean };
 
 /** A device signed in to your account (Settings → Account → Active sessions). */
-export interface Session { id: string; current: boolean; online: boolean; created: number; lastSeen: number; ua: string; ip: string }
+export interface DeviceHints { model?: string; pv?: string; platform?: string }
+export interface Place { city?: string; region?: string; country?: string; cc?: string; isp?: string; local?: boolean }
+export interface Session {
+  id: string; current: boolean; online: boolean; created: number; lastSeen: number; ua: string; ip: string;
+  device: DeviceHints | null; loc: Place | null;
+}
 
 /** A GIF or sticker search result from KLIPY. */
 export interface GifItem { id: string; thumb: string; src: string; w: number; h: number; title: string }

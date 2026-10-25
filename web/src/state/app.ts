@@ -10,6 +10,9 @@ export interface AppState {
   status: Status;
   signupOpen: boolean;
   gifsEnabled: boolean;                  // server has a KLIPY key
+  syncing: boolean;                      // first download of messages since opening the app
+  friendsLoaded: boolean;                // friend list known (saved on this device, or fetched)
+  settingsPage: string | null;           // open Settings at this page (e.g. 'sessions' from a sign-in alert)
   conn: Conn;
   me: Me | null;
   friends: Record<string, Friend>;
@@ -37,6 +40,9 @@ export const useApp = create<AppState>(() => ({
   status: 'loading',
   signupOpen: true,
   gifsEnabled: false,
+  syncing: true,
+  friendsLoaded: false,
+  settingsPage: null,
   conn: 'connecting',
   me: null,
   friends: {},

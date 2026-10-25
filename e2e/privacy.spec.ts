@@ -5,7 +5,7 @@ import { PASSWORD, newTab, phone, signUp, uname, type Phone } from './helpers';
 test.describe.configure({ mode: 'serial' });
 
 let P: Phone, Q: Phone;
-const signedIn = (p: Phone) => expect(p.page.getByRole('heading', { name: 'Chattrix', level: 1 })).toBeVisible({ timeout: 15_000 });
+const signedIn = (p: Phone) => expect(p.page.getByRole('heading', { name: p.u, level: 1 })).toBeVisible({ timeout: 15_000 });
 const signedOut = (p: Phone) => expect(p.page.getByRole('tab', { name: 'Sign in' })).toBeVisible({ timeout: 15_000 });
 
 test.beforeAll(async ({ browser }) => {

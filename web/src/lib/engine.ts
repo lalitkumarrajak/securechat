@@ -9,6 +9,7 @@ import type { Chat, Content, Friend, GifItem, LinkPreview, Me, Msg, Request, Sea
 import { prepareFile } from './files';
 import type { LocationContent } from './location';
 import { getApp, setApp } from '../state/app';
+import { deviceHints, deviceName, placeName } from './device';
 import { setSettings, useSettings } from '../state/settings';
 
 const S = {
@@ -69,10 +70,10 @@ export async function boot() {
   S.hiddenTs = (await db.get('kv', 'hiddenTs')) || 0;
   const me: Me = (await db.get('kv', 'me')) || { u: sess.u, name: '', about: '', privacy: { lastSeen: true, receipts: true }, mutes: {}, av: 0 };
   const fr = (await db.get('kv', 'friends')) || {};
-  setApp({ status: 'app', me, friends: fr.friends || {}, incoming: fr.incoming || [], outgoing: fr.outgoing || [], blocked: fr.blocked || [], chats: sortChats(await db.all('chats')) });
+  setApp({ status: 'app', me, friendsLoaded: !!fr.friends, friends: fr.friends || {}, incoming: fr.incoming || [], outgoing: fr.outgoing || [], blocked: fr.blocked || [], chats: sortChats(await db.all('chats')) });
   connect();
   refreshMe().catch(() => {});
-  refreshFriends().catch(() => {});
+  refreshFriends().catch(() => setApp({ friendsLoaded: true }));
   if (useSettings.getState().push && 'Notification' in window && Notification.permission === 'granted') enablePush(true).catch(() => {});
 }
 
@@ -81,7 +82,7 @@ const normalize = (u: string) => u.trim().toLowerCase();
 export async function login(username: string, password: string) {
   const u = normalize(username);
   const { auth, wrapKey } = await C.deriveFromPassword(u, password);
-  const res = await api('/api/login', { u, auth });
+  const res = await api('/api/login', { u, auth, dev: await deviceHints() });
   const priv = await C.unwrapIdentity(res.encPriv, wrapKey);
   await startSession(u, res.token, priv, res.pub);
 }
@@ -90,7 +91,7 @@ export async function register(username: string, password: string) {
   const u = normalize(username);
   const { auth, wrapKey } = await C.deriveFromPassword(u, password);
   const id = await C.generateIdentity(wrapKey);
-  const { token } = await api('/api/register', { u, auth, pub: id.pub, encPriv: id.encPriv });
+  const { token } = await api('/api/register', { u, auth, pub: id.pub, encPriv: id.encPriv, dev: await deviceHints() });
   await startSession(u, token, id.priv, id.pub);
 }
 
@@ -272,6 +273,7 @@ async function handle(m: any) {
       if (m.more) { wsSend({ t: 'sync', after: S.lastSeq }); break; }
       S.synced = true;
       await reloadChats();
+      setApp({ syncing: false });
       const active = getApp().active;
       if (active) { await loadMessages(active); markRead(active); }
       break;
@@ -329,6 +331,15 @@ async function handle(m: any) {
       }
       break;
     }
+    case 'signin': { // someone signed in to this account on another device
+      const where = placeName(m.loc);
+      toast.warning(`New sign-in: ${deviceName(m.ua, m.device)}`, {
+        description: `${where ? where + ' · ' : ''}IP ${m.ip}. If this wasn’t you, sign it out and change your password.`,
+        duration: 30_000,
+        action: { label: 'Review', onClick: () => setApp({ panel: 'settings', settingsPage: 'sessions' }) },
+      });
+      break;
+    }
     case 'prof':
       if (m.u === S.me) await refreshMe(); else await refreshFriends();
       break;
@@ -364,7 +375,7 @@ export async function refreshFriends() {
   const r = await api<{ friends: Friend[]; incoming: Request[]; outgoing: Request[]; blocked: string[] }>('/api/friends');
   const friends = Object.fromEntries(r.friends.map((f) => [f.u, f]));
   const before = getApp().friends;
-  setApp({ friends, incoming: r.incoming, outgoing: r.outgoing, blocked: r.blocked });
+  setApp({ friends, incoming: r.incoming, outgoing: r.outgoing, blocked: r.blocked, friendsLoaded: true });
   await db.put('kv', { friends, incoming: r.incoming, outgoing: r.outgoing, blocked: r.blocked }, 'friends');
   // Pin each friend's key on first sight; flag a change instead of silently accepting it.
   const changed: Record<string, boolean> = {};

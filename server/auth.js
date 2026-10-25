@@ -5,7 +5,9 @@ import { promisify } from 'node:util';
 import { ctx } from './context.js';
 import { B64_RE, USER_RE, config } from './config.js';
 import { clientIp, rateLimited, readJson, sendJson, sha256 } from './http.js';
-import { online } from './hub.js';
+import { online, sendTo } from './hub.js';
+import { locate } from './geo.js';
+import { notify } from './push.js';
 
 const scrypt = promisify(crypto.scrypt);
 const SCRYPT_OPTS = { N: 16384, r: 8, p: 1 };
@@ -24,13 +26,32 @@ async function validPublicKey(b64) {
   } catch { return false; }
 }
 
-async function createSession(username, req) {
+// Device details the app sends at sign-in (from the browser's client hints): the phone model and
+// OS version, which the user-agent string no longer includes.
+function deviceInfo(dev) {
+  const s = (v) => (typeof v === 'string' ? v.replace(/[^\w .,()+-]/g, '').slice(0, 60) : '');
+  return dev && typeof dev === 'object' ? JSON.stringify({ model: s(dev.model), pv: s(dev.pv), platform: s(dev.platform) }) : '';
+}
+const parseDevice = (json) => { try { return json ? JSON.parse(json) : null; } catch { return null; } };
+
+async function createSession(username, req, dev) {
   const token = crypto.randomBytes(32).toString('base64url');
   const h = sha256(token);
   const now = Date.now();
+  const ua = String(req.headers['user-agent'] || '').slice(0, 300);
+  const ip = clientIp(req);
+  const device = deviceInfo(dev);
   await ctx.db.run('insertSession', h, username, now + config.sessionMs);
-  await ctx.db.run('insertSessionInfo', h, username, now, now, String(req.headers['user-agent'] || '').slice(0, 300), clientIp(req));
-  return token;
+  await ctx.db.run('insertSessionInfo', h, username, now, now, ua, ip, device);
+  return { token, id: sessionId(h), ua, ip, device: parseDevice(device) };
+}
+
+// Tell the account's other devices about a new sign-in, so a stranger signing in is noticed.
+async function alertSignIn(username, s) {
+  const loc = await locate(s.ip);
+  sendTo(username, { t: 'signin', id: s.id, ua: s.ua, device: s.device, ip: s.ip, loc });
+  const where = loc?.city ? ` near ${[loc.city, loc.country].filter(Boolean).join(', ')}` : '';
+  await notify(username, { t: 'signin', name: 'Chattrix', where });
 }
 
 // Record when each session was last used, at most every 5 minutes (it's only for the sessions list).
@@ -74,7 +95,7 @@ export const routes = {
   'POST /api/register': async (req, res) => {
     if (!config.allowSignup) return sendJson(res, 403, { error: 'Sign-up is closed' });
     if (rateLimited('reg:' + clientIp(req), config.signupsPerHour, 3600e3)) return sendJson(res, 429, { error: 'Too many attempts, try later' });
-    const { u, auth, pub, encPriv } = await readJson(req);
+    const { u, auth, pub, encPriv, dev } = await readJson(req);
     if (typeof u !== 'string' || !USER_RE.test(u)) return sendJson(res, 400, { error: 'Username: 3-24 chars, a-z 0-9 _ .' });
     if (!isAuthKey(auth)) return sendJson(res, 400, { error: 'Invalid auth key' });
     if (!(await validPublicKey(pub))) return sendJson(res, 400, { error: 'Invalid public key' });
@@ -84,19 +105,21 @@ export const routes = {
     const hash = await hashAuth(auth, salt);
     const { changes } = await ctx.db.run('insertUser', u, hash, salt, pub, encPriv, Date.now());
     if (!changes) return sendJson(res, 409, { error: 'Username taken' });
-    sendJson(res, 200, { token: await createSession(u, req) });
+    sendJson(res, 200, { token: (await createSession(u, req, dev)).token });
   },
 
   'POST /api/login': async (req, res) => {
     const ip = clientIp(req);
-    const { u, auth } = await readJson(req);
+    const { u, auth, dev } = await readJson(req);
     if (typeof u !== 'string' || !USER_RE.test(u) || !isAuthKey(auth)) return sendJson(res, 400, { error: 'Invalid credentials' });
     if (rateLimited('login-ip:' + ip, 30, 900e3) || rateLimited('login-u:' + u, 10, 900e3)) {
       return sendJson(res, 429, { error: 'Too many attempts, try again in 15 minutes' });
     }
     const user = await checkPassword(u, auth);
     if (!user) return sendJson(res, 401, { error: 'Wrong username or password' });
-    sendJson(res, 200, { token: await createSession(u, req), pub: user.pubkey, encPriv: user.enc_priv });
+    const s = await createSession(u, req, dev);
+    sendJson(res, 200, { token: s.token, pub: user.pubkey, encPriv: user.enc_priv });
+    alertSignIn(u, s).catch((err) => console.error('sign-in alert failed', err.message));
   },
 
   'POST /api/logout': async (req, res, me, token) => {
@@ -125,7 +148,8 @@ export const routes = {
     const mine = sha256(token);
     const rows = await ctx.db.all('listSessions', me, Date.now());
     const live = new Set([...(online.get(me) || [])].map((ws) => ws.tokenHash));
-    const sessions = rows.map((r) => ({
+    const locs = await Promise.all(rows.map((r) => locate(r.ip)));
+    const sessions = rows.map((r, i) => ({
       id: sessionId(r.token_hash),
       current: r.token_hash === mine,
       online: live.has(r.token_hash),
@@ -133,6 +157,8 @@ export const routes = {
       lastSeen: r.token_hash === mine ? Date.now() : (r.last_seen || 0),
       ua: r.ua || '',
       ip: r.ip || '',
+      device: parseDevice(r.device),
+      loc: locs[i],
     })).sort((a, b) => Number(b.current) - Number(a.current) || b.lastSeen - a.lastSeen);
     sendJson(res, 200, { sessions });
   },

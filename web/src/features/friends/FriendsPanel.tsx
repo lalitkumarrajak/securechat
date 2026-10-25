@@ -9,6 +9,7 @@ import { acceptRequest, declineRequest, openChat, searchUsers, sendRequest, unbl
 import { displayName, type Person, type SearchHit } from '../../lib/types';
 import { LinkBox } from '../../components/LinkBox';
 import { inviteLink } from '../../lib/invite';
+import { ChatListSkeleton } from '../../components/Skeleton';
 import { setApp, useApp } from '../../state/app';
 
 export function FriendsPanel() {
@@ -60,11 +61,13 @@ function Row({ p, sub, children, onClick }: { p: Person; sub?: string; children?
 
 function FriendsList() {
   const friends = useApp((s) => s.friends);
+  const loaded = useApp((s) => s.friendsLoaded);
   const [q, setQ] = useState('');
   const list = useMemo(() => Object.values(friends)
     .filter((f) => !q || f.u.includes(q.toLowerCase()) || f.name.toLowerCase().includes(q.toLowerCase()))
     .sort((a, b) => displayName(a, a.u).localeCompare(displayName(b, b.u))), [friends, q]);
 
+  if (!Object.keys(friends).length && !loaded) return <ChatListSkeleton rows={4} />;
   if (!Object.keys(friends).length) {
     return (
       <div className="px-8 py-12 text-center">

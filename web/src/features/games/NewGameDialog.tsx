@@ -8,6 +8,7 @@ import { displayName } from '../../lib/types';
 import { cn } from '../../lib/utils';
 import { useApp } from '../../state/app';
 import { GAME_UI } from './registry';
+import { ChatRowSkeleton } from '../../components/Skeleton';
 import { closePicker, createGame, useGames } from './store';
 
 export function NewGameDialog() {
@@ -17,6 +18,7 @@ export function NewGameDialog() {
 
 function Picker({ initial }: { initial: string[] }) {
   const friends = useApp((s) => s.friends);
+  const loaded = useApp((s) => s.friendsLoaded);
   const games = Object.values(GAME_UI);
   const [type, setType] = useState(games[0].type);
   const [picked, setPicked] = useState<string[]>(initial);
@@ -57,7 +59,8 @@ function Picker({ initial }: { initial: string[] }) {
           className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
       </label>
       <ul className="max-h-[34dvh] overflow-y-auto">
-        {list.length === 0 && <li className="py-6 text-center text-sm text-muted">No friends yet. You can still share a link.</li>}
+        {list.length === 0 && !loaded && !q && Array.from({ length: 3 }, (_, i) => <ChatRowSkeleton key={i} i={i} />)}
+        {list.length === 0 && (loaded || q) && <li className="py-6 text-center text-sm text-muted">{q ? 'No friends match.' : 'No friends yet. You can still share a link.'}</li>}
         {list.map((f) => {
           const on = picked.includes(f.u);
           return (

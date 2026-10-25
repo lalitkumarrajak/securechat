@@ -34,7 +34,7 @@ export function Landing() {
       <div className="mx-auto grid min-h-full max-w-6xl items-center gap-10 px-5 py-8 md:grid-cols-[1.1fr_1fr] md:gap-16 md:px-10">
         <section>
           <div className="flex items-center gap-3">
-            <img src="/icon.svg" alt="" className="size-11" />
+            <img src="/logo-mark.png" alt="" className="size-11 rounded-xl" />
             <span className="text-2xl font-bold tracking-tight">Chattrix</span>
           </div>
           <h1 className="mt-8 text-4xl font-bold leading-tight tracking-tight md:text-5xl">

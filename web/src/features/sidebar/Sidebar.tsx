@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Archive, ArrowLeft, BellOff, Clock, Gamepad2, LogOut, MessageSquarePlus, MoreVertical, Search, Settings, UserPlus, WifiOff, X } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
 import { Ticks } from '../../components/Ticks';
@@ -11,6 +11,8 @@ import { displayName, type Chat } from '../../lib/types';
 import { cn } from '../../lib/utils';
 import { setApp, useApp } from '../../state/app';
 import { GamesStrip } from '../games/GamesStrip';
+import { ChatListSkeleton } from '../../components/Skeleton';
+import { useSettings } from '../../state/settings';
 import { openPicker } from '../games/store';
 
 export function Sidebar() {
@@ -20,6 +22,10 @@ export function Sidebar() {
   const friends = useApp((s) => s.friends);
   const incoming = useApp((s) => s.incoming.length);
   const panel = useApp((s) => s.panel);
+  const syncing = useApp((s) => s.syncing);
+  const [waited, setWaited] = useState(false); // stop showing placeholders if the server is slow to answer
+  useEffect(() => { const t = setTimeout(() => setWaited(true), 10_000); return () => clearTimeout(t); }, []);
+  const headerTitle = useSettings((s) => s.headerTitle);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const archivedView = panel === 'archived';
@@ -52,7 +58,7 @@ export function Sidebar() {
             <button onClick={() => setApp({ panel: 'settings' })} aria-label="Profile and settings" className="rounded-full">
               <Avatar u={me.u} name={me.name} size={40} />
             </button>
-            <h1 className="flex-1 pl-1 text-xl font-bold tracking-tight">Chattrix</h1>
+            <h1 className="min-w-0 flex-1 truncate pl-1 text-xl font-bold tracking-tight">{headerTitle.trim() || me.u}</h1>
             <IconButton label="Play games" onClick={() => openPicker()}><Gamepad2 /></IconButton>
             <div className="relative">
               <IconButton label="Friends" onClick={() => setApp({ panel: 'friends', friendsTab: incoming ? 'requests' : 'friends' })}>
@@ -120,15 +126,41 @@ export function Sidebar() {
         )}
         {!archivedView && !query && <GamesStrip />}
         <ul>{visible.map((c) => <ChatRow key={c.peer} chat={c} />)}</ul>
-        {!visible.length && <EmptyList archived={archivedView} searching={!!query || filter !== 'all'} />}
+        {!visible.length && syncing && !waited && conn !== 'offline' && !query && !archivedView ? <ChatListSkeleton rows={6} />
+          : !visible.length && <EmptyList archived={archivedView} searching={!!query || filter !== 'all'} />}
       </div>
     </>
   );
 }
 
 function EmptyList({ archived, searching }: { archived: boolean; searching: boolean }) {
+  const friends = useApp((s) => s.friends);
+  const loaded = useApp((s) => s.friendsLoaded);
   if (searching) return <p className="px-6 py-10 text-center text-sm text-muted">No chats found.</p>;
   if (archived) return <p className="px-6 py-10 text-center text-sm text-muted">No archived chats.</p>;
+  const list = Object.values(friends).sort((a, b) => displayName(a, a.u).localeCompare(displayName(b, b.u)));
+  if (!list.length && !loaded) return <ChatListSkeleton rows={4} />;
+  if (list.length) {
+    return (
+      <div className="py-4">
+        <p className="px-5 pb-2 text-sm text-muted">No chats yet. Say hi to {list.length === 1 ? 'your friend' : `your ${list.length} friends`}:</p>
+        <ul>
+          {list.slice(0, 8).map((f) => (
+            <li key={f.u}>
+              <button onClick={() => openChat(f.u)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-hover">
+                <Avatar u={f.u} name={f.name} size={48} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{displayName(f, f.u)}</span>
+                  <span className="block truncate text-sm text-muted">@{f.u}</span>
+                </span>
+                <MessageSquarePlus className="size-5 text-accent-ink" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
   return (
     <div className="px-8 py-12 text-center">
       <div className="mx-auto grid size-16 place-items-center rounded-2xl bg-accent/12 text-accent-ink"><MessageSquarePlus className="size-8" /></div>

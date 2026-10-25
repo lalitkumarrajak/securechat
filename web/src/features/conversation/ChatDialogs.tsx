@@ -13,6 +13,7 @@ import { displayName } from '../../lib/types';
 import { cn } from '../../lib/utils';
 import { setApp, useApp } from '../../state/app';
 import { ICONS } from './MessageBubble';
+import { ChatRowSkeleton } from '../../components/Skeleton';
 import { actionsFor, canReact, myReaction, reactTo, setChatUi, useChatUi } from './chatUi';
 
 export function ChatDialogs({ peer, name }: { peer: string; name: string }) {
@@ -89,6 +90,7 @@ function ReactionPicker() {
 function ForwardDialog() {
   const msgs = useChatUi((s) => s.forward);
   const friends = useApp((s) => s.friends);
+  const friendsLoaded = useApp((s) => s.friendsLoaded);
   const [picked, setPicked] = useState<string[]>([]);
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
@@ -132,7 +134,8 @@ function ForwardDialog() {
             </li>
           );
         })}
-        {!list.length && <li className="py-6 text-center text-sm text-muted">No friends to forward to.</li>}
+        {!list.length && !friendsLoaded && <ChatRowSkeleton />}
+        {!list.length && friendsLoaded && <li className="py-6 text-center text-sm text-muted">No friends to forward to.</li>}
       </ul>
       <Button className="mt-4 w-full" disabled={!picked.length} loading={busy} onClick={send}>
         Send{picked.length ? ` to ${picked.length}` : ''}
