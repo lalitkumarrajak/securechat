@@ -8,7 +8,7 @@ import { mentioned } from '../../lib/mentions';
 import { playSound } from './sounds';
 
 export type PlayerState = 'invited' | 'joined' | 'declined' | 'playing' | 'done' | 'left' | 'out';
-export interface GamePlayer { u: string; n: string; state: PlayerState; missed?: number; rank?: number }
+export interface GamePlayer { u: string; n: string; state: PlayerState; missed?: number; rank?: number; bot?: boolean }
 export interface GameEvent { k: string; s?: number; [key: string]: any }
 export interface Game<S = any> {
   id: string; type: string; host: string; status: 'lobby' | 'play' | 'over';
@@ -148,6 +148,8 @@ export const startNow = (id: string) => sendOrWarn({ t: 'gstart', id });
 export const leave = (id: string) => sendOrWarn({ t: 'gleave', id });
 export const act = (id: string, a: object) => sendOrWarn({ t: 'gact', id, a });
 export const say = (id: string, x: string) => sendOrWarn({ t: 'gsay', id, x });
+export const addBot = (id: string) => sendOrWarn({ t: 'gbot', id });
+export const dropBot = (id: string, u: string) => sendOrWarn({ t: 'gbot', id, drop: u });
 
 /** The game's link was copied or shared: from now on anyone with it can join until the game starts. */
 export const linkShared = (g: Game) => { if (!g.open) sendOrWarn({ t: 'glink', id: g.id }); };

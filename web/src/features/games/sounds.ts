@@ -1,7 +1,8 @@
 // Game sounds, synthesised so there's nothing to download. Off with the speaker button in a game.
 import { useSettings } from '../../state/settings';
 
-export type Sound = 'roll' | 'step' | 'capture' | 'zip' | 'home' | 'turn' | 'chat' | 'invite' | 'win' | 'out';
+export type Sound = 'roll' | 'step' | 'capture' | 'zip' | 'home' | 'turn' | 'chat' | 'invite' | 'win' | 'out'
+  | 'card' | 'draw' | 'uno' | 'skip' | 'plus' | 'shuffle';
 
 let ctx: AudioContext | null = null;
 
@@ -69,6 +70,13 @@ export function playSound(s: Sound) {
       case 'invite': [784, 988, 1175].forEach((f, i) => tone(t + i * 0.1, f, 0.2, 0.1)); break;
       case 'win': [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(t + i * 0.12, f, 0.25, 0.1, 'triangle')); break;
       case 'out': tone(t, 300, 0.4, 0.1, 'triangle', 150); break;
+      // UNO
+      case 'card': noise(t, 0.12, 4000, 0.45, 0.7, 1500); noise(t + 0.1, 0.03, 1500, 0.5, 2); break;   // swish and slap
+      case 'draw': noise(t, 0.09, 6000, 0.25, 0.8, 2500); break;                                      // flick off the deck
+      case 'uno': tone(t, 660, 0.16, 0.14, 'square'); tone(t + 0.16, 990, 0.3, 0.14, 'square'); break; // "U-NO!"
+      case 'skip': tone(t, 900, 0.25, 0.1, 'triangle', 300); break;                                    // whoop
+      case 'plus': tone(t, 220, 0.3, 0.16, 'sawtooth', 90); noise(t, 0.08, 600, 0.6, 1); break;        // heavy thud
+      case 'shuffle': for (let i = 0; i < 14; i++) noise(t + i * 0.035, 0.03, 3500 + Math.random() * 2000, 0.25, 2); break;
     }
   } catch { /* audio not available */ }
 }

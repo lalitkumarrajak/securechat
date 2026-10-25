@@ -5,7 +5,9 @@
 // Anyone with a game's link can join it while it's in the lobby, friends or not ("open" games).
 //
 // Client → server: gnew {type, to, ref} · gjoin · gdecline · gstart · gleave · gact {a} · gsay {x} · glist
-//                  glink (share by link) · gjoinlink (join from a link)
+//                  glink (share by link) · gjoinlink (join from a link) · gbot {add | drop} (computer players)
+//
+// Computer players sit in seats like people (u "bot:<id>"); the server plays their turns.
 // Server → client: g {g, ref} after every change · gc {id, f, x, ts} chat line · gl {games} on glist
 import crypto from 'node:crypto';
 import { config, USER_RE } from './config.js';
@@ -29,7 +31,7 @@ const ID_RE = /^[A-Za-z0-9_-]{12}$/;
 
 const def = (g) => GAMES[g.type];
 const seat = (g, u) => g.players.findIndex((pl) => pl.u === u);
-const members = (g) => g.players.filter((pl) => pl.state !== 'declined').map((pl) => pl.u);
+const members = (g) => g.players.filter((pl) => pl.state !== 'declined' && !core.isBot(pl)).map((pl) => pl.u);
 const mine = (u) => [...games.values()].filter((g) => members(g).includes(u));
 const isOpen = (g) => g.status !== 'over';
 
@@ -37,9 +39,11 @@ const isOpen = (g) => g.status !== 'over';
 export const inGameTogether = (a, b) => mine(a).some((g) => isOpen(g) && members(g).includes(b));
 profileHooks.inGameTogether = inGameTogether;
 
-function pub(g) {
+// What one person sees: games with secrets (cards in hand) show each player only their own.
+function pub(g, u) {
   const { chat, deadline, created, updated, ...rest } = g;
-  return { ...rest, left: deadline ? Math.max(0, deadline - Date.now()) : 0 };
+  const view = g.status !== 'lobby' && def(g).view?.(g, seat(g, u));
+  return { ...rest, ...(view && { s: view.s, ev: view.ev }), left: deadline ? Math.max(0, deadline - Date.now()) : 0 };
 }
 
 async function commit(g, ref) {
@@ -47,7 +51,7 @@ async function commit(g, ref) {
   g.updated = Date.now();
   ctx.db.run('saveGame', g.id, g.type, g.status, JSON.stringify(g), g.updated)
     .catch((err) => console.error('saving game failed', err.message));
-  for (const u of members(g)) sendTo(u, { t: 'g', g: pub(g), ...(u === g.host && ref && { ref }) });
+  for (const u of members(g)) sendTo(u, { t: 'g', g: pub(g, u), ...(u === g.host && ref && { ref }) });
   schedule(g);
 }
 
@@ -64,10 +68,15 @@ function schedule(g) {
   timers.set(g.id, t);
 }
 
-const turnDeadline = (g) => { g.deadline = Date.now() + (config.gameTurnMs || def(g).turnMs) + config.gameAnimMs; };
+// A person gets the turn time plus time for animations; a computer player "thinks" until the
+// animations are over, then a little more.
+const botDelay = (g) => config.gameBotMs || (def(g).animMs?.(g.ev) ?? 1500) + 900;
+const turnDeadline = (g) => {
+  g.deadline = Date.now() + (core.isBot(g.players[g.turn]) ? botDelay(g) : (config.gameTurnMs || def(g).turnMs) + config.gameAnimMs);
+};
 
 function start(g) {
-  core.begin(g, def(g));
+  core.begin(g, def(g), rand);
   turnDeadline(g);
   return commit(g);
 }
@@ -86,6 +95,12 @@ function timeout(g) {
   if (g.status !== 'play') return;
   const i = g.turn;
   const pl = g.players[i];
+  if (core.isBot(pl)) { // a computer player's turn: it plays, it never "misses"
+    g.ev = [];
+    (def(g).bot || def(g).auto)(g, rand);
+    turnDeadline(g);
+    return commit(g);
+  }
   g.ev = [{ k: 'timeout', s: i }];
   const turnNo = g.turnNo || 0; // turns so far (unset before the first change of turn)
   if (g.missTurn !== turnNo) { pl.missed++; g.missTurn = turnNo; }
@@ -224,10 +239,12 @@ export const handlers = {
     if (!g) return;
     const i = seat(g, ws.user);
     g.ev = [];
+    const turn = g.turn, turnNo = g.turnNo;
     try { def(g).act(g, i, m.a, rand); }
     catch (err) { g.ev = []; return send(ws, { t: 'gerr', id: g.id, e: err.message }); }
-    g.players[i].missed = 0;
-    turnDeadline(g);
+    // Some actions don't need your turn (UNO's "UNO!" and catching): they don't reset the clock.
+    if (i === turn) g.players[i].missed = 0;
+    if (i === turn || g.turn !== turn || g.turnNo !== turnNo) turnDeadline(g);
     await commit(g);
   },
 
@@ -252,7 +269,26 @@ export const handlers = {
   },
 
   async glist(ws) {
-    send(ws, { t: 'gl', games: mine(ws.user).map((g) => ({ ...pub(g), chat: g.chat })) });
+    send(ws, { t: 'gl', games: mine(ws.user).map((g) => ({ ...pub(g, ws.user), chat: g.chat })) });
+  },
+
+  // The host adds or removes a computer player while waiting for people.
+  async gbot(ws, m) {
+    const g = find(ws, m);
+    if (!g || g.status !== 'lobby' || g.host !== ws.user) return;
+    if (m.drop) {
+      const i = g.players.findIndex((pl) => core.isBot(pl) && pl.u === m.drop);
+      if (i < 0) return;
+      g.players.splice(i, 1);
+      g.ev = [{ k: 'botleft' }];
+      return commit(g);
+    }
+    if (g.players.filter((pl) => pl.state !== 'declined').length >= def(g).max) return send(ws, { t: 'gerr', id: g.id, e: 'No seats left' });
+    const used = new Set(g.players.map((pl) => pl.n));
+    const name = core.BOT_NAMES.find((n) => !used.has(n)) || 'Bot';
+    g.players.push({ u: 'bot:' + crypto.randomBytes(4).toString('base64url'), n: name, state: 'joined', bot: true });
+    g.ev = [{ k: 'bot' }];
+    await settleLobby(g);
   },
 };
 

@@ -2,6 +2,7 @@
 // shared/games/ (see core.js), list it in shared/games/index.js, and add its board here.
 import { lazy, type ComponentType, type LazyExoticComponent } from 'react';
 import ludo from '../../../../shared/games/ludo.js';
+import uno from '../../../../shared/games/uno.js';
 import { registerGameNames, type Game } from './store';
 
 export interface GameBoardProps {
@@ -29,6 +30,12 @@ export const GAME_UI: Record<string, GameUi> = {
     min: ludo.min, max: ludo.max,
     background: 'radial-gradient(circle, rgba(255,255,255,0.07) 0 1.5px, transparent 2px) 0 0 / 34px 34px, radial-gradient(120% 90% at 50% 38%, #2a66df 0%, #0f3394 45%, #071a55 80%, #040d33 100%)',
     Board: lazy(() => import('./ludo/LudoBoard')),
+  },
+  uno: {
+    type: uno.type, name: uno.name, emoji: '🃏', blurb: 'Match colours and numbers · 2 to 8 players',
+    min: uno.min, max: uno.max,
+    background: 'radial-gradient(circle, rgba(255,255,255,0.06) 0 1.5px, transparent 2px) 0 0 / 30px 30px, radial-gradient(120% 90% at 50% 45%, #c62828 0%, #8e0f14 45%, #4a0509 85%, #2a0205 100%)',
+    Board: lazy(() => import('./uno/UnoBoard')),
   },
 };
 

@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { loadAvatar } from '../lib/engine';
-import { Users } from 'lucide-react';
-import { isGroup } from '../lib/types';
+import { Bot, Users } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useApp } from '../state/app';
 
@@ -12,7 +11,7 @@ export function Avatar({ u, name, size = 44, online, className }: {
   u: string; name?: string; size?: number; online?: boolean; className?: string;
 }) {
   const url = useApp((s) => s.avatars[u]);
-  useEffect(() => { if (url === undefined) loadAvatar(u); }, [u, url]);
+  useEffect(() => { if (url === undefined && !u.startsWith('bot:')) loadAvatar(u); }, [u, url]);
   const label = name || u;
   return (
     <span className={cn('relative inline-flex shrink-0', className)} style={{ width: size, height: size }}>
@@ -24,7 +23,9 @@ export function Avatar({ u, name, size = 44, online, className }: {
           style={{ background: `hsl(${hue(u)} 45% 48%)`, fontSize: size * 0.42 }}
           aria-hidden
         >
-          {isGroup(u) ? <Users style={{ width: size * 0.5, height: size * 0.5 }} /> : label[0]?.toUpperCase() || '?'}
+          {u.startsWith('g:') ? <Users style={{ width: size * 0.5, height: size * 0.5 }} />
+            : u.startsWith('bot:') ? <Bot style={{ width: size * 0.56, height: size * 0.56 }} aria-label="Computer player" />
+            : label[0]?.toUpperCase() || '?'}
         </span>
       )}
       {online && (

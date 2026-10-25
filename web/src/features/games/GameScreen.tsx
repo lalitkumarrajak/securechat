@@ -1,7 +1,7 @@
 // The full-screen game view every game shares: header, lobby, the game's own board, in-game
 // chat with emoji and quick phrases, and the results.
 import { Suspense, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Check, Clock, Crown, LogOut, MessageCircle, MoreVertical, SendHorizontal, Smile, Volume2, VolumeX, X } from 'lucide-react';
+import { ArrowLeft, Bot, Check, Clock, Crown, LogOut, MessageCircle, MoreVertical, SendHorizontal, Smile, Volume2, VolumeX, X } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
 import { LinkBox } from '../../components/LinkBox';
 import { Button, IconButton, Spinner } from '../../components/ui/button';
@@ -15,7 +15,7 @@ import { setSettings, useSettings } from '../../state/settings';
 import { GAME_UI } from './registry';
 import { insertMention, mentionQuery, splitMentions } from '../../lib/mentions';
 import {
-  act, createGame, decline, dismiss, gameName, join, leave, linkShared, nameOf, openGame, say, setChatOpen, shareLink, startNow, useGames, type ChatLine, type Game,
+  act, addBot, createGame, decline, dismiss, dropBot, gameName, join, leave, linkShared, nameOf, openGame, say, setChatOpen, shareLink, startNow, useGames, type ChatLine, type Game,
 } from './store';
 
 export const QUICK_EMOJI = ['😂', '😍', '😎', '😡', '😭', '🔥', '👏', '🙏', '😈', '🤞'];
@@ -236,13 +236,27 @@ function Lobby({ g, me, onLeave }: { g: Game; me: string; onLeave: () => void })
           <li key={p.u} className="flex items-center gap-3 rounded-2xl bg-white/10 px-3 py-2 text-left">
             <Avatar u={p.u} name={p.n} size={40} />
             <span className="min-w-0 flex-1 truncate font-medium">{p.u === me ? 'You' : p.n || p.u}{p.u === g.host && <Crown className="ml-1.5 inline size-4 text-amber-300" aria-label="host" />}</span>
-            <span className={cn('rounded-full px-2.5 py-0.5 text-xs font-semibold',
-              p.state === 'joined' ? 'bg-emerald-400/90 text-emerald-950' : p.state === 'declined' ? 'bg-white/15 text-white/60' : 'bg-amber-300/90 text-amber-950')}>
-              {p.state === 'joined' ? <><Check className="mr-0.5 inline size-3" />Ready</> : p.state === 'declined' ? 'Declined' : 'Waiting…'}
-            </span>
+            {p.bot ? (
+              <>
+                <span className="rounded-full bg-sky-300/90 px-2.5 py-0.5 text-xs font-semibold text-sky-950">Computer</span>
+                {g.host === me && (
+                  <button type="button" onClick={() => dropBot(g.id, p.u)} aria-label={`Remove ${p.n}`} className="rounded-full p-1 text-white/70 hover:bg-white/15"><X className="size-4" /></button>
+                )}
+              </>
+            ) : (
+              <span className={cn('rounded-full px-2.5 py-0.5 text-xs font-semibold',
+                p.state === 'joined' ? 'bg-emerald-400/90 text-emerald-950' : p.state === 'declined' ? 'bg-white/15 text-white/60' : 'bg-amber-300/90 text-amber-950')}>
+                {p.state === 'joined' ? <><Check className="mr-0.5 inline size-3" />Ready</> : p.state === 'declined' ? 'Declined' : 'Waiting…'}
+              </span>
+            )}
           </li>
         ))}
       </ul>
+      {g.host === me && g.players.filter((p) => p.state !== 'declined').length < (ui?.max ?? 6) && (
+        <Button variant="secondary" className="w-full gap-2" onClick={() => addBot(g.id)}>
+          <Bot className="size-4" /> Add computer player
+        </Button>
+      )}
       {mine?.state === 'invited' ? (
         <div className="flex w-full gap-3">
           <Button variant="secondary" className="flex-1" onClick={() => { decline(g.id); openGame(null); }}>Decline</Button>

@@ -136,6 +136,46 @@ describe('games', () => {
     S.close(); BL.close();
   });
 
+  it('computer players fill seats and play their own turns', async () => {
+    const s2 = await startServer({ GAME_TURN_MS: '60000', GAME_ANIM_MS: '0', GAME_BOT_MS: '50' });
+    try {
+      const x = await register(s2, name('botx'));
+      const X = await connect(s2, x.token);
+      X.sendJson({ t: 'gnew', type: 'ludo', to: [], ref: 'bots' });
+      const gid = (await X.next('g', (m) => m.ref === 'bots')).g.id;
+      X.sendJson({ t: 'gbot', id: gid });
+      X.sendJson({ t: 'gbot', id: gid });
+      const lobby = await frame(X, (g) => g.id === gid && g.players.length === 3);
+      assert.ok(lobby.players.slice(1).every((p) => p.bot && p.u.startsWith('bot:') && p.n));
+      X.sendJson({ t: 'gbot', id: gid, drop: lobby.players[2].u });
+      await frame(X, (g) => g.id === gid && g.players.length === 2);
+      X.sendJson({ t: 'gstart', id: gid });
+      await frame(X, (g) => g.id === gid && g.status === 'play' && g.turn === 0);
+      X.sendJson({ t: 'gact', id: gid, a: { a: 'roll' } });
+      // the bot takes its turn by itself, and it's back to me
+      const back = await frame(X, (g) => g.id === gid && g.status === 'play' && g.turn === 0 && g.ev.some((e) => e.k === 'roll' && e.s === 1), 10_000);
+      assert.equal(back.players[1].missed, 0);
+      X.close();
+    } finally { await s2.stop(); }
+  });
+
+  it('UNO: each player sees only their own cards', async () => {
+    A.sendJson({ t: 'gnew', type: 'uno', to: [b.u], ref: 'uno1' });
+    const gid = (await A.next('g', (m) => m.ref === 'uno1')).g.id;
+    B.sendJson({ t: 'gjoin', id: gid });
+    const [ga, gb] = await Promise.all([frame(A, (g) => g.id === gid && g.status === 'play'), frame(B, (g) => g.id === gid && g.status === 'play')]);
+    assert.equal(ga.s.hand.length, 7);
+    assert.equal(gb.s.hand.length, 7);
+    assert.equal(ga.s.hands, undefined);
+    assert.deepEqual(ga.s.counts, [7, 7]);
+    assert.ok(!ga.s.hand.some((c) => gb.s.hand.includes(c)));
+    assert.equal(typeof ga.s.deck, 'number');
+    A.sendJson({ t: 'gact', id: gid, a: { a: 'draw' } });
+    const seen = await frame(B, (g) => g.id === gid && g.ev.some((e) => e.k === 'draw'));
+    assert.equal(seen.ev.find((e) => e.k === 'draw').ids, undefined); // B can't see what A drew
+    A.sendJson({ t: 'gleave', id: gid });
+  });
+
   it('a running game survives a server restart', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'chattrix-games-'));
     const env = { DATA_DIR: dir, GAME_TURN_MS: '60000', GAME_ANIM_MS: '0' };

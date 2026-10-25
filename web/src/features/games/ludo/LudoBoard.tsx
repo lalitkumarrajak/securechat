@@ -2,7 +2,6 @@
 // the middle, tokens hopping square by square. Server updates arrive as events (roll, move,
 // capture…) which are played back in order before the next update is shown.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Heart } from 'lucide-react';
 import { Avatar } from '../../../components/Avatar';
 import { cn } from '../../../lib/utils';
 import { homeAt } from '../../../../../shared/games/ludo.js';
@@ -10,14 +9,13 @@ import { playSound } from '../sounds';
 import type { Game, GameEvent } from '../store';
 import type { GameBoardProps } from '../registry';
 import { MISSES_OUT } from '../../../../../shared/games/core.js';
+import { Chances, TurnRing } from '../TurnRing';
 import { COLORS, COLOR_NAMES, DARK, LIGHT, makeLayout, pathOf, poly, type Layout, type Pt } from './geometry';
 
 interface LudoState { arms: number; arm: number[]; tokens: number[][]; phase: 'roll' | 'move'; dice: number; sixes: number; moves: number[] }
 interface Shown { tokens: number[][]; turn: number; dice: { s: number; d: number; rolling: boolean } | null }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const TURN_TOTAL = 35_000; // 30 s per turn + the server's allowance for animations (GAME_ANIM_MS)
-const TURN_SECS = 30;
 // Ludo King's rhythm: the dice rattles for about a second, the result stays a moment, tokens hop
 // a square at a time, and a captured token visibly zips back to its yard.
 const PACE = { roll: 950, reveal: 450, step: 260, hit: 320, rewind: 38, settle: 300, burn: 900, turn: 350 };
@@ -365,42 +363,13 @@ function PlayerPanel({ g, i, me, shown, canRoll, onRoll, spinning, bubble, right
         <div className={cn(away ? 'font-medium text-amber-300' : 'text-white/60')}>
           {away ? 'Auto-playing' : gone ? (pl.state === 'out' ? 'Removed' : 'Left') : pl.rank ? ordinal(pl.rank) : `${COLOR_NAMES[arm]}${homeCount ? ` · ${homeCount}/4 home` : ''}`}
         </div>
-        {pl.state === 'playing' && (
-          <div className={cn('mt-0.5 flex gap-0.5', right && 'justify-end')} role="img" aria-label={`${MISSES_OUT - missed} of ${MISSES_OUT} chances left`}
-            title={`Missed turns: ${missed} of ${MISSES_OUT}. At ${MISSES_OUT} they're removed.`}>
-            {Array.from({ length: MISSES_OUT }, (_, k) => (
-              <Heart key={k} className={cn('size-2.5', k < MISSES_OUT - missed ? 'fill-red-500 text-red-500' : 'text-white/35')} />
-            ))}
-          </div>
-        )}
+        {pl.state === 'playing' && !pl.bot && <Chances missed={missed} right={right} />}
       </div>
     </div>
   );
 }
 
 const ordinal = (n: number) => n + (['th', 'st', 'nd', 'rd'][n % 100 > 10 && n % 100 < 14 ? 0 : n % 10 < 4 ? n % 10 : 0]) + ' place';
-
-function TurnRing({ active, deadline, color, children }: { active: boolean; deadline: number; color: string; children: React.ReactNode }) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    if (!active) return;
-    const t = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(t);
-  }, [active]);
-  const frac = active ? Math.max(0, Math.min(1, (deadline - now) / TURN_TOTAL)) : 0;
-  const low = frac < 0.25;
-  const secs = Math.min(TURN_SECS, Math.max(0, Math.ceil((deadline - now) / 1000)));
-  return (
-    <div className="relative rounded-[14px] p-[3px]" data-turn={active || undefined}
-      style={active ? { background: `conic-gradient(${low ? '#ef4444' : color} ${frac * 360}deg, rgba(255,255,255,0.15) 0)` } : undefined}>
-      {children}
-      {active && (
-        <span className={cn('absolute -bottom-1.5 left-1/2 -translate-x-1/2 rounded-full px-1.5 text-[10px] font-bold tabular-nums text-white shadow', low ? 'bg-red-500' : 'bg-black/70')}
-          aria-label={`${secs} seconds left`}>{secs}s</span>
-      )}
-    </div>
-  );
-}
 
 const PIPS: Record<number, [number, number][]> = {
   1: [[50, 50]], 2: [[28, 28], [72, 72]], 3: [[26, 26], [50, 50], [74, 74]],

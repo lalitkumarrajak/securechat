@@ -150,6 +150,18 @@ export default {
 
   pass,
 
+  // Matches the app's pace (PACE in LudoBoard.tsx), so computer players wait for the animations.
+  animMs(ev) {
+    let ms = 0;
+    for (const e of ev) {
+      if (e.k === 'roll') ms += 1400;
+      else if (e.k === 'move') ms += (e.from === -1 ? 1 : e.to - e.from) * 260 + 300 + (e.cap?.length ? 320 + Math.max(...e.cap.map((c) => c.from + 1)) * 38 : 0);
+      else if (e.k === 'burn') ms += 900;
+      else if (e.k === 'turn') ms += 350;
+    }
+    return ms;
+  },
+
   removed(g, i) {
     g.s.tokens[i] = Array(TOKENS).fill(-2);
   },

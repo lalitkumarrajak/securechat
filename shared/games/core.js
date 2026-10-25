@@ -12,27 +12,35 @@
 // Each game is a definition object (see ludo.js):
 //   type, name, min, max   players allowed
 //   turnMs                 time per turn before the server plays for you
-//   begin(g)               set up g.s for the players
+//   begin(g, rand)         set up g.s for the players
 //   act(g, i, action, rand) apply player i's action, or throw if it isn't allowed
 //   auto(g, rand)          play for whoever's turn it is (they ran out of time)
 //   pass(g)                end the current turn
 //   removed(g, i)          clean up after player i leaves (e.g. take their pieces off the board)
+// and optionally:
+//   bot(g, rand)           a computer player's move (default: auto)
+//   view(g, i)             { s, ev } as player i may see them, for games with secrets (cards in hand)
+//   animMs(ev)             how long apps take to show these events, so bots wait for them
 // rand(n) returns a random whole number from 0 to n-1; only the server supplies it.
+//
+// Players: { u, n, state, missed, rank, bot? }. Computer players ("bots") have u "bot:<id>".
 
 export const playing = (pl) => pl.state === 'playing';
+export const isBot = (pl) => !!pl?.bot;
+export const BOT_NAMES = ['Riya', 'Arjun', 'Meera', 'Kabir', 'Zoya', 'Vikram', 'Ananya', 'Rohan'];
 
 // Turns in a row the server may play for someone who isn't playing before they're removed.
 export const MISSES_OUT = 5;
 
 /** Start the game with the players who joined. */
-export function begin(g, def) {
+export function begin(g, def, rand) {
   g.players = g.players.filter((pl) => pl.state === 'joined');
   for (const pl of g.players) Object.assign(pl, { state: 'playing', missed: 0, rank: 0 });
   g.status = 'play';
   g.turn = 0;
   g.ranked = 0;
   g.ev = [{ k: 'start' }];
-  def.begin(g);
+  def.begin(g, rand);
   return g;
 }
 
@@ -55,10 +63,11 @@ export function finish(g, i) {
   endIfDecided(g);
 }
 
-// The game ends when at most one player is still playing; they take the last place.
+// The game ends when at most one player is still playing (they take the last place), or when
+// only computer players are left.
 export function endIfDecided(g) {
   const left = g.players.filter(playing);
-  if (left.length > 1) return;
+  if (left.length > 1 && left.some((pl) => !isBot(pl))) return;
   for (const pl of left) { pl.state = 'done'; pl.rank = ++g.ranked; }
   g.status = 'over';
   g.ev.push({ k: 'over' });
