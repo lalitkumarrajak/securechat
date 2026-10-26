@@ -12,6 +12,7 @@ import { editMessage, fetchLinkPreview, me, preview, saveDraft, sendFile, sendGi
 import { fmtDuration } from '../../lib/format';
 import type { GifItem, LinkPreview, Msg } from '../../lib/types';
 import { ExpressionPanel, type PanelTab } from './ExpressionPanel';
+import { MAX_PHOTOS, SendPhotos, toItems, type PhotoItem } from './SendPhotos';
 import { cn, isTouch } from '../../lib/utils';
 import { VoiceRecorder } from '../../lib/voice';
 import { getApp, setApp, useApp } from '../../state/app';
@@ -52,6 +53,7 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
     return () => window.removeEventListener('keydown', onKey, true);
   }, [panel]);
   const camera = useRef<HTMLInputElement>(null);
+  const [review, setReview] = useState<PhotoItem[] | null>(null); // photos waiting to be sent
   const link = useLinkPreview(editing ? '' : text);
 
   // Editing fills the box with the message; leaving edit mode restores the draft.
@@ -96,21 +98,45 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
     sendText(peer, t, replyTo, lp, mn).catch((e) => toast.error(e.message));
   }
 
-  async function photo(file?: File | null) {
-    if (!file) return;
-    if (!(await isPhoto(file))) return toast.error('Only photos can be sent for now.');
-    const re = getApp().replyTo;
-    setApp({ replyTo: null });
-    try { await sendPhoto(peer, file, re); } catch (e) { toast.error((e as Error).message || 'Couldn’t send that photo'); }
+  // Picked or pasted photos open the review screen first (several at once, captions, add more).
+  async function photos(files: File[]) {
+    const ok: File[] = [];
+    for (const f of files) if (await isPhoto(f)) ok.push(f);
+    if (ok.length < files.length) toast.error(ok.length ? 'Some of those aren’t photos, so they were left out.' : 'Only photos can be sent here.');
+    if (!ok.length) return;
+    if (ok.length + (review?.length || 0) > MAX_PHOTOS) toast(`You can send up to ${MAX_PHOTOS} photos at a time.`);
+    setReview((r) => [...(r || []), ...toItems(ok)].slice(0, MAX_PHOTOS));
   }
 
-  async function document_(file?: File | null) {
-    if (!file) return;
-    if (file.size < 25 * 1024 * 1024 && (await isPhoto(file))) return photo(file); // photos get compressed
-    const re = getApp().replyTo;
+  // One after another, so they arrive in the order you picked them. A reply goes with the first.
+  async function sendPhotos(items: PhotoItem[]) {
+    setReview(null);
+    let re = getApp().replyTo;
     setApp({ replyTo: null });
-    const t = toast.loading(`Sending ${file.name}…`);
-    try { await sendFile(peer, file, re); toast.dismiss(t); } catch (e) { toast.error((e as Error).message || 'Couldn’t send that file', { id: t }); }
+    const t = items.length > 1 ? toast.loading(`Sending ${items.length} photos…`) : undefined;
+    let failed = 0;
+    for (const [n, x] of items.entries()) {
+      if (t) toast.loading(`Sending photo ${n + 1} of ${items.length}…`, { id: t });
+      try { await sendPhoto(peer, x.file, re, x.caption); re = null; }
+      catch (e) { failed++; if (!t) toast.error((e as Error).message || 'Couldn’t send that photo'); }
+    }
+    if (t) {
+      if (failed) toast.error(`${failed} of ${items.length} photos couldn’t be sent`, { id: t });
+      else toast.dismiss(t);
+    }
+  }
+
+  // Photos among the documents go through the review screen (they get compressed); other files send in order.
+  async function documents(files: File[]) {
+    const pics: File[] = [], rest: File[] = [];
+    for (const f of files) ((f.size < 25 * 1024 * 1024 && (await isPhoto(f))) ? pics : rest).push(f);
+    if (pics.length) photos(pics);
+    let re = pics.length ? null : getApp().replyTo;
+    if (rest.length && !pics.length) setApp({ replyTo: null });
+    for (const [n, file] of rest.entries()) {
+      const t = toast.loading(rest.length > 1 ? `Sending ${file.name} (${n + 1} of ${rest.length})…` : `Sending ${file.name}…`);
+      try { await sendFile(peer, file, re); re = null; toast.dismiss(t); } catch (e) { toast.error((e as Error).message || `Couldn’t send ${file.name}`, { id: t }); }
+    }
   }
 
   async function location() {
@@ -201,8 +227,8 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
             if (e.key === 'Escape' && (replyTo || editing)) { e.preventDefault(); setApp({ replyTo: null, editing: null }); }
           }}
           onPaste={(e) => {
-            const file = [...e.clipboardData.files].find((f) => f.type.startsWith('image/'));
-            if (file) { e.preventDefault(); photo(file); }
+            const files = [...e.clipboardData.files].filter((f) => f.type.startsWith('image/'));
+            if (files.length) { e.preventDefault(); photos(files); }
           }}
           onFocus={() => { if (isTouch()) setPanel(null); }} // typing again: keyboard replaces the panel
           rows={1}
@@ -211,11 +237,11 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
           aria-label="Message"
           className={cn('max-h-40 min-h-11 min-w-0 flex-1 resize-none bg-transparent py-2.5 text-[0.95rem] leading-snug outline-none placeholder:text-muted', editing && 'pl-4')}
         />
-          {!editing && <AttachButton onPhoto={photo} onDocument={document_} onLocation={location} />}
+          {!editing && <AttachButton onPhotos={photos} onDocuments={documents} onLocation={location} />}
           {!editing && empty && (
             <IconButton label="Camera" className="mr-0.5 shrink-0" onClick={() => camera.current?.click()}><Camera /></IconButton>
           )}
-          <input ref={camera} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { photo(e.target.files?.[0]); e.target.value = ''; }} />
+          <input ref={camera} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { photos([...(e.target.files || [])]); e.target.value = ''; }} />
         </div>
         {empty && !editing ? (
           <MicButton peer={peer} onStart={() => setRecording(true)} />
@@ -232,6 +258,7 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
           </button>
         )}
       </div>
+      {review && <SendPhotos items={review} to={peerName} onChange={setReview} onSend={sendPhotos} onClose={() => setReview(null)} />}
       {panel && !editing && (
         <ExpressionPanel tab={panel} setTab={setPanel} onEmoji={insertEmoji} onBackspace={backspace} onGif={pickGif} onSticker={pickSticker} />
       )}
@@ -258,8 +285,8 @@ function ContextBar({ m, editing, peerName, onClose }: { m: Msg; editing: boolea
 
 const ITEM = 'flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm outline-none data-[highlighted]:bg-hover';
 
-function AttachButton({ onPhoto, onDocument, onLocation }: {
-  onPhoto: (f?: File | null) => void; onDocument: (f?: File | null) => void; onLocation: () => void;
+function AttachButton({ onPhotos, onDocuments, onLocation }: {
+  onPhotos: (f: File[]) => void; onDocuments: (f: File[]) => void; onLocation: () => void;
 }) {
   const gallery = useRef<HTMLInputElement>(null);
   const camera = useRef<HTMLInputElement>(null);
@@ -279,9 +306,9 @@ function AttachButton({ onPhoto, onDocument, onLocation }: {
           </M.Content>
         </M.Portal>
       </M.Root>
-      <input ref={gallery} type="file" data-kind="gallery" accept="image/*" hidden onChange={(e) => { onPhoto(e.target.files?.[0]); e.target.value = ''; }} />
-      <input ref={camera} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { onPhoto(e.target.files?.[0]); e.target.value = ''; }} />
-      <input ref={doc} type="file" data-kind="document" hidden onChange={(e) => { onDocument(e.target.files?.[0]); e.target.value = ''; }} />
+      <input ref={gallery} type="file" data-kind="gallery" accept="image/*" multiple hidden onChange={(e) => { onPhotos([...(e.target.files || [])]); e.target.value = ''; }} />
+      <input ref={camera} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { onPhotos([...(e.target.files || [])]); e.target.value = ''; }} />
+      <input ref={doc} type="file" data-kind="document" multiple hidden onChange={(e) => { onDocuments([...(e.target.files || [])]); e.target.value = ''; }} />
     </>
   );
 }

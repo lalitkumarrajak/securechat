@@ -952,9 +952,9 @@ export async function fetchLinkPreview(url: string): Promise<LinkPreview | null>
   } catch { return null; }
 }
 
-export async function sendPhoto(peer: string, file: File, re?: Msg | null) {
+export async function sendPhoto(peer: string, file: File, re?: Msg | null, caption = '') {
   const img = await compressImage(file);
-  await sendContent(peer, { type: 'img', ...img, text: '', ...(re && { re: replyRef(re) }) });
+  await sendContent(peer, { type: 'img', ...img, text: caption.trim(), ...(re && { re: replyRef(re) }) });
 }
 
 export async function sendVoice(peer: string, rec: { src: string; dur: number; peaks: number[] }, re?: Msg | null) {

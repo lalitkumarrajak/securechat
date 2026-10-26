@@ -32,6 +32,8 @@ export function MessageList({ peer, peerName, unreadAtOpen }: { peer: string; pe
   const keep = useSettings((s) => s.privacyKeep);
   const box = useRef<HTMLDivElement>(null);
   const [atBottom, setAtBottom] = useState(true);
+  const bottomRef = useRef(true); // atBottom, for the observers
+  const content = useRef<HTMLDivElement>(null);
   const [newCount, setNewCount] = useState(0);
   const lastLen = useRef(0);
   const opened = useRef(false);
@@ -75,6 +77,7 @@ export function MessageList({ peer, peerName, unreadAtOpen }: { peer: string; pe
 
   // When the list gets shorter (the phone keyboard opens, a reply bar appears), keep the messages
   // at the bottom where they were instead of letting them slide behind the keyboard.
+  // And when what's inside grows while you're at the bottom (photos loading, link previews), stay there.
   useEffect(() => {
     const el = box.current;
     if (!el) return;
@@ -85,7 +88,9 @@ export function MessageList({ peer, peerName, unreadAtOpen }: { peer: string; pe
       h = now;
     });
     ro.observe(el);
-    return () => ro.disconnect();
+    const grow = new ResizeObserver(() => { if (bottomRef.current) el.scrollTop = el.scrollHeight; });
+    if (content.current) grow.observe(content.current);
+    return () => { ro.disconnect(); grow.disconnect(); };
   }, []);
 
   useEffect(() => {
@@ -98,6 +103,7 @@ export function MessageList({ peer, peerName, unreadAtOpen }: { peer: string; pe
     const el = box.current!;
     const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
     setAtBottom(bottom);
+    bottomRef.current = bottom;
     if (bottom) setNewCount(0);
   };
 
@@ -112,6 +118,7 @@ export function MessageList({ peer, peerName, unreadAtOpen }: { peer: string; pe
             🔒 Messages are end-to-end encrypted. Say hi to {peerName}!
           </div>
         )}
+        <div ref={content}>
         {messages.map((m, i) => {
           const day = fmtDay(m.ts);
           const showDay = day !== lastDay;
@@ -143,6 +150,7 @@ export function MessageList({ peer, peerName, unreadAtOpen }: { peer: string; pe
             </Fragment>
           );
         })}
+        </div>
       </div>
       {!atBottom && (
         <button onClick={toBottom} aria-label="Scroll to latest messages"

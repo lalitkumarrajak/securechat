@@ -221,6 +221,7 @@ test('photo and voice messages', async () => {
   await A.page.keyboard.press('Escape');
   const png = testPng();
   await A.page.locator('input[data-kind="gallery"]').setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: png });
+  await A.page.getByRole('button', { name: 'Send photo' }).click(); // after the review screen
   await expect(B.page.locator('img[alt="Photo"]').last()).toBeVisible();
 
   // Voice: hold the mic for ~1.5 s with Chrome's fake microphone, release to send

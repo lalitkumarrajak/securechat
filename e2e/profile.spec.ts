@@ -102,18 +102,37 @@ test("friends' profiles: tap their photo, or Contact info in the chat menu", asy
 
 test('camera photos without a file type still send', async () => {
   await P.page.locator('input[data-kind="gallery"]').setInputFiles({ name: 'IMG_20261026.jpg', mimeType: '', buffer: testPng(400, 300) });
+  await P.page.getByRole('button', { name: 'Send photo' }).click();
   await expect(P.page.locator('[data-k] img[alt="Photo"]')).toHaveCount(1, { timeout: 15_000 });
   await Q.page.locator('aside li').filter({ hasText: P.u }).click();
   await expect(Q.page.locator('[data-k] img[alt="Photo"]')).toHaveCount(1, { timeout: 15_000 });
+});
+
+test('several photos at once: review, remove one, caption, send in order', async () => {
+  const before = await Q.page.locator('[data-k] img[alt="Photo"]').count();
+  await P.page.locator('input[data-kind="gallery"]').setInputFiles([1, 2, 3].map((n) => ({ name: `pic${n}.png`, mimeType: 'image/png', buffer: testPng(200 + n * 40, 150) })));
+  const review = P.page.getByRole('dialog', { name: new RegExp(`photos? to ${Q.u}`) });
+  await expect(review.getByRole('heading', { name: `3 photos to ${Q.u}` })).toBeVisible();
+  await review.getByRole('button', { name: 'Remove photo 3' }).click();
+  await review.getByRole('button', { name: 'Photo 2', exact: true }).click();
+  await review.getByRole('textbox', { name: 'Caption' }).fill('Look at this view');
+  await review.getByRole('button', { name: 'Send 2 photos' }).click();
+  await expect(review).toBeHidden();
+  await expect(Q.page.locator('[data-k] img[alt="Photo"]')).toHaveCount(before + 2, { timeout: 20_000 });
+  const last = Q.page.locator('[data-k]').last();
+  await expect(last).toContainText('Look at this view'); // the caption went with the second photo, sent last
+  await expect(last.locator('img[alt="Photo"]')).toHaveAttribute('width', '280');
 });
 
 // Needs a real HEIC photo, e.g. libheif's examples/example.heic: HEIC_SAMPLE=/path/to/photo.heic
 test('HEIC camera photos are converted on the phone and sent', async () => {
   test.skip(!process.env.HEIC_SAMPLE, 'set HEIC_SAMPLE to a .heic file');
   const buffer = fs.readFileSync(process.env.HEIC_SAMPLE!);
+  const before = await Q.page.locator('[data-k] img[alt="Photo"]').count();
   await P.page.locator('input[data-kind="gallery"]').setInputFiles({ name: 'IMG_0001.HEIC', mimeType: 'image/heic', buffer });
-  await expect(P.page.locator('[data-k] img[alt="Photo"]')).toHaveCount(2, { timeout: 60_000 });
-  await expect(Q.page.locator('[data-k] img[alt="Photo"]')).toHaveCount(2, { timeout: 15_000 });
+  await expect(P.page.getByRole('img', { name: 'Photo 1 of 1' })).toBeVisible({ timeout: 60_000 }); // converted, so it shows
+  await P.page.getByRole('button', { name: 'Send photo' }).click();
+  await expect(Q.page.locator('[data-k] img[alt="Photo"]')).toHaveCount(before + 1, { timeout: 60_000 });
   // The converter first tries to fetch its code from a blob: URL (blocked by connect-src, harmless),
   // then uses its built-in copy. WebAssembly itself must not be blocked.
   P.errors = P.errors.filter((e) => !/Connecting to 'blob:.*connect-src/s.test(e));
@@ -142,8 +161,11 @@ test('reply opens the keyboard even if the message box already has focus', async
 });
 
 test('the newest messages stay in view when the keyboard opens', async () => {
-  await expect(P.page.locator('[data-k]').last()).toBeInViewport();
+  const gap = () => P.page.evaluate(() => { const el = document.querySelector('[role=log]')!; return el.scrollHeight - el.scrollTop - el.clientHeight; });
+  await P.page.getByRole('button', { name: 'Scroll to latest messages' }).click(); // the reply swipe scrolled up
+  await expect.poll(gap).toBeLessThan(2); // finished scrolling down
   await P.page.setViewportSize({ width: 390, height: 430 }); // the keyboard takes the bottom of the screen
+  await expect.poll(gap).toBeLessThan(2); // still at the very bottom
   await expect(P.page.locator('[data-k]').last()).toBeInViewport();
   await P.page.setViewportSize({ width: 390, height: 780 });
 });
@@ -161,14 +183,14 @@ test('privacy screen blurs names and older messages; tap or the eye shows them',
   await P.page.getByRole('button', { name: 'Profile and settings' }).click();
   await P.page.getByRole('button', { name: /Privacy/ }).click();
   await P.page.getByRole('switch', { name: 'Blur my chats' }).click();
-  await P.page.getByRole('radio', { name: 'Last 3' }).click();
+  await P.page.getByRole('radio', { name: 'Last 5' }).click();
   await P.page.keyboard.press('Escape');
 
   const row = P.page.locator('aside li').filter({ hasText: Q.u }).locator('.priv').last();
   await expect.poll(() => blurred(row)).toBe(true);
   await P.page.locator('aside li').filter({ hasText: Q.u }).click();
   const last = bubble(P, 'Message number 14').locator('.priv');
-  await expect(last).toHaveCount(0); // the newest three (photo, 14, 13) stay readable
+  await expect(last).toHaveCount(0); // the newest five (photos, then 14…) stay readable
   const older = bubble(P, 'Message number 11');
   await expect.poll(() => blurred(older.locator('.priv'))).toBe(true);
   await older.locator('.priv').tap();
