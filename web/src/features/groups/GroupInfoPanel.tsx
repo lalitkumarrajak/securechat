@@ -7,6 +7,7 @@ import {
 import { Avatar } from '../../components/Avatar';
 import { LinkBox } from '../../components/LinkBox';
 import { PhotoCropper } from '../../components/PhotoCropper';
+import { pickPhoto } from '../../lib/image';
 import { setChatUi } from '../conversation/chatUi';
 import { Button, IconButton } from '../../components/ui/button';
 import { confirm } from '../../components/ui/confirm';
@@ -87,7 +88,7 @@ function Info({ g }: { g: Group }) {
             )}
             <input ref={file} type="file" accept="image/*" hidden onChange={(e) => {
               const f = e.target.files?.[0]; e.target.value = '';
-              if (f) setPicked(f);
+              if (f) pickPhoto(f).then(setPicked);
             }} />
             <PhotoCropper file={picked} title="Group photo" onCancel={() => setPicked(null)} onDone={(crop) => {
               const f = picked; setPicked(null);

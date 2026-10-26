@@ -14,8 +14,9 @@ interface ChatUi {
   sheet: Msg | null;       // phone action sheet (long-press)
   verify: boolean;         // security code dialog
   viewer: string | null;   // full-screen photo
+  profile: string | null;  // someone's profile card (tapped their photo)
 }
-export const useChatUi = create<ChatUi>(() => ({ forward: null, info: null, picker: null, sheet: null, verify: false, viewer: null }));
+export const useChatUi = create<ChatUi>(() => ({ forward: null, info: null, picker: null, sheet: null, verify: false, viewer: null, profile: null }));
 export const setChatUi = useChatUi.setState;
 
 /** Focus the message box. Must run during the tap itself: phones only open the keyboard then.

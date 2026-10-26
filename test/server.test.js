@@ -13,7 +13,9 @@ describe('basics', () => {
   it('serves the web app compressed with strict security headers', async () => {
     const page = await fetch(srv.base + '/', { headers: { 'Accept-Encoding': 'br' } });
     assert.equal(page.status, 200);
-    assert.match(page.headers.get('content-security-policy'), /script-src 'self';/);
+    const csp = page.headers.get('content-security-policy');
+    assert.match(csp, /script-src 'self' 'wasm-unsafe-eval';/); // WebAssembly only (HEIC photos), never JS eval
+    assert.doesNotMatch(csp, /'unsafe-eval'/);
     assert.equal(page.headers.get('content-encoding'), 'br');
     assert.equal(page.headers.get('cache-control'), 'no-cache');
     const asset = await fetch(srv.base + '/assets/app-abc123.js');

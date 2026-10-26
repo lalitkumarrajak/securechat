@@ -226,6 +226,7 @@ function PersonHeader({ peer, name }: { peer: string; name: string }) {
       <Menu>
         <MenuTrigger asChild><IconButton label="Chat options"><MoreVertical /></IconButton></MenuTrigger>
         <MenuContent>
+          <MenuItem icon={<Info />} onSelect={() => setApp({ panel: 'contact' })}>Contact info</MenuItem>
           <MenuItem icon={<Search />} onSelect={() => setApp({ searchOpen: true })}>Search</MenuItem>
           <MenuItem icon={<SquareCheck />} onSelect={() => setApp({ selection: [] })}>Select messages</MenuItem>
           <MenuItem icon={<Gamepad2 />} onSelect={() => openPicker([peer])}>Play a game</MenuItem>

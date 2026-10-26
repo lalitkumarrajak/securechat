@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import * as M from '@radix-ui/react-dropdown-menu';
 import { toast } from 'sonner';
 import { Camera, Check, FileText, Image as ImageIcon, Keyboard, Link2, MapPin, Mic, Paperclip, Pencil, Reply, SendHorizontal, Smile, Trash2, X } from 'lucide-react';
 import { confirm } from '../../components/ui/confirm';
 import { currentLocation } from '../../lib/location';
+import { isPhoto } from '../../lib/image';
 import { IconButton } from '../../components/ui/button';
 import { senderOf } from '../../lib/controls';
 import { editMessage, fetchLinkPreview, me, preview, saveDraft, sendFile, sendGif, sendLocation, sendPhoto, sendSticker, sendText, sendTyping, sendVoice } from '../../lib/engine';
@@ -37,9 +39,11 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
   function chooseMention(u: string) {
     if (!tag) return;
     const r = insertMention(text, input.current?.selectionStart ?? text.length, tag.start, u);
-    change(r.text);
-    setTag(null);
-    requestAnimationFrame(() => { input.current?.focus(); input.current?.setSelectionRange(r.cursor, r.cursor); });
+    // Put the new text in and the cursor after the name right now, so letters typed straight
+    // afterwards don't land in the wrong place.
+    flushSync(() => { change(r.text); setTag(null); });
+    input.current?.focus();
+    input.current?.setSelectionRange(r.cursor, r.cursor);
   }
   useEffect(() => { // Esc closes the panel before anything else
     if (!panel) return;
@@ -94,7 +98,7 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
 
   async function photo(file?: File | null) {
     if (!file) return;
-    if (!file.type.startsWith('image/')) return toast.error('Only photos can be sent for now.');
+    if (!(await isPhoto(file))) return toast.error('Only photos can be sent for now.');
     const re = getApp().replyTo;
     setApp({ replyTo: null });
     try { await sendPhoto(peer, file, re); } catch (e) { toast.error((e as Error).message || 'Couldn’t send that photo'); }
@@ -102,7 +106,7 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
 
   async function document_(file?: File | null) {
     if (!file) return;
-    if (file.type.startsWith('image/') && file.size < 15 * 1024 * 1024) return photo(file); // photos get compressed
+    if (file.size < 25 * 1024 * 1024 && (await isPhoto(file))) return photo(file); // photos get compressed
     const re = getApp().replyTo;
     setApp({ replyTo: null });
     const t = toast.loading(`Sending ${file.name}…`);

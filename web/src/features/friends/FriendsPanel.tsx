@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ArrowLeft, Check, Clock, Copy, MessageCircle, Search, UserPlus, X } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
+import { showProfile } from './ProfileCard';
 import { Button, IconButton, Spinner } from '../../components/ui/button';
 import { Panel } from '../../components/ui/dialog';
 import { Tabs, TabsContent, TabsList } from '../../components/ui/tabs';
@@ -44,7 +45,6 @@ function Row({ p, sub, children, onClick }: { p: Person; sub?: string; children?
   const online = useApp((s) => s.presence[p.u]?.on);
   const body = (
     <>
-      <Avatar u={p.u} name={p.name} size={46} online={online} />
       <span className="min-w-0 flex-1">
         <span className="block truncate font-medium">{displayName(p, p.u)}</span>
         <span className="block truncate text-sm text-muted">{sub ?? (p.name ? '@' + p.u : p.about || '@' + p.u)}</span>
@@ -53,6 +53,9 @@ function Row({ p, sub, children, onClick }: { p: Person; sub?: string; children?
   );
   return (
     <li className="flex items-center gap-3 px-4 py-2.5">
+      <button onClick={() => showProfile(p.u)} aria-label={`${displayName(p, p.u)}’s profile`} className="shrink-0 rounded-full">
+        <Avatar u={p.u} name={p.name} size={46} online={online} />
+      </button>
       {onClick ? <button onClick={onClick} className="flex min-w-0 flex-1 items-center gap-3 text-left">{body}</button> : body}
       {children}
     </li>

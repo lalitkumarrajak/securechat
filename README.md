@@ -2,8 +2,8 @@
 
 Private, end-to-end encrypted messaging with the people you choose. Built to work well on slow, flaky connections.
 
-- **Friends only:** search a username, send a friend request; you can chat once they accept. Block or remove friends any time.
-- **Messages:** text, photos, voice messages (hold the mic), big animated emoji, replies (swipe right), reactions, edit (15 min), forward, copy, pin (up to 3 per chat), select several, delete for me or for everyone (5 min).
+- **Friends only:** search a username, send a friend request; you can chat once they accept. Block or remove friends any time Tap a friend's photo for their profile card (photo, about, Message / Play / Info).
+- **Messages:** text, photos (any format the phone takes, including HEIC/HEIF camera photos), voice messages (hold the mic), big animated emoji, replies (swipe right), reactions, edit (15 min), forward, copy, pin (up to 3 per chat), select several, delete for me or for everyone (5 min).
 - **Chats:** unread divider, search inside a chat (matches highlighted), drafts, mute (8 h / 1 week / always), archive, sent / delivered / read ticks, typing and "recording audio…".
 - **Presence that's honest:** you show as online only while Chattrix is open in front of you; closing the tab switches you to "last seen" immediately.
 - **Account security:** Active sessions shows each device (phone model where the browser shares it) and its approximate location and network; a new sign-in alerts your other devices straight away.

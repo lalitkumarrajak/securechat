@@ -1,6 +1,7 @@
 // End-to-end: cropping and viewing profile photos, search highlighting, replying with the
 // keyboard already focused, keeping messages above the keyboard, and the privacy screen.
 import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
 import { bubble, phone, signUp, swipeRight, testPng, uname, type Phone } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
@@ -75,6 +76,50 @@ test('profile photo: choose the part to keep, then view it', async () => {
   await P.page.locator('aside li').filter({ hasText: Q.u }).click();
 });
 
+test("friends' profiles: tap their photo, or Contact info in the chat menu", async () => {
+  await P.page.getByRole('button', { name: 'Back' }).click(); // to the chat list
+  await P.page.getByRole('button', { name: `${Q.u}’s profile` }).click();
+  const card = P.page.getByRole('dialog', { name: Q.u });
+  await expect(card).toContainText('@' + Q.u);
+  await card.getByRole('button', { name: 'Info' }).click();
+  await expect(P.page.getByRole('dialog', { name: 'Contact info' })).toBeVisible();
+  await P.page.getByRole('button', { name: 'Close' }).click();
+  await P.page.getByRole('button', { name: 'Chat options' }).click();
+  await P.page.getByRole('menuitem', { name: 'Contact info' }).click();
+  await expect(P.page.getByRole('dialog', { name: 'Contact info' })).toBeVisible();
+  await P.page.getByRole('button', { name: 'Close' }).click();
+
+  // Q sees P's new (cropped) photo full size from the friends list
+  await Q.page.getByRole('button', { name: 'Back' }).click();
+  await Q.page.getByRole('button', { name: 'Friends' }).click();
+  await Q.page.getByRole('button', { name: `${P.u}’s profile` }).click();
+  await Q.page.getByRole('button', { name: `View ${P.u}’s photo` }).click();
+  await expect(Q.page.getByRole('dialog', { name: 'Photo' }).locator('img')).toBeVisible();
+  await Q.page.keyboard.press('Escape');
+  await Q.page.keyboard.press('Escape');
+  await Q.page.keyboard.press('Escape');
+});
+
+test('camera photos without a file type still send', async () => {
+  await P.page.locator('input[data-kind="gallery"]').setInputFiles({ name: 'IMG_20261026.jpg', mimeType: '', buffer: testPng(400, 300) });
+  await expect(P.page.locator('[data-k] img[alt="Photo"]')).toHaveCount(1, { timeout: 15_000 });
+  await Q.page.locator('aside li').filter({ hasText: P.u }).click();
+  await expect(Q.page.locator('[data-k] img[alt="Photo"]')).toHaveCount(1, { timeout: 15_000 });
+});
+
+// Needs a real HEIC photo, e.g. libheif's examples/example.heic: HEIC_SAMPLE=/path/to/photo.heic
+test('HEIC camera photos are converted on the phone and sent', async () => {
+  test.skip(!process.env.HEIC_SAMPLE, 'set HEIC_SAMPLE to a .heic file');
+  const buffer = fs.readFileSync(process.env.HEIC_SAMPLE!);
+  await P.page.locator('input[data-kind="gallery"]').setInputFiles({ name: 'IMG_0001.HEIC', mimeType: 'image/heic', buffer });
+  await expect(P.page.locator('[data-k] img[alt="Photo"]')).toHaveCount(2, { timeout: 60_000 });
+  await expect(Q.page.locator('[data-k] img[alt="Photo"]')).toHaveCount(2, { timeout: 15_000 });
+  // The converter first tries to fetch its code from a blob: URL (blocked by connect-src, harmless),
+  // then uses its built-in copy. WebAssembly itself must not be blocked.
+  P.errors = P.errors.filter((e) => !/Connecting to 'blob:.*connect-src/s.test(e));
+  expect(P.errors).toEqual([]);
+});
+
 test('search highlights the words in the message', async () => {
   await P.page.getByRole('button', { name: 'Chat options' }).click();
   await P.page.getByRole('menuitem', { name: 'Search' }).click();
@@ -97,9 +142,9 @@ test('reply opens the keyboard even if the message box already has focus', async
 });
 
 test('the newest messages stay in view when the keyboard opens', async () => {
-  await expect(bubble(P, 'Message number 14')).toBeInViewport();
+  await expect(P.page.locator('[data-k]').last()).toBeInViewport();
   await P.page.setViewportSize({ width: 390, height: 430 }); // the keyboard takes the bottom of the screen
-  await expect(bubble(P, 'Message number 14')).toBeInViewport();
+  await expect(P.page.locator('[data-k]').last()).toBeInViewport();
   await P.page.setViewportSize({ width: 390, height: 780 });
 });
 
@@ -116,23 +161,23 @@ test('privacy screen blurs names and older messages; tap or the eye shows them',
   await P.page.getByRole('button', { name: 'Profile and settings' }).click();
   await P.page.getByRole('button', { name: /Privacy/ }).click();
   await P.page.getByRole('switch', { name: 'Blur my chats' }).click();
-  await P.page.getByRole('radio', { name: 'Last 1' }).click();
+  await P.page.getByRole('radio', { name: 'Last 3' }).click();
   await P.page.keyboard.press('Escape');
 
   const row = P.page.locator('aside li').filter({ hasText: Q.u }).locator('.priv').last();
   await expect.poll(() => blurred(row)).toBe(true);
   await P.page.locator('aside li').filter({ hasText: Q.u }).click();
   const last = bubble(P, 'Message number 14').locator('.priv');
-  await expect(last).toHaveCount(0); // the newest message stays readable
-  const older = bubble(P, 'Message number 13');
+  await expect(last).toHaveCount(0); // the newest three (photo, 14, 13) stay readable
+  const older = bubble(P, 'Message number 11');
   await expect.poll(() => blurred(older.locator('.priv'))).toBe(true);
   await older.locator('.priv').tap();
   await expect(older).toHaveAttribute('data-peek', 'true');
   await expect.poll(() => blurred(older.locator('.priv'))).toBe(false);
 
   await P.page.getByRole('button', { name: 'Show chats for 30 seconds' }).click();
-  await expect.poll(() => blurred(bubble(P, 'Message number 12').locator('.priv'))).toBe(false);
+  await expect.poll(() => blurred(bubble(P, 'Message number 10').locator('.priv'))).toBe(false);
   await P.page.getByRole('button', { name: 'Blur chats' }).click();
-  await expect.poll(() => blurred(bubble(P, 'Message number 12').locator('.priv'))).toBe(true);
+  await expect.poll(() => blurred(bubble(P, 'Message number 10').locator('.priv'))).toBe(true);
   for (const p of [P, Q]) expect(p.errors).toEqual([]);
 });

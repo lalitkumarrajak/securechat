@@ -7,6 +7,7 @@ import { FriendsPanel } from './friends/FriendsPanel';
 import { SettingsPanel } from './settings/SettingsPanel';
 import { ContactPanel } from './conversation/ContactPanel';
 import { PhotoViewer } from './conversation/ChatDialogs';
+import { ProfileCard } from './friends/ProfileCard';
 import { NewGameDialog } from './games/NewGameDialog';
 import { useGames } from './games/store';
 
@@ -39,6 +40,7 @@ export function Shell() {
         {panel === 'newgroup' && <NewGroupPanel />}
       </Suspense>
       <NewGameDialog />
+      <ProfileCard />
       <PhotoViewer />
       {gameOpen && <Suspense fallback={null}><GameScreen /></Suspense>}
     </div>

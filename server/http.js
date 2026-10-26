@@ -9,8 +9,9 @@ export const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex')
 
 export const SECURITY_HEADERS = {
   // Scripts are strictly same-origin. Styles allow inline because the UI libraries (Radix, Sonner)
-  // inject small <style> tags; worker-src blob: is for the animated-emoji player.
-  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
+  // inject small <style> tags; worker-src blob: is for the animated-emoji player. 'wasm-unsafe-eval'
+  // (WebAssembly only, not JS eval) lets HEIC/HEIF camera photos be converted on the device.
+  'Content-Security-Policy': "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; " +
     "img-src 'self' data: blob: https://static.klipy.com https://tile.openstreetmap.org; media-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; " +
     "manifest-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
   'X-Content-Type-Options': 'nosniff',

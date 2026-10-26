@@ -17,6 +17,7 @@ import { lockNow } from '../../lib/applock';
 import { togglePeek, usePeek } from '../../lib/privacy';
 import { groupIdOf, isGroup } from '../../lib/types';
 import { openPicker } from '../games/store';
+import { showProfile } from '../friends/ProfileCard';
 
 export function Sidebar() {
   const me = useApp((s) => s.me)!;
@@ -208,10 +209,12 @@ function ChatRow({ chat }: { chat: Chat }) {
   else if (chat.lastOut && chat.last) line = <><Ticks s={chat.lastS ?? 0} className="mr-0.5 inline align-[-3px]" />{chat.last}</>;
 
   return (
-    <li>
-      <button onClick={() => openChat(chat.peer)}
-        className={cn('priv-scope flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-hover', active && 'bg-hover')}>
+    <li className={cn('priv-scope relative flex items-center transition hover:bg-hover', active && 'bg-hover')}>
+      {/* the photo opens their profile card; the rest of the row opens the chat */}
+      <button onClick={() => showProfile(chat.peer)} aria-label={`${name}’s profile`} className="absolute top-1/2 left-3 z-10 -translate-y-1/2 rounded-full">
         <Avatar u={chat.peer} name={name} size={50} online={online} className="priv" />
+      </button>
+      <button onClick={() => openChat(chat.peer)} className="flex w-full items-center gap-3 py-2.5 pr-3 pl-[74px] text-left">
         <span className="priv min-w-0 flex-1 border-b border-line/0 py-0.5">
           <span className="flex items-center gap-2">
             <span className="flex-1 truncate font-medium">{name}</span>

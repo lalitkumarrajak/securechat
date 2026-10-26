@@ -5,6 +5,7 @@ import {
   Smartphone, Sun, Tablet, Trash2, UserRound, MapPin } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
 import { PhotoCropper } from '../../components/PhotoCropper';
+import { pickPhoto } from '../../lib/image';
 import { setChatUi } from '../conversation/chatUi';
 import type { Crop } from '../../lib/image';
 import { Button, IconButton, Spinner } from '../../components/ui/button';
@@ -161,7 +162,7 @@ function Profile() {
             <Camera className="size-5" />
           </button>
         </div>
-        <input ref={file} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setPicked(f); }} />
+        <input ref={file} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) pickPhoto(f).then(setPicked); }} />
         <PhotoCropper file={picked} title="Profile photo" onCancel={() => setPicked(null)} onDone={(crop) => picked && upload(picked, crop)} />
         <p className="mt-3 text-lg font-semibold">{me.name || me.u}</p>
         <p className="text-sm text-muted">@{me.u}{me.about ? ` · ${me.about}` : ''}</p>
