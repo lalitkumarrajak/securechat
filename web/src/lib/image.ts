@@ -38,11 +38,12 @@ export async function squarePhoto(file: Blob, crop?: Crop, size = 512) {
   g.drawImage(bmp, x, y, side, side, 0, 0, canvas.width, canvas.height);
   if ('close' in bmp) bmp.close();
   let url = '';
-  for (const q of [0.85, 0.7, 0.55]) { // the server takes up to 180 000 base64 characters
+  for (const q of [0.85, 0.7, 0.55, 0.4]) { // the server takes up to 180 000 base64 characters
     url = canvas.toDataURL('image/webp', q);
     if (!url.startsWith('data:image/webp')) url = canvas.toDataURL('image/jpeg', q);
     if (url.length < 170_000) break;
   }
+  if (url.length >= 170_000 && size > 256) return squarePhoto(file, crop, 256); // a very detailed photo: smaller still
   return url.slice(url.indexOf(',') + 1);
 }
 

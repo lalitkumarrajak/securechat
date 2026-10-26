@@ -153,6 +153,10 @@ html[data-away]::after {
   background: color-mix(in oklab, var(--bg) 35%, transparent);
   -webkit-backdrop-filter: blur(28px); backdrop-filter: blur(28px);
 }
+/* Browsers without backdrop blur: cover the screen completely instead. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html[data-away]::after { background: var(--bg); }
+}
 
 /* Lottie draws an <svg> sized by its own attributes; make it fill the emoji box. */
 .big-emoji svg { width: 100% !important; height: 100% !important; }

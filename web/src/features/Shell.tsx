@@ -8,6 +8,7 @@ import { SettingsPanel } from './settings/SettingsPanel';
 import { ContactPanel } from './conversation/ContactPanel';
 import { PhotoViewer } from './conversation/ChatDialogs';
 import { ProfileCard } from './friends/ProfileCard';
+import { PhotoGallery } from './conversation/PhotoGallery';
 import { NewGameDialog } from './games/NewGameDialog';
 import { useGames } from './games/store';
 
@@ -42,6 +43,7 @@ export function Shell() {
       <NewGameDialog />
       <ProfileCard />
       <PhotoViewer />
+      <PhotoGallery />
       {gameOpen && <Suspense fallback={null}><GameScreen /></Suspense>}
     </div>
   );

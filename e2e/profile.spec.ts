@@ -2,7 +2,7 @@
 // keyboard already focused, keeping messages above the keyboard, and the privacy screen.
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
-import { bubble, phone, signUp, swipeRight, testPng, uname, type Phone } from './helpers';
+import { bubble, longPress, phone, signUp, swipeRight, testPng, uname, type Phone } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -108,20 +108,61 @@ test('camera photos without a file type still send', async () => {
   await expect(Q.page.locator('[data-k] img[alt="Photo"]')).toHaveCount(1, { timeout: 15_000 });
 });
 
-test('several photos at once: review, remove one, caption, send in order', async () => {
-  const before = await Q.page.locator('[data-k] img[alt="Photo"]').count();
+test('several photos at once: review, swipe, remove, caption; they arrive as one album', async () => {
+  const drag = async (page: import('@playwright/test').Page, el: import('@playwright/test').Locator, by: number) => {
+    await expect(el).toBeInViewport({ ratio: 1 }); // the slide animation has finished
+    const r = (await el.boundingBox())!;
+    await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(r.x + r.width / 2 + by, r.y + r.height / 2, { steps: 8 });
+    await page.mouse.up();
+  };
   await P.page.locator('input[data-kind="gallery"]').setInputFiles([1, 2, 3].map((n) => ({ name: `pic${n}.png`, mimeType: 'image/png', buffer: testPng(200 + n * 40, 150) })));
   const review = P.page.getByRole('dialog', { name: new RegExp(`photos? to ${Q.u}`) });
   await expect(review.getByRole('heading', { name: `3 photos to ${Q.u}` })).toBeVisible();
+  await drag(P.page, review.getByRole('img', { name: 'Photo 1 of 3' }), -200); // swipe to the next one
+  await expect(review.getByRole('img', { name: 'Photo 2 of 3' })).toBeVisible();
   await review.getByRole('button', { name: 'Remove photo 3' }).click();
-  await review.getByRole('button', { name: 'Photo 2', exact: true }).click();
   await review.getByRole('textbox', { name: 'Caption' }).fill('Look at this view');
   await review.getByRole('button', { name: 'Send 2 photos' }).click();
   await expect(review).toBeHidden();
-  await expect(Q.page.locator('[data-k] img[alt="Photo"]')).toHaveCount(before + 2, { timeout: 20_000 });
-  const last = Q.page.locator('[data-k]').last();
-  await expect(last).toContainText('Look at this view'); // the caption went with the second photo, sent last
-  await expect(last.locator('img[alt="Photo"]')).toHaveAttribute('width', '280');
+
+  // One bubble with both photos and the caption, on both phones
+  for (const p of [P, Q]) {
+    const album = p.page.getByRole('group', { name: '2 photos' }).last();
+    await expect(album.getByRole('img')).toHaveCount(2, { timeout: 20_000 });
+    await expect(p.page.locator('[data-k]').last()).toContainText('Look at this view');
+  }
+
+  // The viewer swipes through all the chat's photos, both ways
+  await Q.page.getByRole('group', { name: '2 photos' }).last().getByRole('button', { name: 'View photo 1 of 2' }).click();
+  const viewer = Q.page.getByRole('dialog').filter({ has: Q.page.getByRole('button', { name: 'Close' }) }).last();
+  const counter = async () => Number((await viewer.getByText(/^\d+ of \d+$/).textContent())!.split(' ')[0]);
+  const start = await counter();
+  await expect(viewer.getByText('Look at this view')).toHaveCount(0); // that caption is on the second photo
+  await Q.page.keyboard.press('ArrowRight');
+  await expect.poll(counter).toBe(start + 1);
+  await expect(viewer.getByText('Look at this view')).toBeVisible();
+  await drag(Q.page, viewer.getByRole('img', { name: new RegExp(`Photo ${start + 1} of`) }), 220); // swipe back
+  await expect.poll(counter).toBe(start);
+  await drag(Q.page, viewer.getByRole('img', { name: new RegExp(`Photo ${start} of`) }), 220); // and further back, to older photos
+  await expect.poll(counter).toBe(start - 1);
+  await Q.page.keyboard.press('Escape');
+});
+
+test('a big album shows four tiles and "+N"; long-press acts on the whole album', async () => {
+  await P.page.locator('input[data-kind="gallery"]').setInputFiles([1, 2, 3, 4, 5, 6].map((n) => ({ name: `b${n}.png`, mimeType: 'image/png', buffer: testPng(160 + n * 10, 120) })));
+  await P.page.getByRole('button', { name: 'Send 6 photos' }).click();
+  const album = Q.page.getByRole('group', { name: '6 photos' });
+  await expect(album.getByRole('img')).toHaveCount(4, { timeout: 30_000 });
+  await expect(album).toContainText('+2');
+  await longPress(P, P.page.getByRole('group', { name: '6 photos' }));
+  const sheet = P.page.getByRole('dialog', { name: 'Message options' });
+  await expect(sheet).toContainText('📷 6 photos');
+  await sheet.getByRole('button', { name: 'Delete' }).click();
+  await P.page.getByRole('button', { name: 'Delete for everyone' }).click();
+  await expect(Q.page.getByRole('group', { name: '6 photos' })).toHaveCount(0, { timeout: 15_000 });
+  await expect(Q.page.getByRole('log').getByText('This message was deleted')).toHaveCount(6);
 });
 
 // Needs a real HEIC photo, e.g. libheif's examples/example.heic: HEIC_SAMPLE=/path/to/photo.heic
@@ -189,8 +230,7 @@ test('privacy screen blurs names and older messages; tap or the eye shows them',
   const row = P.page.locator('aside li').filter({ hasText: Q.u }).locator('.priv').last();
   await expect.poll(() => blurred(row)).toBe(true);
   await P.page.locator('aside li').filter({ hasText: Q.u }).click();
-  const last = bubble(P, 'Message number 14').locator('.priv');
-  await expect(last).toHaveCount(0); // the newest five (photos, then 14…) stay readable
+  await expect(P.page.locator('[data-k]').last().locator('.priv')).toHaveCount(0); // the newest stay readable
   const older = bubble(P, 'Message number 11');
   await expect.poll(() => blurred(older.locator('.priv'))).toBe(true);
   await older.locator('.priv').tap();
@@ -202,4 +242,89 @@ test('privacy screen blurs names and older messages; tap or the eye shows them',
   await P.page.getByRole('button', { name: 'Blur chats' }).click();
   await expect.poll(() => blurred(bubble(P, 'Message number 10').locator('.priv'))).toBe(true);
   for (const p of [P, Q]) expect(p.errors).toEqual([]);
+});
+
+test('scrolling up loads older messages; search and jumps reach them too', async () => {
+  // 400 older messages already on this phone (typing them would take minutes)
+  await P.page.evaluate(async (peer) => {
+    const db = await new Promise<IDBDatabase>((res, rej) => { const r = indexedDB.open('chattrix'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+    const tx = db.transaction('msgs', 'readwrite');
+    const base = Date.now() - 3 * 864e5;
+    for (let i = 1; i <= 400; i++) {
+      tx.objectStore('msgs').put({ k: `${peer}/old${i}`, cid: `old${i}`, peer, out: false, ts: base + i * 1000, s: 2, type: 'text', text: i === 5 ? 'Remember the old picnic?' : `Old message ${i}` });
+    }
+    await new Promise((res) => { tx.oncomplete = res; });
+  }, Q.u);
+  const reopen = async () => {
+    await P.page.getByRole('button', { name: 'Back' }).click();
+    await P.page.locator('aside li').filter({ hasText: Q.u }).click();
+    await expect(bubble(P, 'Message number 14')).toBeAttached();
+  };
+  const oldest = P.page.getByText('Old message 1', { exact: true });
+  await reopen();
+  await expect(oldest).toHaveCount(0); // only the newest are loaded
+
+  // Search finds a message far up, and jumping to it loads back to it
+  await P.page.getByRole('button', { name: 'Chat options' }).click();
+  await P.page.getByRole('menuitem', { name: 'Search' }).click();
+  await P.page.getByPlaceholder('Search messages').fill('picnic');
+  const hit = bubble(P, 'Remember the old picnic?');
+  await expect(hit.locator('mark')).toHaveText('picnic');
+  await expect(hit).toBeInViewport();
+  await P.page.getByRole('button', { name: 'Close search' }).click();
+
+  // Scrolling up loads a page at a time, keeping what you were reading in place
+  await reopen();
+  const log = P.page.locator('[role=log]');
+  const firstLoaded = P.page.locator('[data-k]').first();
+  const k = await firstLoaded.getAttribute('data-k');
+  await log.evaluate((el) => { el.scrollTop = 0; });
+  await expect.poll(() => P.page.locator('[data-k]').first().getAttribute('data-k')).not.toBe(k); // older ones came in above
+  await expect(P.page.locator(`[data-k="${k}"]`)).toBeInViewport(); // and you stayed where you were
+  for (let i = 0; i < 10 && !(await oldest.count()); i++) {
+    await log.evaluate((el) => { el.scrollTop = 0; });
+    await P.page.waitForTimeout(300);
+  }
+  await expect(oldest).toHaveCount(1); // all the way to the first message
+  await expect(P.page.getByRole('status', { name: 'Loading older messages' })).toHaveCount(0);
+  expect(P.errors).toEqual([]);
+});
+
+test('phones with the old on-device storage upgrade without losing messages', async ({ browser }) => {
+  const R = await phone(browser, uname('rex'));
+  await R.page.goto('/');
+  // The version-1 database exactly as earlier versions of the app created it, with a message in it
+  await R.page.evaluate(async () => {
+    await new Promise((res) => { const r = indexedDB.deleteDatabase('chattrix'); r.onsuccess = r.onerror = r.onblocked = res; });
+    const db = await new Promise<IDBDatabase>((res, rej) => {
+      const r = indexedDB.open('chattrix', 1);
+      r.onupgradeneeded = () => {
+        const d = r.result;
+        d.createObjectStore('kv');
+        const msgs = d.createObjectStore('msgs', { keyPath: 'k' });
+        msgs.createIndex('peer_ts', ['peer', 'ts']);
+        msgs.createIndex('id', 'id');
+        d.createObjectStore('outbox', { keyPath: 'cid' });
+        d.createObjectStore('chats', { keyPath: 'peer' });
+        d.createObjectStore('peers', { keyPath: 'u' });
+        d.createObjectStore('avatars', { keyPath: 'u' });
+      };
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    });
+    const tx = db.transaction('msgs', 'readwrite');
+    tx.objectStore('msgs').put({ k: 'old/1', cid: '1', peer: 'old', out: false, ts: 1, s: 2, type: 'img', src: 'data:image/png;base64,AA', w: 1, h: 1 });
+    await new Promise((res) => { tx.oncomplete = res; });
+    db.close();
+  });
+  await R.page.reload();
+  await expect(R.page.getByRole('tab', { name: 'Sign in' })).toBeVisible();
+  const after = await R.page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((res, rej) => { const r = indexedDB.open('chattrix'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+    const store = db.transaction('msgs').objectStore('msgs');
+    const keys = await new Promise<IDBValidKey[]>((res) => { const r = store.index('peer_type_ts').getAllKeys(); r.onsuccess = () => res(r.result); });
+    return { version: db.version, keys };
+  });
+  expect(after).toEqual({ version: 2, keys: ['old/1'] }); // upgraded, message kept, and the new photo index finds it
+  expect(R.errors).toEqual([]);
+  await R.ctx.close();
 });

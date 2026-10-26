@@ -115,9 +115,10 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
     setApp({ replyTo: null });
     const t = items.length > 1 ? toast.loading(`Sending ${items.length} photos…`) : undefined;
     let failed = 0;
+    const album = items.length > 1 ? crypto.randomUUID().replace(/-/g, '').slice(0, 16) : undefined; // shown together as one grid
     for (const [n, x] of items.entries()) {
       if (t) toast.loading(`Sending photo ${n + 1} of ${items.length}…`, { id: t });
-      try { await sendPhoto(peer, x.file, re, x.caption); re = null; }
+      try { await sendPhoto(peer, x.file, re, x.caption, album); re = null; }
       catch (e) { failed++; if (!t) toast.error((e as Error).message || 'Couldn’t send that photo'); }
     }
     if (t) {

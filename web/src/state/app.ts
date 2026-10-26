@@ -22,6 +22,7 @@ export interface AppState {
   chats: Chat[];                         // newest first
   active: string | null;                 // open chat
   messages: Msg[];                       // messages of the open chat, oldest first
+  olderLeft: boolean;                    // the open chat has older messages on this device, not loaded yet
   presence: Record<string, Presence>;
   typing: Record<string, 'typing' | 'recording'>;
   typingWho: Record<string, string>;     // group peer -> who is typing there
@@ -55,6 +56,7 @@ export const useApp = create<AppState>(() => ({
   chats: [],
   active: null,
   messages: [],
+  olderLeft: false,
   presence: {},
   typing: {},
   typingWho: {},

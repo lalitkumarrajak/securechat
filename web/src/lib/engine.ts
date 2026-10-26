@@ -488,10 +488,53 @@ async function saveChat(chat: Chat) {
   setApp((s) => ({ chats: sortChats([...s.chats.filter((c) => c.peer !== chat.peer), chat]) }));
 }
 
+// A chat opens with its newest messages; older ones load as you scroll up (loadOlder).
+const PAGE = 150;
+
 async function loadMessages(peer: string) {
-  const msgs = await db.recentMessages(peer);
-  if (getApp().active === peer) setApp({ messages: msgs });
+  const unread = getApp().chats.find((c) => c.peer === peer)?.unread || 0;
+  const limit = Math.max(PAGE, unread + 30); // always include the first unread message
+  const msgs = await db.recentMessages(peer, limit);
+  if (getApp().active === peer) setApp({ messages: msgs, olderLeft: msgs.length >= limit });
 }
+
+let loadingOlder: Promise<number> | null = null;
+/** Loads the next older page of the open chat (or back to `from`, for jumps). Returns how many were added. */
+export function loadOlder(from?: number): Promise<number> {
+  return (loadingOlder ??= (async () => {
+    const s = getApp();
+    const peer = s.active;
+    if (!peer || !s.olderLeft || !s.messages.length) return 0;
+    // Messages sent in the same millisecond as the oldest loaded one come back too; those we have are skipped.
+    const oldest = s.messages[0].ts;
+    const same = s.messages.filter((m) => m.ts === oldest).length;
+    const limit = from !== undefined ? Infinity : PAGE + same;
+    const got = await db.olderMessages(peer, oldest, limit, from);
+    const have = new Set(s.messages.map((m) => m.k));
+    const add = got.filter((m) => !have.has(m.k));
+    if (getApp().active !== peer) return 0;
+    setApp((st) => ({ messages: [...add, ...st.messages], olderLeft: from !== undefined || got.length >= limit }));
+    return add.length;
+  })().finally(() => { loadingOlder = null; }));
+}
+
+/** Makes sure a message is in the open chat's list (for jumping to a reply, a pin or a search hit). */
+export async function loadUntil(k: string) {
+  if (getApp().messages.some((m) => m.k === k)) return true;
+  const target = await db.getMsg(k);
+  if (!target || target.peer !== getApp().active) return false;
+  for (let i = 0; i < 2 && !getApp().messages.some((m) => m.k === k); i++) await loadOlder(target.ts); // twice: a page may be loading already
+  return getApp().messages.some((m) => m.k === k);
+}
+
+/** The text of every message in a chat on this device, for searching it (no photos or files, so it stays small). */
+export const messageTexts = (peer: string) => db.messageTexts(peer);
+
+/** A message from this device, loaded or not (pinned messages far up the chat). */
+export const findMessage = (k: string) => db.getMsg(k);
+
+/** Every photo in a chat, oldest first, for swiping through them. */
+export const photoKeys = (peer: string) => db.photoKeys(peer);
 
 /** Insert or replace a message in the open chat's list. */
 function showMessage(m: Msg) {
@@ -499,6 +542,8 @@ function showMessage(m: Msg) {
     if (s.active !== m.peer) return {};
     const i = s.messages.findIndex((x) => x.k === m.k);
     if (i >= 0) { const messages = s.messages.slice(); messages[i] = m; return { messages }; }
+    // An edit or reaction to a message further up than what's loaded: it shows when you scroll there.
+    if (s.olderLeft && s.messages.length && m.ts < s.messages[0].ts) return {};
     const messages = [...s.messages, m];
     if (messages.length > 1 && messages[messages.length - 2].ts > m.ts) messages.sort((a, b) => a.ts - b.ts);
     return { messages };
@@ -538,6 +583,10 @@ const replyOf = (r: any) =>
   r && typeof r.f === 'string' && typeof r.c === 'string' && typeof r.p === 'string'
     ? { f: r.f.slice(0, 24), c: r.c.slice(0, 40), p: r.p.slice(0, 120) } : undefined;
 
+const PHOTO_SRC = /^data:image\/(webp|jpeg|png|gif|avif);base64,/;
+const ALBUM_ID = /^[A-Za-z0-9_-]{6,32}$/; // photos sent together share one
+const MAX_PHOTO_SRC = 3_000_000; // the app sends photos of at most ~1.4 MB; anything far bigger is refused
+
 /** Validate decrypted content into the fields a Msg may carry. */
 function pick(c: any): Partial<Msg> {
   const extra = { ...(replyOf(c.re) && { re: replyOf(c.re) }), ...(c.fwd === true && { fwd: true }) };
@@ -556,8 +605,12 @@ function pick(c: any): Partial<Msg> {
   if (c.type === 'location' && Number.isFinite(c.lat) && Number.isFinite(c.lng) && Math.abs(c.lat) <= 90 && Math.abs(c.lng) <= 180) {
     return { type: 'location', loc: { lat: +c.lat, lng: +c.lng, acc: Math.max(0, +c.acc || 0) }, ...extra };
   }
-  if (c.type === 'img' && typeof c.src === 'string' && c.src.startsWith('data:image/')) {
-    return { type: 'img', src: c.src, w: c.w | 0, h: c.h | 0, text: typeof c.text === 'string' ? c.text : '', ...extra };
+  // Photos are always re-encoded by the sender's app, so only real photo formats are accepted (never SVG).
+  if (c.type === 'img' && typeof c.src === 'string' && c.src.length <= MAX_PHOTO_SRC && PHOTO_SRC.test(c.src)) {
+    return {
+      type: 'img', src: c.src, w: c.w | 0, h: c.h | 0, text: typeof c.text === 'string' ? c.text.slice(0, 2000) : '', ...extra,
+      ...(typeof c.al === 'string' && ALBUM_ID.test(c.al) && { al: c.al }),
+    };
   }
   // GIFs and KLIPY stickers are only ever loaded from KLIPY's CDN; built-in stickers are "noto:<emoji>".
   if (c.type === 'gif' && typeof c.src === 'string' && c.src.startsWith(KLIPY_MEDIA)) {
@@ -952,9 +1005,9 @@ export async function fetchLinkPreview(url: string): Promise<LinkPreview | null>
   } catch { return null; }
 }
 
-export async function sendPhoto(peer: string, file: File, re?: Msg | null, caption = '') {
+export async function sendPhoto(peer: string, file: File, re?: Msg | null, caption = '', album?: string) {
   const img = await compressImage(file);
-  await sendContent(peer, { type: 'img', ...img, text: caption.trim(), ...(re && { re: replyRef(re) }) });
+  await sendContent(peer, { type: 'img', ...img, text: caption.trim(), ...(re && { re: replyRef(re) }), ...(album && { al: album }) });
 }
 
 export async function sendVoice(peer: string, rec: { src: string; dur: number; peaks: number[] }, re?: Msg | null) {
@@ -1065,7 +1118,7 @@ export async function openChat(peer: string) {
   if (!history.state?.chat) history.pushState({ chat: true }, '');
   setApp({
     active: peer, panel: null,
-    ...(prev !== peer && { messages: [], replyTo: null, editing: null, selection: null, searchOpen: false, searchQuery: '', highlight: null }),
+    ...(prev !== peer && { messages: [], olderLeft: false, replyTo: null, editing: null, selection: null, searchOpen: false, searchQuery: '', highlight: null }),
   });
   if (!(await db.getChat(peer))) await saveChat(newChat(peer));
   await loadMessages(peer);
@@ -1074,7 +1127,7 @@ export async function openChat(peer: string) {
   askNotifyPermissionOnce();
 }
 
-const closedChat = { active: null, messages: [], replyTo: null, editing: null, selection: null, searchOpen: false, searchQuery: '', highlight: null };
+const closedChat = { active: null, messages: [], olderLeft: false, replyTo: null, editing: null, selection: null, searchOpen: false, searchQuery: '', highlight: null };
 
 /** Remove a chat and its messages from this device (e.g. a group you left). */
 export async function deleteChatHere(peer: string) {
@@ -1153,8 +1206,9 @@ function alertIncoming(peer: string, msg: Msg) {
   // Hidden tab: if push is on the server notifies; otherwise show a notification from the page.
   if (!visible() && !useSettings.getState().push && 'Notification' in window && Notification.permission === 'granted') {
     const group = isGroup(peer) ? getApp().groups[groupIdOf(peer)] : undefined;
-    const name = group?.name || getApp().friends[peer]?.name || peer;
-    const body = group ? `${nameOf(senderOf(msg), group)}${mentioned ? ' mentioned you' : ''}: ${preview(msg)}` : preview(msg);
+    const hide = useSettings.getState().privacyScreen; // privacy screen: no names or text on the lock screen either
+    const name = hide ? 'Chattrix' : group?.name || getApp().friends[peer]?.name || peer;
+    const body = hide ? 'New message' : group ? `${nameOf(senderOf(msg), group)}${mentioned ? ' mentioned you' : ''}: ${preview(msg)}` : preview(msg);
     navigator.serviceWorker?.ready.then((reg) => reg.showNotification(name, {
       body, icon: '/icon-192.png', tag: 'chat-' + peer, data: { peer },
     })).catch(() => {});

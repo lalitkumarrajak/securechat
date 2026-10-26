@@ -32,6 +32,7 @@ export interface Msg {
   sys?: SysEvent;
   pending?: boolean;      // group message whose key hasn't arrived yet
   mn?: string[];          // usernames @mentioned (groups)
+  al?: string;            // album: photos sent together share this id and show as one grid
 }
 
 export interface Pin { k: string; ts: number }
@@ -74,7 +75,7 @@ export type Content =
   | { type: 'text'; text: string; re?: Reply; fwd?: boolean; lp?: LinkPreview }
   | { type: 'file'; src: string; name: string; size: number; mime: string; thumb?: string; text?: string; pages?: number; re?: Reply; fwd?: boolean }
   | { type: 'location'; lat: number; lng: number; acc: number; re?: Reply; fwd?: boolean }
-  | { type: 'img'; src: string; w: number; h: number; text?: string; re?: Reply; fwd?: boolean }
+  | { type: 'img'; src: string; w: number; h: number; text?: string; re?: Reply; fwd?: boolean; al?: string }
   | { type: 'voice'; src: string; dur: number; peaks: number[]; re?: Reply; fwd?: boolean }
   | { type: 'gif'; src: string; w: number; h: number; re?: Reply; fwd?: boolean }
   | { type: 'sticker'; src: string; w?: number; h?: number; re?: Reply; fwd?: boolean }

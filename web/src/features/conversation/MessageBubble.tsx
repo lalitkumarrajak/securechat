@@ -13,7 +13,7 @@ import { setApp, useApp } from '../../state/app';
 import { BigEmoji, Emoji } from './BigEmoji';
 import { FileCard, LinkPreviewCard, LocationCard } from './Attachments';
 import { VoicePlayer } from './VoicePlayer';
-import { actionsFor, canReact, myReaction, reactTo, setChatUi, startReply, type Action } from './chatUi';
+import { actionsFor, canReact, myReaction, openGallery, reactTo, setChatUi, startReply, type Action } from './chatUi';
 
 export const ICONS: Record<string, React.ReactNode> = {
   retry: <RotateCcw />, reply: <Reply />, copy: <Copy />, forward: <Forward />, pin: <Pin />, edit: <Pencil />,
@@ -29,6 +29,7 @@ interface Props {
   selected: boolean;
   pinned: boolean;
   hidden?: boolean;    // privacy screen: blurred until hovered or tapped
+  album?: Msg[];       // photos sent together (m is the last): shown as one grid
 }
 
 // In groups, everyone's name gets its own steady colour, like WhatsApp.
@@ -40,7 +41,7 @@ export function useMemberName() {
   return (u: string, g?: Group, me?: string) => (u === me ? 'You' : friends[u]?.name || g?.members.find((x) => x.u === u)?.n || u);
 }
 
-export const MessageBubble = memo(function MessageBubble({ m, me, peerName, first, selecting, selected, pinned, hidden }: Props) {
+export const MessageBubble = memo(function MessageBubble({ m, me, peerName, first, selecting, selected, pinned, hidden, album }: Props) {
   const group = useApp((s) => (isGroup(m.peer) ? s.groups[groupIdOf(m.peer)] : undefined));
   const memberName = useMemberName();
   const from = senderOf(m);
@@ -64,7 +65,7 @@ export const MessageBubble = memo(function MessageBubble({ m, me, peerName, firs
       p.long = true;
       navigator.vibrate?.(12);
       if (selecting) toggleSelect();
-      else setChatUi({ sheet: m });
+      else setChatUi({ sheet: m, sheetAlbum: album || null });
     }, 450);
     press.current = p;
   };
@@ -101,7 +102,8 @@ export const MessageBubble = memo(function MessageBubble({ m, me, peerName, firs
   function toggleSelect() {
     setApp((s) => {
       const sel = s.selection || [];
-      const next = sel.includes(m.k) ? sel.filter((k) => k !== m.k) : [...sel, m.k];
+      const ks = album ? album.map((x) => x.k) : [m.k]; // an album is selected as a whole
+      const next = ks.every((k) => sel.includes(k)) ? sel.filter((k) => !ks.includes(k)) : [...new Set([...sel, ...ks])];
       return { selection: next.length ? next : null };
     });
   }
@@ -123,6 +125,7 @@ export const MessageBubble = memo(function MessageBubble({ m, me, peerName, firs
     <div
       ref={row}
       data-k={m.k}
+      data-keys={album ? album.map((x) => x.k).join(' ') : undefined}
       data-peek={peek || undefined}
       className={cn('group relative flex touch-pan-y items-end gap-2 px-3 transition-transform md:px-[6%] pointer-coarse:select-none pointer-coarse:[-webkit-touch-callout:none]', first ? 'mt-2' : 'mt-0.5',
         m.out ? 'justify-end' : 'justify-start', selected && 'bg-accent/10', selecting && 'cursor-pointer', hidden && 'priv-scope')}
@@ -156,21 +159,42 @@ export const MessageBubble = memo(function MessageBubble({ m, me, peerName, firs
           (m.type === 'img' || m.type === 'gif') && 'p-1',
         )}>
           {!selecting && !deleted && !isTouch() && (
-            <DesktopMenu m={m} open={menuOpen} onOpenChange={setMenuOpen} bare={bare} />
+            <DesktopMenu m={m} album={album} open={menuOpen} onOpenChange={setMenuOpen} bare={bare} />
           )}
           {showSender && (
             <div className="px-0.5 pb-0.5 text-[13px] font-semibold" style={{ color: `hsl(${nameHue(from)} 55% 45%)` }}>{memberName(from, group)}</div>
           )}
           {m.fwd && <div className="flex items-center gap-1 px-0.5 text-xs text-muted italic"><Forward className="size-3" /> Forwarded</div>}
           {m.re && <Quote re={m.re} me={me} peerName={isGroup(m.peer) ? memberName(m.re.f, group) : peerName} />}
-          <Body m={m} emoji={emoji} me={me} members={group?.members.map((x) => x.u)} />
-          <Meta m={m} pinned={pinned} bare={bare} />
+          {album ? <Album album={album} /> : <Body m={m} emoji={emoji} me={me} members={group?.members.map((x) => x.u)} />}
+          <Meta m={m} pinned={pinned} bare={bare} {...(album && { onPhoto: !album.some((x) => x.text) })} />
         </div>
         {m.reacts && Object.keys(m.reacts).length > 0 && <Reactions m={m} me={me} />}
       </div>
     </div>
   );
 });
+
+/** Photos sent together: a grid of up to four, the last showing "+N" for the rest, like WhatsApp. */
+function Album({ album }: { album: Msg[] }) {
+  const shown = album.slice(0, 4);
+  const more = album.length - shown.length;
+  const caption = album.findLast((x) => x.text)?.text;
+  return (
+    <>
+      <div className={cn('grid w-[min(280px,68vw)] gap-1', shown.length > 1 && 'grid-cols-2')} role="group" aria-label={`${album.length} photos`}>
+        {shown.map((x, n) => (
+          <button key={x.k} onClick={(e) => { e.stopPropagation(); openGallery(x); }} aria-label={`View photo ${n + 1} of ${album.length}`}
+            className={cn('relative block aspect-square overflow-hidden rounded-xl bg-panel-2', shown.length === 3 && n === 0 && 'col-span-2 aspect-[2/1]')}>
+            <img src={x.src} alt="Photo" loading="lazy" className="size-full object-cover" />
+            {more > 0 && n === 3 && <span className="absolute inset-0 grid place-items-center bg-black/50 text-2xl font-semibold text-white">+{more}</span>}
+          </button>
+        ))}
+      </div>
+      {caption && <p className="px-1.5 pt-1 whitespace-pre-wrap [overflow-wrap:anywhere]"><Marked text={caption} /></p>}
+    </>
+  );
+}
 
 function Body({ m, emoji, me, members }: { m: Msg; emoji: string[] | null; me: string; members?: string[] }) {
   if (m.type === 'deleted') {
@@ -187,7 +211,7 @@ function Body({ m, emoji, me, members }: { m: Msg; emoji: string[] | null; me: s
   if (m.type === 'img') {
     return (
       <>
-        <button className="block" onClick={(e) => { e.stopPropagation(); setChatUi({ viewer: m.src! }); }} aria-label="View photo">
+        <button className="block" onClick={(e) => { e.stopPropagation(); openGallery(m); }} aria-label="View photo">
           <img src={m.src} alt="Photo" loading="lazy" width={m.w || undefined} height={m.h || undefined}
             className="block h-auto max-h-80 w-auto max-w-[min(300px,70vw)] rounded-xl object-cover" />
         </button>
@@ -245,10 +269,10 @@ function Marked({ text }: { text: string }) {
   return <>{out}</>;
 }
 
-function Meta({ m, pinned, bare }: { m: Msg; pinned: boolean; bare: boolean }) {
+function Meta({ m, pinned, bare, onPhoto = (m.type === 'img' && !m.text) || m.type === 'gif' }: { m: Msg; pinned: boolean; bare: boolean; onPhoto?: boolean }) {
   return (
     <span className={cn('float-right ml-2 flex translate-y-1 items-center gap-1 text-[11px] text-muted select-none',
-      ((m.type === 'img' && !m.text) || m.type === 'gif') && 'absolute right-2 bottom-2 translate-y-0 rounded-full bg-black/45 px-1.5 py-0.5 text-white',
+      onPhoto && 'absolute right-2 bottom-2 translate-y-0 rounded-full bg-black/45 px-1.5 py-0.5 text-white',
       (m.type === 'voice' || m.type === 'file' || m.type === 'location') && 'float-none mt-1 justify-end translate-y-0',
       bare && 'float-none mt-1 justify-end rounded-full bg-bubble-in px-2 py-0.5 shadow-bubble')}>
       {pinned && <Pin className="size-3" aria-label="Pinned" />}
@@ -286,8 +310,8 @@ function Reactions({ m, me }: { m: Msg; me: string }) {
 }
 
 /** Hover chevron (and right-click) menu on desktop, with quick reactions on top. */
-function DesktopMenu({ m, open, onOpenChange, bare }: { m: Msg; open: boolean; onOpenChange: (o: boolean) => void; bare: boolean }) {
-  const actions = actionsFor(m);
+function DesktopMenu({ m, album, open, onOpenChange, bare }: { m: Msg; album?: Msg[]; open: boolean; onOpenChange: (o: boolean) => void; bare: boolean }) {
+  const actions = actionsFor(m, album);
   return (
     <M.Root open={open} onOpenChange={onOpenChange} modal={false}>
       <M.Trigger asChild>

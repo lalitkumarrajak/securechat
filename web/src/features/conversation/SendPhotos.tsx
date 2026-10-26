@@ -5,9 +5,10 @@ import * as D from '@radix-ui/react-dialog';
 import { Plus, SendHorizontal, X } from 'lucide-react';
 import { Spinner } from '../../components/ui/button';
 import { readablePhoto } from '../../lib/image';
+import { useSwipe } from '../../lib/swipe';
 import { cn } from '../../lib/utils';
 
-export const MAX_PHOTOS = 30;
+export const MAX_PHOTOS = 100;
 
 export interface PhotoItem { id: number; file: File; caption: string }
 let nextId = 1;
@@ -22,6 +23,7 @@ export function SendPhotos({ items, to, onChange, onSend, onClose }: {
   const i = Math.min(current, items.length - 1);
   const cur = items[i];
   const urls = usePreviews(items);
+  const swipe = useSwipe(i > 0 ? () => setCurrent(i - 1) : null, i < items.length - 1 ? () => setCurrent(i + 1) : null);
 
   const remove = (id: number) => {
     const rest = items.filter((x) => x.id !== id);
@@ -44,8 +46,9 @@ export function SendPhotos({ items, to, onChange, onSend, onClose }: {
             )}
           </header>
 
-          <div className="grid min-h-0 flex-1 place-items-center p-2">
-            {urls[cur.id] ? <img src={urls[cur.id]} alt={`Photo ${i + 1} of ${items.length}`} className="max-h-full max-w-full object-contain" />
+          <div className="grid min-h-0 flex-1 touch-none place-items-center overflow-hidden p-2 select-none" {...swipe.handlers}>
+            {urls[cur.id] ? <img src={urls[cur.id]} alt={`Photo ${i + 1} of ${items.length}`} draggable={false}
+              className={cn('max-h-full max-w-full object-contain', !swipe.dragging && 'transition-transform duration-150')} style={{ transform: `translateX(${swipe.dx}px)` }} />
               : <Spinner className="size-8" />}
           </div>
 

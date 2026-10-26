@@ -9,7 +9,7 @@ import { Button, IconButton } from '../../components/ui/button';
 import { confirm } from '../../components/ui/confirm';
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuSub, MenuSubContent, MenuSubTrigger, MenuTrigger } from '../../components/ui/menu';
 import {
-  acceptRequest, blockUser, closeChat, copyMessages, deleteChatHere, isMuted, mute, preview, removeFriend, sendRequest, setArchived, togglePin, unblockUser,
+  acceptRequest, blockUser, findMessage, messageTexts, closeChat, copyMessages, deleteChatHere, isMuted, mute, preview, removeFriend, sendRequest, setArchived, togglePin, unblockUser,
 } from '../../lib/engine';
 import { fmtLastSeen } from '../../lib/format';
 import { displayName } from '../../lib/types';
@@ -24,6 +24,7 @@ import { useGames } from '../games/store';
 import { groupIdOf, isGroup } from '../../lib/types';
 import { leaveGroup } from '../../lib/groups';
 import { canEdit } from '../../lib/controls';
+import type { Msg } from '../../lib/types';
 import { PeekButton } from '../sidebar/Sidebar';
 
 export function EmptyPane() {
@@ -291,12 +292,19 @@ function SelectionBar() {
 
 function SearchBar() {
   const messages = useApp((s) => s.messages);
+  const peer = useApp((s) => s.active);
   const query = useApp((s) => s.searchQuery);
   const [index, setIndex] = useState(-1); // -1: haven't jumped yet
+  // The whole chat on this device, not just what's loaded on screen; the loaded ones are the freshest copies.
+  const [stored, setStored] = useState<Pick<Msg, 'k' | 'ts' | 'text' | 'type'>[]>([]);
+  useEffect(() => { if (peer) messageTexts(peer).then(setStored); }, [peer]);
   const hits = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return q ? messages.filter((m) => m.text?.toLowerCase().includes(q)).reverse() : []; // newest first
-  }, [messages, query]);
+    if (!q) return [];
+    const byK = new Map<string, Pick<Msg, 'k' | 'ts' | 'text' | 'type'>>(stored.map((m) => [m.k, m]));
+    for (const m of messages) byK.set(m.k, m);
+    return [...byK.values()].filter((m) => m.type !== 'deleted' && m.text?.toLowerCase().includes(q)).sort((a, b) => b.ts - a.ts); // newest first
+  }, [messages, stored, query]);
 
   const go = (i: number) => {
     if (!hits.length) return;
@@ -333,7 +341,12 @@ function PinnedBar({ peer }: { peer: string }) {
   const pins = useApp((s) => s.chats.find((c) => c.peer === peer)?.pins);
   const messages = useApp((s) => s.messages);
   const [i, setI] = useState(0);
-  const list = useMemo(() => (pins || []).map((p) => messages.find((m) => m.k === p.k)).filter((m) => !!m && m.type !== 'deleted'), [pins, messages]);
+  // Pinned messages further up than what's loaded come from this device's storage.
+  const [far, setFar] = useState<Record<string, Msg>>({});
+  useEffect(() => {
+    for (const p of pins || []) if (!messages.some((m) => m.k === p.k) && !far[p.k]) findMessage(p.k).then((m) => m?.peer === peer && setFar((f) => ({ ...f, [m.k]: m }))); // only this chat's messages
+  }, [pins, messages]);
+  const list = useMemo(() => (pins || []).map((p) => messages.find((m) => m.k === p.k) || far[p.k]).filter((m) => !!m && m.type !== 'deleted'), [pins, messages, far]);
   if (!list.length) return null;
   const cur = list[i % list.length]!;
   return (

@@ -3,24 +3,31 @@
 import type { Chat, Msg } from './types';
 
 const DB_NAME = 'chattrix';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 let dbPromise: Promise<IDBDatabase> | undefined;
 
 function openDb() {
   return (dbPromise ??= new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
+    req.onupgradeneeded = (e) => {
       const d = req.result;
-      d.createObjectStore('kv');
-      const msgs = d.createObjectStore('msgs', { keyPath: 'k' });
-      msgs.createIndex('peer_ts', ['peer', 'ts']);
-      msgs.createIndex('id', 'id');
-      d.createObjectStore('outbox', { keyPath: 'cid' });
-      d.createObjectStore('chats', { keyPath: 'peer' });
-      d.createObjectStore('peers', { keyPath: 'u' });   // { u, pub, newPub?, changed? }: pinned keys
-      d.createObjectStore('avatars', { keyPath: 'u' }); // { u, ver, blob }
+      if (e.oldVersion < 1) {
+        d.createObjectStore('kv');
+        const msgs = d.createObjectStore('msgs', { keyPath: 'k' });
+        msgs.createIndex('peer_ts', ['peer', 'ts']);
+        msgs.createIndex('id', 'id');
+        d.createObjectStore('outbox', { keyPath: 'cid' });
+        d.createObjectStore('chats', { keyPath: 'peer' });
+        d.createObjectStore('peers', { keyPath: 'u' });   // { u, pub, newPub?, changed? }: pinned keys
+        d.createObjectStore('avatars', { keyPath: 'u' }); // { u, ver, blob }
+      }
+      // v2: find a chat's photos by key alone, without reading every message (the photo viewer)
+      if (e.oldVersion < 2) req.transaction!.objectStore('msgs').createIndex('peer_type_ts', ['peer', 'type', 'ts']);
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      req.result.onversionchange = () => req.result.close(); // a newer version opened in another tab
+      resolve(req.result);
+    };
     req.onerror = () => reject(req.error);
   }));
 }
@@ -56,6 +63,47 @@ export async function recentMessages(peer: string, limit = 500): Promise<Msg[]> 
       const cur = req.result;
       if (cur && out.length < limit) { out.push(cur.value); cur.continue(); }
       else resolve(out.reverse());
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+/** Up to `limit` messages of a chat sent at or before `ts` (and not before `from`), oldest first. */
+export async function olderMessages(peer: string, ts: number, limit: number, from = -Infinity): Promise<Msg[]> {
+  const idx = (await store('msgs')).index('peer_ts');
+  const range = IDBKeyRange.bound([peer, from], [peer, ts]);
+  return new Promise((resolve, reject) => {
+    const out: Msg[] = [];
+    const req = idx.openCursor(range, 'prev');
+    req.onsuccess = () => {
+      const cur = req.result;
+      if (cur && out.length < limit) { out.push(cur.value); cur.continue(); }
+      else resolve(out.reverse());
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+/** Keys of every photo in a chat, oldest first. Only keys are read, so a chat with thousands
+ *  of photos stays fast and small (the viewer loads each photo as you swipe to it). */
+export async function photoKeys(peer: string): Promise<string[]> {
+  const idx = (await store('msgs')).index('peer_type_ts');
+  return wrap(idx.getAllKeys(IDBKeyRange.bound([peer, 'img', -Infinity], [peer, 'img', Infinity]))) as Promise<string[]>;
+}
+
+/** Just the key, time and text of every message in a chat (for search): photos, voice notes and
+ *  files are read one at a time and dropped, never all held in memory at once. */
+export async function messageTexts(peer: string): Promise<Pick<Msg, 'k' | 'ts' | 'text' | 'type' | 'peer'>[]> {
+  const idx = (await store('msgs')).index('peer_ts');
+  return new Promise((resolve, reject) => {
+    const out: Pick<Msg, 'k' | 'ts' | 'text' | 'type' | 'peer'>[] = [];
+    const req = idx.openCursor(IDBKeyRange.bound([peer, -Infinity], [peer, Infinity]));
+    req.onsuccess = () => {
+      const cur = req.result;
+      if (!cur) return resolve(out);
+      const m = cur.value as Msg;
+      if (m.text && m.type !== 'deleted') out.push({ k: m.k, ts: m.ts, text: m.text, type: m.type, peer: m.peer });
+      cur.continue();
     };
     req.onerror = () => reject(req.error);
   });

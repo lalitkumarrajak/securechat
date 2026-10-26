@@ -31,12 +31,13 @@ export function ChatDialogs({ peer, name }: { peer: string; name: string }) {
 /** Long-press on a phone: reactions on top, then the actions. */
 function ActionSheet() {
   const m = useChatUi((s) => s.sheet);
-  const close = () => setChatUi({ sheet: null });
+  const album = useChatUi((s) => s.sheetAlbum);
+  const close = () => setChatUi({ sheet: null, sheetAlbum: null });
   return (
     <Dialog open={!!m} onOpenChange={(o) => !o && close()} title="Message options" hideTitle keepFocus className="md:max-w-sm">
       {m && (
         <>
-          <p className="mb-3 line-clamp-2 rounded-xl bg-panel-2 px-3 py-2 text-sm text-muted">{preview(m)}</p>
+          <p className="mb-3 line-clamp-2 rounded-xl bg-panel-2 px-3 py-2 text-sm text-muted">{album ? `📷 ${album.length} photos` : preview(m)}</p>
           {canReact(m) && (
             <div className="mb-3 flex items-center justify-between rounded-2xl bg-panel-2 px-2 py-1.5">
               {QUICK_REACTIONS.map((e) => (
@@ -51,7 +52,7 @@ function ActionSheet() {
             </div>
           )}
           <ul className="-mx-2">
-            {actionsFor(m).map((a) => (
+            {actionsFor(m, album).map((a) => (
               <li key={a.key}>
                 {/* Close the sheet right now (it traps focus while open), then run the action in the
                     same tap, so "Reply" can focus the message box and open the keyboard. */}

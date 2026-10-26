@@ -2,20 +2,22 @@ import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 
 import { ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { senderOf } from '../../lib/controls';
-import { me as myName, preview } from '../../lib/engine';
+import { loadOlder, loadUntil, me as myName, preview } from '../../lib/engine';
 import { fmtDay } from '../../lib/format';
 import { setApp, useApp } from '../../state/app';
 import { useSettings } from '../../state/settings';
 import { MessageBubble } from './MessageBubble';
 import { cn } from '../../lib/utils';
+import type { Msg } from '../../lib/types';
 
 const GROUP_MS = 5 * 60e3;
 
 /** Scrolls a message into view and flashes it (replies, pins, search). */
 function flash(k: string) {
-  const el = document.querySelector<HTMLElement>(`[data-k="${CSS.escape(k)}"]`);
+  const el = document.querySelector<HTMLElement>(`[data-k="${CSS.escape(k)}"]`)
+    ?? document.querySelector<HTMLElement>(`[data-keys~="${CSS.escape(k)}"]`); // a photo inside an album
   if (!el) return false;
-  el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  el.scrollIntoView({ block: 'center' }); // instant: a smooth scroll would be cut short when older messages load in above
   el.classList.remove('animate-flash');
   void el.offsetWidth;
   el.classList.add('animate-flash');
@@ -36,6 +38,8 @@ export function MessageList({ peer, peerName, unreadAtOpen }: { peer: string; pe
   const content = useRef<HTMLDivElement>(null);
   const [newCount, setNewCount] = useState(0);
   const lastLen = useRef(0);
+  const olderLeft = useApp((s) => s.olderLeft);
+  const edges = useRef({ first: '', last: '', height: 0, prepended: false }); // what was rendered last time, to tell older from newer
   const opened = useRef(false);
   const me = myName();
 
@@ -50,6 +54,26 @@ export function MessageList({ peer, peerName, unreadAtOpen }: { peer: string; pe
     return i;
   }, [privacy, keep, messages]);
 
+  // Photos sent together (same album, same sender, one after another) show as one bubble,
+  // drawn at the last of them; the others are skipped.
+  const albums = useMemo(() => {
+    const at = new Map<number, Msg[]>();
+    const skip = new Set<number>();
+    for (let i = 0; i < messages.length;) {
+      const m = messages[i];
+      let j = i + 1;
+      if (m.type === 'img' && m.al) {
+        while (j < messages.length && messages[j].type === 'img' && messages[j].al === m.al && senderOf(messages[j]) === senderOf(m)) j++;
+      }
+      if (j - i > 1) {
+        at.set(j - 1, messages.slice(i, j));
+        for (let n = i; n < j - 1; n++) skip.add(n);
+      }
+      i = j;
+    }
+    return { at, skip };
+  }, [messages]);
+
   // The unread divider sits before the first of the messages that were unread when the chat opened.
   const dividerK = useMemo(() => {
     if (!unreadAtOpen) return null;
@@ -59,6 +83,7 @@ export function MessageList({ peer, peerName, unreadAtOpen }: { peer: string; pe
 
   // First render: jump to the unread divider (or the bottom). Afterwards: follow new messages
   // if you're at the bottom or sent them yourself, otherwise count them on the ↓ button.
+  // Older messages loaded above (scrolling up) keep what you're reading where it is.
   useLayoutEffect(() => {
     const el = box.current;
     if (!el || !messages.length) return;
@@ -67,12 +92,16 @@ export function MessageList({ peer, peerName, unreadAtOpen }: { peer: string; pe
       const divider = dividerK && el.querySelector('[data-divider]');
       if (divider) (divider as HTMLElement).scrollIntoView({ block: 'start' });
       else el.scrollTop = el.scrollHeight;
+    } else if (messages[0].k !== edges.current.first && messages[messages.length - 1].k === edges.current.last) {
+      el.scrollTop += el.scrollHeight - edges.current.height;
+      edges.current.prepended = true; // not new content at the bottom: don't follow it down
     } else if (messages.length > lastLen.current) {
       const last = messages[messages.length - 1];
       if (atBottom || last.out) el.scrollTop = el.scrollHeight;
       else setNewCount((n) => n + (messages.length - lastLen.current));
     }
     lastLen.current = messages.length;
+    edges.current = { ...edges.current, first: messages[0].k, last: messages[messages.length - 1].k, height: el.scrollHeight };
   }, [messages, dividerK, atBottom]);
 
   // When the list gets shorter (the phone keyboard opens, a reply bar appears), keep the messages
@@ -88,15 +117,25 @@ export function MessageList({ peer, peerName, unreadAtOpen }: { peer: string; pe
       h = now;
     });
     ro.observe(el);
-    const grow = new ResizeObserver(() => { if (bottomRef.current) el.scrollTop = el.scrollHeight; });
+    const grow = new ResizeObserver(() => {
+      if (bottomRef.current && !edges.current.prepended) el.scrollTop = el.scrollHeight;
+      edges.current.prepended = false;
+      edges.current.height = el.scrollHeight;
+    });
     if (content.current) grow.observe(content.current);
     return () => { ro.disconnect(); grow.disconnect(); };
   }, []);
 
+  // Jumping to a message further up than what's loaded (a reply, pin or search hit) loads back to it first.
   useEffect(() => {
     if (!highlight) return;
-    if (!flash(highlight)) toast('That message isn’t on this device anymore.');
     setApp({ highlight: null });
+    bottomRef.current = false; // jumping away from the bottom
+    if (flash(highlight)) return;
+    loadUntil(highlight).then((ok) => {
+      if (ok) requestAnimationFrame(() => flash(highlight));
+      else toast('That message isn’t on this device anymore.');
+    });
   }, [highlight]);
 
   const onScroll = () => {
@@ -104,6 +143,7 @@ export function MessageList({ peer, peerName, unreadAtOpen }: { peer: string; pe
     const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
     setAtBottom(bottom);
     bottomRef.current = bottom;
+    if (el.scrollTop < 600 && olderLeft) loadOlder(); // getting near the top: load the next older page
     if (bottom) setNewCount(0);
   };
 
@@ -119,11 +159,18 @@ export function MessageList({ peer, peerName, unreadAtOpen }: { peer: string; pe
           </div>
         )}
         <div ref={content}>
+        {olderLeft && (
+          <div className="flex h-10 items-center justify-center" role="status" aria-label="Loading older messages">
+            <span className="size-5 animate-spin rounded-full border-2 border-muted/40 border-t-accent" />
+          </div>
+        )}
         {messages.map((m, i) => {
           const day = fmtDay(m.ts);
           const showDay = day !== lastDay;
           lastDay = day;
-          const prev = messages[i - 1];
+          const album = albums.at.get(i);
+          const lead = album ? i - album.length + 1 : i; // where this bubble starts
+          const prev = messages[lead - 1];
           const first = !prev || showDay || senderOf(prev) !== senderOf(m) || m.ts - prev.ts > GROUP_MS;
           return (
             <Fragment key={m.k}>
@@ -139,13 +186,14 @@ export function MessageList({ peer, peerName, unreadAtOpen }: { peer: string; pe
                   </span>
                 </div>
               )}
-              {m.type === 'sys' ? (
+              {albums.skip.has(i) ? null : m.type === 'sys' ? (
                 <div className={cn('my-2 flex justify-center px-6', i < blurBefore && 'priv-scope')} data-k={m.k}>
                   <span className="priv rounded-lg bg-panel/95 px-3 py-1 text-center text-xs text-muted shadow-bubble">{preview(m)}</span>
                 </div>
               ) : (
                 <MessageBubble m={m} me={me} peerName={peerName} first={first || prev?.type === 'sys'}
-                  selecting={!!selection} selected={selected.has(m.k)} pinned={pinned.has(m.k)} hidden={i < blurBefore} />
+                  selecting={!!selection} pinned={album ? album.some((x) => pinned.has(x.k)) : pinned.has(m.k)} hidden={lead < blurBefore}
+                  selected={album ? album.every((x) => selected.has(x.k)) : selected.has(m.k)} album={album} />
               )}
             </Fragment>
           );
