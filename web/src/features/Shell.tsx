@@ -6,6 +6,7 @@ import { ChatPane, EmptyPane } from './conversation/ChatPane';
 import { FriendsPanel } from './friends/FriendsPanel';
 import { SettingsPanel } from './settings/SettingsPanel';
 import { ContactPanel } from './conversation/ContactPanel';
+import { PhotoViewer } from './conversation/ChatDialogs';
 import { NewGameDialog } from './games/NewGameDialog';
 import { useGames } from './games/store';
 
@@ -21,8 +22,9 @@ export function Shell() {
   const gameOpen = useGames((s) => !!s.open);
   const panel = useApp((s) => s.panel);
   useEffect(() => { handleInvite(); }, []); // opened from someone's invite link
+  useKeyboardHeight();
   return (
-    <div className="mx-auto flex h-dvh max-w-[1600px] overflow-hidden bg-panel md:border-x md:border-line">
+    <div className="mx-auto flex h-[var(--app-h,100dvh)] max-w-[1600px] overflow-hidden bg-panel md:border-x md:border-line">
       <aside className={cn('flex w-full flex-col border-line bg-panel md:w-[360px] md:shrink-0 md:border-r lg:w-[400px]', active && 'hidden md:flex')}>
         <Sidebar />
       </aside>
@@ -37,7 +39,27 @@ export function Shell() {
         {panel === 'newgroup' && <NewGroupPanel />}
       </Suspense>
       <NewGameDialog />
+      <PhotoViewer />
       {gameOpen && <Suspense fallback={null}><GameScreen /></Suspense>}
     </div>
   );
+}
+
+// iPhones don't shrink the page when the keyboard opens (Android does, see index.html); they slide
+// the page up instead, hiding the header and the newest messages. Size the app to the part of the
+// screen above the keyboard, so the chat shrinks like it does on Android.
+function useKeyboardHeight() {
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const fit = () => {
+      if (vv.scale > 1.05) return; // zoomed in with two fingers: leave the page alone
+      document.documentElement.style.setProperty('--app-h', `${vv.height}px`);
+      if (window.scrollY) window.scrollTo(0, 0);
+    };
+    fit();
+    vv.addEventListener('resize', fit);
+    vv.addEventListener('scroll', fit);
+    return () => { vv.removeEventListener('resize', fit); vv.removeEventListener('scroll', fit); document.documentElement.style.removeProperty('--app-h'); };
+  }, []);
 }

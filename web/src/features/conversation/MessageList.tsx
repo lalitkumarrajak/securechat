@@ -7,6 +7,7 @@ import { fmtDay } from '../../lib/format';
 import { setApp, useApp } from '../../state/app';
 import { useSettings } from '../../state/settings';
 import { MessageBubble } from './MessageBubble';
+import { cn } from '../../lib/utils';
 
 const GROUP_MS = 5 * 60e3;
 
@@ -27,6 +28,8 @@ export function MessageList({ peer, peerName, unreadAtOpen }: { peer: string; pe
   const highlight = useApp((s) => s.highlight);
   const pins = useApp((s) => s.chats.find((c) => c.peer === peer)?.pins);
   const wallpaper = useSettings((s) => s.wallpaper);
+  const privacy = useSettings((s) => s.privacyScreen);
+  const keep = useSettings((s) => s.privacyKeep);
   const box = useRef<HTMLDivElement>(null);
   const [atBottom, setAtBottom] = useState(true);
   const [newCount, setNewCount] = useState(0);
@@ -36,6 +39,14 @@ export function MessageList({ peer, peerName, unreadAtOpen }: { peer: string; pe
 
   const pinned = useMemo(() => new Set((pins || []).map((p) => p.k)), [pins]);
   const selected = useMemo(() => new Set(selection || []), [selection]);
+
+  // Privacy screen: messages before this index are blurred (the newest `keep` stay readable).
+  const blurBefore = useMemo(() => {
+    if (!privacy) return 0;
+    let i = messages.length, n = 0;
+    while (i > 0 && n < keep) if (messages[--i].type !== 'sys') n++;
+    return i;
+  }, [privacy, keep, messages]);
 
   // The unread divider sits before the first of the messages that were unread when the chat opened.
   const dividerK = useMemo(() => {
@@ -61,6 +72,21 @@ export function MessageList({ peer, peerName, unreadAtOpen }: { peer: string; pe
     }
     lastLen.current = messages.length;
   }, [messages, dividerK, atBottom]);
+
+  // When the list gets shorter (the phone keyboard opens, a reply bar appears), keep the messages
+  // at the bottom where they were instead of letting them slide behind the keyboard.
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    let h = el.clientHeight;
+    const ro = new ResizeObserver(() => {
+      const now = el.clientHeight;
+      if (now < h) el.scrollTop += h - now;
+      h = now;
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     if (!highlight) return;
@@ -107,12 +133,12 @@ export function MessageList({ peer, peerName, unreadAtOpen }: { peer: string; pe
                 </div>
               )}
               {m.type === 'sys' ? (
-                <div className="my-2 flex justify-center px-6" data-k={m.k}>
-                  <span className="rounded-lg bg-panel/95 px-3 py-1 text-center text-xs text-muted shadow-bubble">{preview(m)}</span>
+                <div className={cn('my-2 flex justify-center px-6', i < blurBefore && 'priv-scope')} data-k={m.k}>
+                  <span className="priv rounded-lg bg-panel/95 px-3 py-1 text-center text-xs text-muted shadow-bubble">{preview(m)}</span>
                 </div>
               ) : (
                 <MessageBubble m={m} me={me} peerName={peerName} first={first || prev?.type === 'sys'}
-                  selecting={!!selection} selected={selected.has(m.k)} pinned={pinned.has(m.k)} />
+                  selecting={!!selection} selected={selected.has(m.k)} pinned={pinned.has(m.k)} hidden={i < blurBefore} />
               )}
             </Fragment>
           );

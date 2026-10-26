@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Archive, ArrowLeft, BellOff, Clock, Gamepad2, Lock, LogOut, MessageSquarePlus, MoreVertical, Search, Settings, UserPlus, Users, WifiOff, X } from 'lucide-react';
+import { Archive, ArrowLeft, BellOff, Clock, Eye, EyeOff, Gamepad2, Lock, LogOut, MessageSquarePlus, MoreVertical, Search, Settings, UserPlus, Users, WifiOff, X } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
 import { Ticks } from '../../components/Ticks';
 import { IconButton } from '../../components/ui/button';
@@ -14,6 +14,7 @@ import { GamesStrip } from '../games/GamesStrip';
 import { ChatListSkeleton } from '../../components/Skeleton';
 import { useSettings } from '../../state/settings';
 import { lockNow } from '../../lib/applock';
+import { togglePeek, usePeek } from '../../lib/privacy';
 import { groupIdOf, isGroup } from '../../lib/types';
 import { openPicker } from '../games/store';
 
@@ -62,6 +63,7 @@ export function Sidebar() {
               <Avatar u={me.u} name={me.name} size={40} />
             </button>
             <h1 className="min-w-0 flex-1 truncate pl-1 text-xl font-bold tracking-tight">{headerTitle.trim() || me.u}</h1>
+            <PeekButton />
             {appLock && <IconButton label="Lock Chattrix" onClick={lockNow}><Lock /></IconButton>}
             <IconButton label="Play games" onClick={() => openPicker()}><Gamepad2 /></IconButton>
             <div className="relative">
@@ -138,6 +140,14 @@ export function Sidebar() {
   );
 }
 
+/** With the privacy screen on: show everything for a moment, or blur it again. */
+export function PeekButton() {
+  const on = useSettings((s) => s.privacyScreen);
+  const peek = usePeek();
+  if (!on) return null;
+  return <IconButton label={peek ? 'Blur chats' : 'Show chats for 30 seconds'} onClick={() => togglePeek()}>{peek ? <EyeOff /> : <Eye />}</IconButton>;
+}
+
 function EmptyList({ archived, searching }: { archived: boolean; searching: boolean }) {
   const friends = useApp((s) => s.friends);
   const loaded = useApp((s) => s.friendsLoaded);
@@ -200,9 +210,9 @@ function ChatRow({ chat }: { chat: Chat }) {
   return (
     <li>
       <button onClick={() => openChat(chat.peer)}
-        className={cn('flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-hover', active && 'bg-hover')}>
-        <Avatar u={chat.peer} name={name} size={50} online={online} />
-        <span className="min-w-0 flex-1 border-b border-line/0 py-0.5">
+        className={cn('priv-scope flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-hover', active && 'bg-hover')}>
+        <Avatar u={chat.peer} name={name} size={50} online={online} className="priv" />
+        <span className="priv min-w-0 flex-1 border-b border-line/0 py-0.5">
           <span className="flex items-center gap-2">
             <span className="flex-1 truncate font-medium">{name}</span>
             <span className={cn('shrink-0 text-xs', chat.unread && !muted ? 'font-semibold text-accent-ink' : 'text-muted')}>

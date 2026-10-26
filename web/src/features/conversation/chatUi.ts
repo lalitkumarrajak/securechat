@@ -18,9 +18,14 @@ interface ChatUi {
 export const useChatUi = create<ChatUi>(() => ({ forward: null, info: null, picker: null, sheet: null, verify: false, viewer: null }));
 export const setChatUi = useChatUi.setState;
 
-/** Focus the message box. Must run during the tap itself: phones only open the keyboard then. */
+/** Focus the message box. Must run during the tap itself: phones only open the keyboard then.
+ *  If the box still has focus but the keyboard was put away (Android's back button), focusing
+ *  again does nothing, so blur it first: the fresh focus brings the keyboard back. */
 export function focusComposer() {
-  document.querySelector<HTMLTextAreaElement>('#composer-input')?.focus();
+  const el = document.querySelector<HTMLTextAreaElement>('#composer-input');
+  if (!el) return;
+  if (document.activeElement === el) el.blur();
+  el.focus({ preventScroll: true });
 }
 
 export function startReply(m: Msg) {

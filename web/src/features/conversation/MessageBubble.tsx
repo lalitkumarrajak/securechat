@@ -1,4 +1,4 @@
-import { memo, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import * as M from '@radix-ui/react-dropdown-menu';
 import { Ban, Check, ChevronDown, Copy, Forward, Info, Lock, Pencil, Pin, Reply, RotateCcw, SmilePlus, SquareCheck, Trash2 } from 'lucide-react';
 import { Ticks } from '../../components/Ticks';
@@ -28,6 +28,7 @@ interface Props {
   selecting: boolean;
   selected: boolean;
   pinned: boolean;
+  hidden?: boolean;    // privacy screen: blurred until hovered or tapped
 }
 
 // In groups, everyone's name gets its own steady colour, like WhatsApp.
@@ -39,13 +40,16 @@ export function useMemberName() {
   return (u: string, g?: Group, me?: string) => (u === me ? 'You' : friends[u]?.name || g?.members.find((x) => x.u === u)?.n || u);
 }
 
-export const MessageBubble = memo(function MessageBubble({ m, me, peerName, first, selecting, selected, pinned }: Props) {
+export const MessageBubble = memo(function MessageBubble({ m, me, peerName, first, selecting, selected, pinned, hidden }: Props) {
   const group = useApp((s) => (isGroup(m.peer) ? s.groups[groupIdOf(m.peer)] : undefined));
   const memberName = useMemberName();
   const from = senderOf(m);
   const showSender = isGroup(m.peer) && !m.out && first;
   const row = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [peek, setPeek] = useState(false); // privacy screen: tapped to read for a few seconds
+  const peekTimer = useRef(0);
+  useEffect(() => () => clearTimeout(peekTimer.current), []);
   const press = useRef<{ timer: number; x: number; y: number; dx: number; horizontal: boolean | null; long: boolean } | null>(null);
   const emoji = m.type === 'text' && !m.re ? emojiOnly(m.text || '') : null;
   const bare = !!emoji || m.type === 'sticker'; // big emoji and stickers: no bubble, like WhatsApp
@@ -105,15 +109,23 @@ export const MessageBubble = memo(function MessageBubble({ m, me, peerName, firs
   const onClick = (e: React.MouseEvent) => {
     if (press.current?.long) return;
     // Capture phase: while selecting, a tap on a link, photo or file inside selects the message instead
-    if (selecting) { e.preventDefault(); e.stopPropagation(); toggleSelect(); }
+    if (selecting) { e.preventDefault(); e.stopPropagation(); toggleSelect(); return; }
+    // Privacy screen: the first tap on a blurred message shows it (and doesn't open what's inside)
+    if (hidden && !peek && !document.documentElement.hasAttribute('data-peek-all') && !matchMedia('(hover: hover)').matches) {
+      e.preventDefault(); e.stopPropagation();
+      setPeek(true);
+      clearTimeout(peekTimer.current);
+      peekTimer.current = window.setTimeout(() => setPeek(false), 6000);
+    }
   };
 
   return (
     <div
       ref={row}
       data-k={m.k}
-      className={cn('group relative flex items-end gap-2 px-3 transition-transform md:px-[6%] pointer-coarse:select-none pointer-coarse:[-webkit-touch-callout:none]', first ? 'mt-2' : 'mt-0.5',
-        m.out ? 'justify-end' : 'justify-start', selected && 'bg-accent/10', selecting && 'cursor-pointer')}
+      data-peek={peek || undefined}
+      className={cn('group relative flex touch-pan-y items-end gap-2 px-3 transition-transform md:px-[6%] pointer-coarse:select-none pointer-coarse:[-webkit-touch-callout:none]', first ? 'mt-2' : 'mt-0.5',
+        m.out ? 'justify-end' : 'justify-start', selected && 'bg-accent/10', selecting && 'cursor-pointer', hidden && 'priv-scope')}
       onClickCapture={onClick}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
@@ -136,7 +148,7 @@ export const MessageBubble = memo(function MessageBubble({ m, me, peerName, firs
         </span>
       )}
 
-      <div className={cn('relative flex max-w-[85%] flex-col md:max-w-[65%]', m.out ? 'items-end' : 'items-start')}>
+      <div className={cn('relative flex max-w-[85%] flex-col md:max-w-[65%]', m.out ? 'items-end' : 'items-start', hidden && 'priv')}>
         <div className={cn(
           'relative min-w-0 text-[0.95rem] leading-snug',
           bare ? 'px-0' : 'rounded-2xl px-2.5 pt-1.5 pb-1 shadow-bubble',
@@ -179,7 +191,7 @@ function Body({ m, emoji, me, members }: { m: Msg; emoji: string[] | null; me: s
           <img src={m.src} alt="Photo" loading="lazy" width={m.w || undefined} height={m.h || undefined}
             className="block h-auto max-h-80 w-auto max-w-[min(300px,70vw)] rounded-xl object-cover" />
         </button>
-        {m.text && <p className="px-1.5 pt-1 whitespace-pre-wrap [overflow-wrap:anywhere]">{m.text}</p>}
+        {m.text && <p className="px-1.5 pt-1 whitespace-pre-wrap [overflow-wrap:anywhere]"><Marked text={m.text} /></p>}
       </>
     );
   }
@@ -215,7 +227,22 @@ function Body({ m, emoji, me, members }: { m: Msg; emoji: string[] | null; me: s
 // Links become clickable; everything is still rendered as text (never as HTML).
 function Linkify({ text }: { text: string }) {
   const parts = text.split(/(https?:\/\/[^\s<]+[^\s<.,;:!?)"'\]])/g);
-  return <>{parts.map((p, i) => (i % 2 ? <a key={i} href={p} target="_blank" rel="noopener noreferrer nofollow" className="text-accent-ink underline underline-offset-2" onClick={(e) => e.stopPropagation()}>{p}</a> : p))}</>;
+  return <>{parts.map((p, i) => (i % 2 ? <a key={i} href={p} target="_blank" rel="noopener noreferrer nofollow" className="text-accent-ink underline underline-offset-2" onClick={(e) => e.stopPropagation()}><Marked text={p} /></a> : <Marked key={i} text={p} />))}</>;
+}
+
+/** While searching in the chat, the words you searched for are highlighted. */
+function Marked({ text }: { text: string }) {
+  const q = useApp((s) => (s.searchOpen ? s.searchQuery.trim().toLowerCase() : ''));
+  if (!q || !text.toLowerCase().includes(q)) return <>{text}</>;
+  const out: React.ReactNode[] = [];
+  const lower = text.toLowerCase();
+  let at = 0;
+  for (let i = lower.indexOf(q); i !== -1; i = lower.indexOf(q, at)) {
+    out.push(text.slice(at, i), <mark key={i} className="rounded-sm bg-amber-300 px-px text-amber-950">{text.slice(i, i + q.length)}</mark>);
+    at = i + q.length;
+  }
+  out.push(text.slice(at));
+  return <>{out}</>;
 }
 
 function Meta({ m, pinned, bare }: { m: Msg; pinned: boolean; bare: boolean }) {

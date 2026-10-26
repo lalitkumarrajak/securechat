@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
 import { LinkBox } from '../../components/LinkBox';
+import { PhotoCropper } from '../../components/PhotoCropper';
+import { setChatUi } from '../conversation/chatUi';
 import { Button, IconButton } from '../../components/ui/button';
 import { confirm } from '../../components/ui/confirm';
 import { Panel } from '../../components/ui/dialog';
@@ -44,6 +46,8 @@ function Info({ g }: { g: Group }) {
   const [draft, setDraft] = useState('');
   const [link, setLink] = useState<string | null>(null);
   const file = useRef<HTMLInputElement>(null);
+  const [picked, setPicked] = useState<File | null>(null); // photo being cropped
+  const photo = useApp((s) => s.avatars[peer]);
   const close = () => setApp({ panel: null });
   const nameOf = (m: GroupMember) => (m.u === me ? 'You' : friends[m.u]?.name || m.n || m.u);
   const members = [...g.members].sort((a, b) => Number(b.u === me) - Number(a.u === me) || Number(b.admin) - Number(a.admin) || nameOf(a).localeCompare(nameOf(b)));
@@ -72,7 +76,9 @@ function Info({ g }: { g: Group }) {
       <div className="min-h-0 flex-1 overflow-y-auto">
         <section className="bg-panel px-6 pt-4 pb-6 text-center">
           <div className="relative mx-auto w-fit">
-            <Avatar u={peer} name={g.name} size={128} />
+            <button onClick={() => photo && setChatUi({ viewer: photo })} aria-label="View group photo" className="block rounded-full">
+              <Avatar u={peer} name={g.name} size={128} />
+            </button>
             {g.admin && (
               <button onClick={() => file.current?.click()} aria-label="Change group photo"
                 className="absolute right-1 bottom-1 grid size-10 place-items-center rounded-full bg-accent text-white shadow-lg hover:brightness-110">
@@ -81,7 +87,11 @@ function Info({ g }: { g: Group }) {
             )}
             <input ref={file} type="file" accept="image/*" hidden onChange={(e) => {
               const f = e.target.files?.[0]; e.target.value = '';
-              if (f) setGroupPhoto(g.id, f).then(() => toast.success('Group photo updated')).catch(fail);
+              if (f) setPicked(f);
+            }} />
+            <PhotoCropper file={picked} title="Group photo" onCancel={() => setPicked(null)} onDone={(crop) => {
+              const f = picked; setPicked(null);
+              if (f) setGroupPhoto(g.id, f, crop).then(() => toast.success('Group photo updated')).catch(fail);
             }} />
           </div>
           {g.admin && g.photo > 0 && (

@@ -4,6 +4,9 @@ import {
   ArrowLeft, Bell, Camera, ChevronRight, Info, KeyRound, Laptop, Lock, LogOut, MessageSquare, Monitor, MonitorSmartphone, Moon, Palette, Shield,
   Smartphone, Sun, Tablet, Trash2, UserRound, MapPin } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
+import { PhotoCropper } from '../../components/PhotoCropper';
+import { setChatUi } from '../conversation/chatUi';
+import type { Crop } from '../../lib/image';
 import { Button, IconButton, Spinner } from '../../components/ui/button';
 import { confirm } from '../../components/ui/confirm';
 import { Panel } from '../../components/ui/dialog';
@@ -100,7 +103,7 @@ function Main({ go }: { go: (p: Page) => void }) {
       </button>
       <Section>
         <NavRow icon={<Palette />} label="Appearance" sub="Theme, colour, wallpaper, text size" onClick={() => go('appearance')} />
-        <NavRow icon={<Shield />} label="Privacy" sub="Last seen, read receipts, sign out on close, blocked" onClick={() => go('privacy')} />
+        <NavRow icon={<Shield />} label="Privacy" sub="Last seen, read receipts, app lock, privacy screen, blocked" onClick={() => go('privacy')} />
         <NavRow icon={<Bell />} label="Notifications" sub="Push notifications, sounds" onClick={() => go('notifications')} />
         <NavRow icon={<MessageSquare />} label="Chats" sub="Enter to send, archived chats" onClick={() => go('chats')} />
         <NavRow icon={<MonitorSmartphone />} label="Active sessions" sub="Devices signed in to your account" onClick={() => go('sessions')} />
@@ -114,13 +117,15 @@ function Main({ go }: { go: (p: Page) => void }) {
 // ---------- profile ----------
 function Profile() {
   const me = useApp((s) => s.me)!;
-  const hasPhoto = useApp((s) => !!s.avatars[me.u]);
+  const photo = useApp((s) => s.avatars[me.u]);
+  const hasPhoto = !!photo;
   const [name, setName] = useState(me.name);
   const [about, setAbout] = useState(me.about);
   const savedTitle = useSettings((s) => s.headerTitle);
   const [title, setTitle] = useState(savedTitle);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [picked, setPicked] = useState<File | null>(null); // photo being cropped
   const file = useRef<HTMLInputElement>(null);
   const profileDirty = name.trim() !== me.name || about.trim() !== me.about;
   const dirty = profileDirty || title.trim() !== savedTitle;
@@ -136,10 +141,10 @@ function Profile() {
     catch (err) { toast.error((err as Error).message); }
     setBusy(false);
   }
-  async function upload(f?: File) {
-    if (!f) return;
+  async function upload(f: File, crop: Crop) {
+    setPicked(null);
     setUploading(true);
-    try { await setAvatar(f); toast.success('Profile photo updated'); } catch (err) { toast.error((err as Error).message); }
+    try { await setAvatar(f, crop); toast.success('Profile photo updated'); } catch (err) { toast.error((err as Error).message || 'Couldn’t update your photo'); }
     setUploading(false);
   }
 
@@ -147,13 +152,19 @@ function Profile() {
     <>
       <Section className="px-5 py-6 text-center">
         <div className="relative mx-auto w-fit">
-          <Avatar u={me.u} name={me.name} size={140} className={uploading ? 'opacity-60' : ''} />
-          <button onClick={() => file.current?.click()} aria-label="Change profile photo"
+          <button onClick={() => (photo ? setChatUi({ viewer: photo }) : file.current?.click())} aria-label={photo ? 'View profile photo' : 'Add profile photo'} className="block rounded-full">
+            <Avatar u={me.u} name={me.name} size={140} className={uploading ? 'opacity-60' : ''} />
+          </button>
+          {uploading && <span className="absolute inset-0 grid place-items-center text-white"><Spinner className="size-8" /></span>}
+          <button onClick={() => file.current?.click()} aria-label="Change profile photo" disabled={uploading}
             className="absolute right-1 bottom-1 grid size-11 place-items-center rounded-full bg-accent text-white shadow-lg hover:brightness-110">
             <Camera className="size-5" />
           </button>
         </div>
-        <input ref={file} type="file" accept="image/*" hidden onChange={(e) => { upload(e.target.files?.[0]); e.target.value = ''; }} />
+        <input ref={file} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setPicked(f); }} />
+        <PhotoCropper file={picked} title="Profile photo" onCancel={() => setPicked(null)} onDone={(crop) => picked && upload(picked, crop)} />
+        <p className="mt-3 text-lg font-semibold">{me.name || me.u}</p>
+        <p className="text-sm text-muted">@{me.u}{me.about ? ` · ${me.about}` : ''}</p>
         {hasPhoto && (
           <Button variant="ghost" size="sm" className="mt-3 text-danger" onClick={async () => {
             if (await confirm({ title: 'Remove profile photo?', confirmText: 'Remove', destructive: true })) {
@@ -276,6 +287,7 @@ function Privacy() {
           checked={me.privacy.receipts} onChange={(v) => set({ receipts: v })} />
       </Section>
       <AppLockSection />
+      <PrivacyScreenSection />
       <Section title="On this device">
         <ToggleRow label="Sign out when I close the tab"
           sub="For shared computers or a quick exit: closing Chattrix signs you out and erases chats saved on this device. Reloading keeps you signed in. Your chats come back when you sign in again."
@@ -301,6 +313,37 @@ function Privacy() {
           Messages, photos, voice notes, reactions and edits are end-to-end encrypted. Your profile photo, name and friend list are not.</p>
       </Section>
     </>
+  );
+}
+
+const KEEP = [{ n: 0, label: 'None' }, { n: 1, label: 'Last 1' }, { n: 3, label: 'Last 3' }, { n: 5, label: 'Last 5' }];
+
+function PrivacyScreenSection() {
+  const on = useSettings((s) => s.privacyScreen);
+  const keep = useSettings((s) => s.privacyKeep);
+  const away = useSettings((s) => s.privacyBlurAway);
+  return (
+    <Section title="Privacy screen">
+      <ToggleRow label="Blur my chats" sub="On this device, names, photos, previews and messages are blurred so people nearby can’t read them. Hover or tap one to read it, or tap the eye at the top to show everything for 30 seconds."
+        checked={on} onChange={(v) => setSettings({ privacyScreen: v })} />
+      {on && (
+        <>
+          <div className="px-5 pt-1 pb-3" role="radiogroup" aria-label="Keep the newest messages readable">
+            <p className="mb-2 text-sm text-muted">Keep the newest messages in a chat readable</p>
+            <div className="flex flex-wrap gap-2">
+              {KEEP.map((o) => (
+                <button key={o.n} role="radio" aria-checked={keep === o.n} onClick={() => setSettings({ privacyKeep: o.n })}
+                  className={cn('rounded-full border px-3 py-1.5 text-sm', keep === o.n ? 'border-accent bg-accent/12 font-medium text-accent-ink' : 'border-line hover:bg-hover')}>
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <ToggleRow label="Blur when I leave Chattrix" sub="Blurs the whole screen while you’re in another app or window, and in the app switcher."
+            checked={away} onChange={(v) => setSettings({ privacyBlurAway: v })} />
+        </>
+      )}
+    </Section>
   );
 }
 

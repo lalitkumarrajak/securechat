@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import * as C from './crypto.js';
 import * as db from './db';
 import { applyEdit, applyPin, applyReact, senderOf } from './controls';
-import { compressImage, squarePhoto } from './image';
+import { compressImage, squarePhoto, type Crop } from './image';
 import type { Chat, Content, Friend, GifItem, Group, LinkPreview, Me, Msg, Request, SearchHit, Session, SysEvent } from './types';
 import { groupIdOf, isGroup } from './types';
 import { prepareFile } from './files';
@@ -466,8 +466,8 @@ async function syncAvatar(u: string, ver: number) {
   await loadAvatar(u);
 }
 
-export async function setAvatar(file: File) {
-  const { av } = await api('/api/avatar', { img: await squarePhoto(file) });
+export async function setAvatar(file: File, crop?: Crop) {
+  const { av } = await api('/api/avatar', { img: await squarePhoto(file, crop) });
   await syncAvatar(S.me, av);
 }
 export async function removeAvatar() {

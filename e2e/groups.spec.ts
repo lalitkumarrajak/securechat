@@ -132,8 +132,8 @@ test('removing someone: they stop getting messages', async () => {
   await expect(G3.page.getByText('Secret plan after the change')).toHaveCount(0);
 });
 
-test('play Ludo with the group', async () => {
-  await G2.page.getByRole('button', { name: 'Play Ludo' }).click();
+test('play a game with the group', async () => {
+  await G2.page.getByRole('button', { name: 'Play a game' }).click();
   const dlg = G2.page.getByRole('dialog', { name: 'Play a game' });
   await expect(dlg.getByRole('button', { name: new RegExp(G4.u) })).toBeVisible(); // a group member who isn't G2's friend
   await G2.page.keyboard.press('Escape');

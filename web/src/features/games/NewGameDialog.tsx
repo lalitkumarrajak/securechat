@@ -21,7 +21,7 @@ function PickerDialog({ initial, pool }: { initial: string[]; pool?: { u: string
   const loaded = useApp((s) => s.friendsLoaded);
   const games = Object.values(GAME_UI);
   const [type, setType] = useState(games[0].type);
-  const [picked, setPicked] = useState<string[]>(initial);
+  const [picked, setPicked] = useState<string[]>(() => initial.slice(0, games[0].max - 1));
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
   const ui = GAME_UI[type];
@@ -41,7 +41,7 @@ function PickerDialog({ initial, pool }: { initial: string[]; pool?: { u: string
     <Dialog open onOpenChange={(o) => { if (!o) closePicker(); }} title="Play a game" description="Invite friends, or share a link with anyone.">
       <div className="mb-4 flex gap-2 overflow-x-auto">
         {games.map((x) => (
-          <button key={x.type} type="button" onClick={() => setType(x.type)} aria-pressed={x.type === type}
+          <button key={x.type} type="button" onClick={() => { setType(x.type); setPicked((p) => (p.length ? p : initial).slice(0, x.max - 1)); }} aria-pressed={x.type === type}
             className={cn('flex min-w-36 items-center gap-3 rounded-2xl border-2 p-3 text-left', x.type === type ? 'border-accent bg-accent/10' : 'border-line')}>
             <span className="text-3xl" aria-hidden>{x.emoji}</span>
             <span><span className="block font-semibold">{x.name}</span><span className="block text-xs text-muted">{x.blurb}</span></span>

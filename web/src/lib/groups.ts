@@ -1,6 +1,6 @@
 // Group management: create, edit, members and admins, invite links. Messages themselves go
 // through the engine like any chat, to the peer "g:<id>".
-import { squarePhoto } from './image';
+import { squarePhoto, type Crop } from './image';
 import { api, openChat, refreshGroups } from './engine';
 import type { Group } from './types';
 
@@ -33,6 +33,6 @@ export async function joinGroup(code: string) {
   return group;
 }
 
-export async function setGroupPhoto(id: string, file: File | null) {
-  await after(api('/api/groups/photo', { id, img: file ? await squarePhoto(file) : null }));
+export async function setGroupPhoto(id: string, file: File | null, crop?: Crop) {
+  await after(api('/api/groups/photo', { id, img: file ? await squarePhoto(file, crop) : null }));
 }

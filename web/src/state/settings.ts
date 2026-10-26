@@ -23,6 +23,9 @@ export interface Settings {
   headerTitle: string;     // shown at the top of the chat list; empty = your username
   appLock: PinHash | null; // app lock PIN (this device only); see lib/applock.ts
   lockAfterMs: number;     // lock after being away this long (0 = as soon as you leave)
+  privacyScreen: boolean;  // blur names, previews and messages (this device only); see lib/privacy.ts
+  privacyKeep: number;     // …except the newest this many messages in a chat
+  privacyBlurAway: boolean; // blur the whole app while you're in another app or window
 }
 
 export const ACCENTS: { id: Accent; label: string; color: string }[] = [
@@ -47,6 +50,9 @@ const defaults: Settings = {
   headerTitle: '',
   appLock: null,
   lockAfterMs: 0,
+  privacyScreen: false,
+  privacyKeep: 0,
+  privacyBlurAway: true,
 };
 
 export const useSettings = create<Settings>()(persist(() => defaults, { name: 'chattrix-settings', version: 1 }));
@@ -61,6 +67,7 @@ function apply(s: Settings) {
   r.dataset.theme = dark ? 'dark' : 'light';
   r.dataset.accent = s.accent;
   r.dataset.font = s.fontSize;
+  r.dataset.privacy = s.privacyScreen ? 'on' : 'off';
   document.querySelector('meta[name=theme-color]')?.setAttribute('content', dark ? '#0f1419' : '#f7f8fa');
 }
 

@@ -141,6 +141,19 @@ html[data-font=lg] { font-size: 18px; }
 }
 .wallpaper.wp-plain { background-image: none; }
 
+/* ---------- privacy screen (Settings → Privacy) ----------
+   .priv parts are blurred. Hovering their .priv-scope (mouse) or tapping (data-peek) shows one;
+   the eye button (data-peek-all) shows everything for a moment. */
+[data-privacy=on] .priv { filter: blur(7px); transition: filter 0.15s; }
+@media (hover: hover) { [data-privacy=on] .priv-scope:hover .priv { filter: none; } }
+[data-privacy=on] .priv-scope[data-peek] .priv, [data-privacy=on][data-peek-all] .priv { filter: none; }
+/* Away from the app (another app, the app switcher, another window): blur everything. */
+html[data-away]::after {
+  content: ""; position: fixed; inset: 0; z-index: 2147483647; pointer-events: none;
+  background: color-mix(in oklab, var(--bg) 35%, transparent);
+  -webkit-backdrop-filter: blur(28px); backdrop-filter: blur(28px);
+}
+
 /* Lottie draws an <svg> sized by its own attributes; make it fill the emoji box. */
 .big-emoji svg { width: 100% !important; height: 100% !important; }
 

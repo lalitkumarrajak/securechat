@@ -24,7 +24,6 @@ export function ChatDialogs({ peer, name }: { peer: string; name: string }) {
       <ForwardDialog />
       <InfoDialog />
       <VerifyDialog peer={peer} name={name} />
-      <PhotoViewer />
     </>
   );
 }
@@ -197,7 +196,8 @@ function VerifyDialog({ peer, name }: { peer: string; name: string }) {
   );
 }
 
-function PhotoViewer() {
+/** Full-screen photo (chat photos, profile photos). Rendered once, in the Shell. */
+export function PhotoViewer() {
   const src = useChatUi((s) => s.viewer);
   return (
     <D.Root open={!!src} onOpenChange={(o) => !o && setChatUi({ viewer: null })}>
