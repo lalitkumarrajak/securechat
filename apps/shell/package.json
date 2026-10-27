@@ -1,0 +1,14 @@
+{
+  "name": "@sanga/shell",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The main Sanga app: sign-in, chats, stories, calls, games; loads the other apps when opened",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": { "@sanga/crypto": "*", "@sanga/game-rules": "*" }
+}

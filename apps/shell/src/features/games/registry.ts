@@ -1,8 +1,8 @@
 // The games the app offers, and how each is drawn. To add a game: write its rules in
-// shared/games/ (see core.js), list it in shared/games/index.js, and add its board here.
+// packages/game-rules/ (see core.js), list it in packages/game-rules/index.js, and add its board here.
 import { lazy, type ComponentType, type LazyExoticComponent } from 'react';
-import ludo from '../../../../shared/games/ludo.js';
-import uno from '../../../../shared/games/uno.js';
+import ludo from '@sanga/game-rules/ludo.js';
+import uno from '@sanga/game-rules/uno.js';
 import { registerGameNames, type Game } from './store';
 
 export interface GameBoardProps {

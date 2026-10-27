@@ -1,8 +1,8 @@
-// UNO rules (shared/games/uno.js), with chosen hands.
+// UNO rules (packages/game-rules/uno.js), with chosen hands.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { begin, remove } from '../shared/games/core.js';
-import uno, { DECK, card } from '../shared/games/uno.js';
+import { begin, remove } from '@sanga/game-rules/core.js';
+import uno, { DECK, card } from '@sanga/game-rules/uno.js';
 
 let seed = 1;
 const rand = (n) => { seed = (seed * 16807) % 2147483647; return seed % n; };

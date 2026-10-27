@@ -88,7 +88,7 @@ export function compress(raw) {
 }
 
 // ---------- static files (the built web app, compressed once and kept in memory) ----------
-// The build writes .br/.gz copies next to each file (web/vite.config.ts), so starting the server
+// The build writes .br/.gz copies next to each file (apps/*/vite.config.ts), so starting the server
 // doesn't spend seconds compressing (on a small cloud CPU, a cold start would wait for it).
 // Without them, small files are compressed now and big ones in the background.
 const MIME = {

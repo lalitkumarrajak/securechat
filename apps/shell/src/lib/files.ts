@@ -1,6 +1,6 @@
 // Files are sent inside the encrypted message, with a preview made on the sender's device:
 // the first page of a PDF, a frame of a video, or the start of a text file.
-import { unb64 } from './crypto';
+import { unb64 } from '@sanga/crypto';
 
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
 

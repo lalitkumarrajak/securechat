@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Ban, Hand, Repeat2, RotateCcw, RotateCw } from 'lucide-react';
 import { Avatar } from '../../../components/Avatar';
 import { cn } from '../../../lib/utils';
-import { card, COLORS, fits } from '../../../../../shared/games/uno.js';
+import { card, COLORS, fits } from '@sanga/game-rules/uno.js';
 import { playSound } from '../sounds';
 import type { Game, GameEvent } from '../store';
 import type { GameBoardProps } from '../registry';

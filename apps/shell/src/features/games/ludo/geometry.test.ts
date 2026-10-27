@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { homeAt, loopLen } from '../../../../../shared/games/ludo.js';
+import { homeAt, loopLen } from '@sanga/game-rules/ludo.js';
 import { makeLayout } from './geometry';
 
 const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);

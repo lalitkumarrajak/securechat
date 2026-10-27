@@ -10,7 +10,8 @@ export const config = {
   port: num(process.env.PORT, 3000),
   host: process.env.HOST || '0.0.0.0',
   dataDir: process.env.DATA_DIR || path.join(ROOT, 'data'),
-  webDir: process.env.WEB_DIR || path.join(ROOT, 'web', 'dist'),
+  webDir: process.env.WEB_DIR || path.join(ROOT, 'apps', 'shell', 'dist'),
+  appsDir: process.env.APPS_DIR || path.join(ROOT, 'apps'), // the other apps, each served from /apps/<name>/
   mongoUri: process.env.MONGODB_URI,
   databaseUrl: process.env.DATABASE_URL,
   retentionDays: num(process.env.RETENTION_DAYS, 30),

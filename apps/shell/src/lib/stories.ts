@@ -5,7 +5,7 @@
 // Opened stories are kept on this device until they expire, so they show instantly the second time.
 import { create } from 'zustand';
 import { toast } from 'sonner';
-import * as C from './crypto.js';
+import * as C from '@sanga/crypto';
 import * as db from './db';
 import { api, frameHooks, ownIdentity, peerKey, peerKeyChanged, readyHooks } from './engine';
 import { getApp } from '../state/app';

@@ -27,7 +27,7 @@ function precompress(): Plugin {
   };
 }
 
-// The Node server (server/index.js) serves web/dist in production. In development, run
+// The Node server (server/index.js) serves apps/shell/dist in production. In development, run
 // `npm run dev`: Vite serves the UI and forwards API, WebSocket and emoji requests to Node.
 export default defineConfig({
   root: import.meta.dirname,

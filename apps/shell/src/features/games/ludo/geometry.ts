@@ -6,7 +6,7 @@
 // steps to the next arm clockwise: 13 squares per arm. The middle column is the arm owner's home
 // column, and their yard sits on the clockwise side of their arm. The whole board is turned so
 // your own yard is bottom-left, like in Ludo King.
-import { ARM, START, STAR, homeAt, loopLen, trackSquare } from '../../../../../shared/games/ludo.js';
+import { ARM, START, STAR, homeAt, loopLen, trackSquare } from '@sanga/game-rules/ludo.js';
 
 export const COLORS = ['#e8322f', '#2fa24a', '#f5c518', '#1f7fe0', '#9b3fd1', '#f5821f'];
 export const DARK = ['#a51d1b', '#1c6e31', '#b38c00', '#14569c', '#6a2391', '#b35a0c'];

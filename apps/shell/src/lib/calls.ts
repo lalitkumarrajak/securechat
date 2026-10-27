@@ -4,7 +4,7 @@
 // Whoever placed the call writes it into the chat afterwards ("Missed voice call", "Video call · 3:24").
 import { create } from 'zustand';
 import { toast } from 'sonner';
-import * as C from './crypto.js';
+import * as C from '@sanga/crypto';
 import { api, frameHooks, myName, peerKey, peerKeyChanged, readyHooks, sendContent, sendFrame } from './engine';
 import { getApp } from '../state/app';
 import { useStories } from './stories';

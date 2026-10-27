@@ -3,7 +3,7 @@
 import { toast } from 'sonner';
 import { create } from 'zustand';
 import { frameHooks, myName, sendFrame } from '../../lib/engine';
-import { randomId } from '../../lib/crypto.js';
+import { randomId } from '@sanga/crypto';
 import { mentioned } from '../../lib/mentions';
 import { playSound } from './sounds';
 

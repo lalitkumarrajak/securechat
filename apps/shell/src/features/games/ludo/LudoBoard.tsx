@@ -4,11 +4,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Avatar } from '../../../components/Avatar';
 import { cn } from '../../../lib/utils';
-import { homeAt } from '../../../../../shared/games/ludo.js';
+import { homeAt } from '@sanga/game-rules/ludo.js';
 import { playSound } from '../sounds';
 import type { Game, GameEvent } from '../store';
 import type { GameBoardProps } from '../registry';
-import { MISSES_OUT } from '../../../../../shared/games/core.js';
+import { MISSES_OUT } from '@sanga/game-rules/core.js';
 import { Chances, TurnRing } from '../TurnRing';
 import { COLORS, COLOR_NAMES, DARK, LIGHT, makeLayout, pathOf, poly, type Layout, type Pt } from './geometry';
 

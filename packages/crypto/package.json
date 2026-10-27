@@ -1,0 +1,9 @@
+{
+  "name": "@sanga/crypto",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "End-to-end encryption (WebCrypto), shared by every Sanga app and the server tests",
+  "main": "index.js",
+  "types": "index.d.ts"
+}

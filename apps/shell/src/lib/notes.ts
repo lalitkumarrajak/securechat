@@ -4,7 +4,7 @@
 // A readable copy stays on this device (IndexedDB) so they open instantly and work offline;
 // changes made offline are marked `dirty` and go up when the connection is back.
 import { create } from 'zustand';
-import * as C from './crypto.js';
+import * as C from '@sanga/crypto';
 import * as db from './db';
 import { api, frameHooks, ownIdentity, readyHooks } from './engine';
 import { setApp } from '../state/app';

@@ -2,7 +2,7 @@
 // hearts showing how many missed turns a player has left.
 import { useEffect, useState, type ReactNode } from 'react';
 import { Heart } from 'lucide-react';
-import { MISSES_OUT } from '../../../../shared/games/core.js';
+import { MISSES_OUT } from '@sanga/game-rules/core.js';
 import { cn } from '../../lib/utils';
 
 export const TURN_TOTAL = 35_000; // 30 s per turn + the server's allowance for animations (GAME_ANIM_MS)

@@ -1,4 +1,4 @@
-// Games between friends (Ludo, and more later: see shared/games/). The server runs every game:
+// Games between friends (Ludo, and more later: see packages/game-rules/). The server runs every game:
 // it rolls the dice, checks each move and keeps time, so nobody can cheat. Unlike messages, game
 // moves and game chat are not end-to-end encrypted; they're kept only while the game lasts.
 //
@@ -18,8 +18,8 @@ import { canChat } from './friends.js';
 import { shareGroup } from './groups.js';
 import { getProfile, profileHooks } from './profiles.js';
 import { notify } from './push.js';
-import * as core from '../shared/games/core.js';
-import { GAMES } from '../shared/games/index.js';
+import * as core from '@sanga/game-rules/core.js';
+import { GAMES } from '@sanga/game-rules';
 
 const games = new Map();  // id -> game
 const timers = new Map(); // id -> timeout

@@ -1,19 +1,13 @@
-# Build the web app, then run the server with production dependencies only.
+# Build every app, then keep only what the server needs at run time.
 FROM node:24-alpine AS build
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
-COPY web ./web
-RUN npm run build
+COPY . .
+RUN npm ci && npm run build && npm prune --omit=dev && rm -rf .turbo apps/*/src
 
 FROM node:24-alpine
 ENV NODE_ENV=production
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
-COPY server ./server
-COPY shared ./shared
-COPY --from=build /app/web/dist ./web/dist
+COPY --from=build /app /app
 RUN mkdir -p /data && chown node:node /data
 USER node
 ENV DATA_DIR=/data PORT=3000

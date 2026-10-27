@@ -1,6 +1,7 @@
 node_modules/
 data/
 certs/
-web/dist/
+apps/*/dist/
+.turbo/
 test-results/
 e2e/.artifacts/

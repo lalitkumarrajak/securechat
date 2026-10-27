@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import WebSocket from 'ws';
-import * as C from '../web/src/lib/crypto.js';
+import * as C from '@sanga/crypto';
 
 export { C };
 const ROOT = path.join(import.meta.dirname, '..');

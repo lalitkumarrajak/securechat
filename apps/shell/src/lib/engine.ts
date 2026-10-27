@@ -1,7 +1,7 @@
 // The engine: connection, sync, encryption, sending and every message action.
 // It writes to the zustand store (state/app.ts); React components only read and call these functions.
 import { toast } from 'sonner';
-import * as C from './crypto.js';
+import * as C from '@sanga/crypto';
 import * as db from './db';
 import { applyEdit, applyPin, applyReact, senderOf } from './controls';
 import { compressImage, squarePhoto, type Crop } from './image';

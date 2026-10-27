@@ -1,8 +1,8 @@
-// Ludo rules (shared/games/ludo.js), driven with chosen dice.
+// Ludo rules (packages/game-rules/ludo.js), driven with chosen dice.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { begin, remove } from '../shared/games/core.js';
-import ludo, { homeAt, isSafe, trackSquare } from '../shared/games/ludo.js';
+import { begin, remove } from '@sanga/game-rules/core.js';
+import ludo, { homeAt, isSafe, trackSquare } from '@sanga/game-rules/ludo.js';
 
 const game = (n) => begin({
   status: 'lobby',
