@@ -10,11 +10,13 @@ export interface Sdk {
   identity(): { me: string; priv: CryptoKey | null; pub: string };
   /** A request to the Sanga server, signed in. Throws with a readable message on failure. */
   api<T = any>(path: string, body?: unknown): Promise<T>;
-  /** Live messages of one type from the server (e.g. 'notes'). Returns a function that stops listening. */
+  /** Live messages of one type from the server. Only the types in APP_FRAMES (e.g. 'notes'); any
+   *  other throws. Returns a function that stops listening. */
   on(type: string, fn: (m: any) => void): () => void;
   /** Runs each time the connection to the server is (re)established. Returns a function that stops it. */
   onReady(fn: () => void): () => void;
-  /** This device's storage. Apps use their own key prefix ('note/…'). */
+  /** This device's storage, limited to the apps' own keys (see storeKeyAllowed): the shell's keys
+   *  (sign-in token, group keys, cached messages) throw. */
   store: {
     get<T = any>(key: string): Promise<T | undefined>;
     put(key: string, value: unknown): Promise<void>;
@@ -37,6 +39,35 @@ export interface AppProps {
   onClose(): void;
   /** Where to open it, e.g. { chat: 'ravi' } for "Notes about this chat". */
   params: Record<string, string>;
+}
+
+/** The live message types apps may receive. The shell handles every other type itself (messages,
+ *  calls, stories, games…); an app neither sees those nor can take them over. Add a type here when
+ *  an app's server part (server/<name>.js) sends a new one. */
+export const APP_FRAMES: readonly string[] = ['notes'];
+
+export function assertAppFrame(type: string) {
+  if (!APP_FRAMES.includes(type)) throw new Error(`Apps can't listen to “${type}” messages`);
+}
+
+/** The storage keys apps may use: the diary's ('note/<id>', 'notesSince', from before this rule) and
+ *  'app/<appId>/…' for every other app. Everything else on the device belongs to the shell. The rule
+ *  keeps apps away from the shell's secrets; between apps the appId is a convention, not enforced. */
+export function storeKeyAllowed(key: string) {
+  return typeof key === 'string' && (key.startsWith('note/') || key === 'notesSince' || /^app\/[^/]+\//.test(key));
+}
+/** For prefix(): the prefix itself must lie inside an app's keys, so the range can't reach the shell's. */
+const prefixAllowed = (p: string) => typeof p === 'string' && (p.startsWith('note/') || /^app\/[^/]+\//.test(p));
+
+/** Wraps a device store so apps only reach their own keys. */
+export function scopedStore(s: Sdk['store']): Sdk['store'] {
+  const check = (ok: boolean, k: string) => { if (!ok) throw new Error(`Apps can't use the storage key “${k}”`); };
+  return {
+    get: async (k) => { check(storeKeyAllowed(k), k); return s.get(k); },
+    put: async (k, v) => { check(storeKeyAllowed(k), k); return s.put(k, v); },
+    del: async (k) => { check(storeKeyAllowed(k), k); return s.del(k); },
+    prefix: async (p) => { check(prefixAllowed(p), p); return s.prefix(p); },
+  };
 }
 
 let current: Sdk | null = null;

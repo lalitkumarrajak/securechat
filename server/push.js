@@ -75,13 +75,17 @@ export const routes = {
       typeof sub.keys?.p256dh === 'string' && sub.keys.p256dh.length < 200 &&
       typeof sub.keys?.auth === 'string' && sub.keys.auth.length < 100;
     if (!ok) return sendJson(res, 400, { error: 'Invalid subscription' });
-    await ctx.db.run('setPushSub', sub.endpoint, me, JSON.stringify({ p256dh: sub.keys.p256dh, auth: sub.keys.auth }), Date.now());
+    // An endpoint already registered to another account stays theirs: otherwise anyone who learned it
+    // could cut that browser off from its account's notifications and send it their own. (Signing out
+    // unsubscribes the browser, so the next account to sign in there gets a new endpoint.)
+    const { changes } = await ctx.db.run('setPushSub', sub.endpoint, me, JSON.stringify({ p256dh: sub.keys.p256dh, auth: sub.keys.auth }), Date.now());
+    if (!changes) return sendJson(res, 409, { error: 'This browser is set up for notifications for another account' });
     sendJson(res, 200, { ok: true });
   },
 
-  'POST /api/push/unsubscribe': async (req, res) => {
+  'POST /api/push/unsubscribe': async (req, res, me) => {
     const { endpoint } = await readJson(req);
-    if (typeof endpoint === 'string') await ctx.db.run('deletePushSub', endpoint);
+    if (typeof endpoint === 'string') await ctx.db.run('deletePushSubOf', endpoint, me); // only my own
     sendJson(res, 200, { ok: true });
   },
 };

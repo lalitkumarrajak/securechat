@@ -159,3 +159,13 @@ export const encryptComment = (key, obj, id, author, cid) => seal(key, te.encode
 export async function decryptComment(key, body, id, author, cid) {
   return JSON.parse(td.decode(await open(key, body, `scmt|${id}|${author}|${cid}`)));
 }
+
+// Story comments, v2: sealed with the commenter and owner's conversation key (the owner's own
+// comments with their story self key), not the story key every viewer holds, so the server can't
+// hand one viewer's comment to another who could open it. Bound to the owner, story, author and id.
+const commentAad = (owner, id, author, cid) => `scmt|${owner}|${id}|${author}|${cid}`;
+export const encryptStoryComment = (pairKey, obj, owner, id, author, cid) =>
+  seal(pairKey, te.encode(JSON.stringify(obj)), commentAad(owner, id, author, cid));
+export async function decryptStoryComment(pairKey, body, owner, id, author, cid) {
+  return JSON.parse(td.decode(await open(pairKey, body, commentAad(owner, id, author, cid))));
+}

@@ -112,7 +112,10 @@ export const routes = {
     const ip = clientIp(req);
     const { u, auth, dev } = await readJson(req);
     if (typeof u !== 'string' || !USER_RE.test(u) || !isAuthKey(auth)) return sendJson(res, 400, { error: 'Invalid credentials' });
-    if (rateLimited('login-ip:' + ip, 30, 900e3) || rateLimited('login-u:' + u, 10, 900e3)) {
+    // Guessing is limited per address, and per account from each address; a much higher limit per
+    // account from everywhere is a backstop. So someone else's wrong guesses can't lock its owner out.
+    if (rateLimited('login-ip:' + ip, 30, 900e3) || rateLimited('login-u:' + u + '|' + ip, 10, 900e3) ||
+        rateLimited('login-u:' + u, 200, 900e3)) {
       return sendJson(res, 429, { error: 'Too many attempts, try again in 15 minutes' });
     }
     const user = await checkPassword(u, auth);

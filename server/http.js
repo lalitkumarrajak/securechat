@@ -26,8 +26,11 @@ export const SECURITY_HEADERS = {
 
 export function clientIp(req) {
   if (config.trustProxy) {
+    // Each proxy appends the address it saw, so only the right-most entry (added by our one proxy,
+    // e.g. Render's) is trustworthy; anything to its left is whatever the client sent.
     const fwd = req.headers['x-forwarded-for'];
-    if (fwd) return String(fwd).split(',')[0].trim();
+    const last = fwd && String(fwd).split(',').at(-1).trim();
+    if (last) return last;
   }
   return req.socket.remoteAddress || '';
 }

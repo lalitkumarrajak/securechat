@@ -49,6 +49,12 @@ async function unseal(peer: string, id: string, kind: string, b: string) {
   return C.decryptMessage(await peerKey(peer), b, peer, myName(), `call|${id}|${kind}`);
 }
 
+// An offer carries when it was made, so one the server held back or replays later doesn't ring.
+// Phones' clocks can be minutes apart (set by hand, no network time), so allow 10 minutes either
+// way: still useless for replaying a call afterwards. (Ringing itself stops after 45 s on the server.)
+const OFFER_MAX_AGE = 10 * 60e3;
+const isFresh = (at: unknown) => typeof at === 'number' && Math.abs(Date.now() - at) <= OFFER_MAX_AGE;
+
 let ice: { at: number; servers: RTCIceServer[] } | null = null;
 async function iceServers() {
   if (!ice || Date.now() - ice.at > 10 * 60e3) {
@@ -157,7 +163,7 @@ export async function startCall(peer: string, video: boolean) {
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     if (cur()?.id !== id) return;
-    if (!sendFrame({ t: 'call', id, to: peer, v: video ? 1 : 0, b: await seal(peer, id, 'offer', { sdp: offer.sdp }) })) throw new Error('You’re offline');
+    if (!sendFrame({ t: 'call', id, to: peer, v: video ? 1 : 0, b: await seal(peer, id, 'offer', { sdp: offer.sdp, at: Date.now() }) })) throw new Error('You’re offline');
     startTone('ringback');
     R.timers.push(window.setTimeout(() => { if (cur()?.id === id && !R.answered) { sendFrame({ t: 'cend', id, r: 'ended' }); finish('missed', 'No answer'); } }, 60_000));
   } catch (e) {
@@ -269,8 +275,9 @@ frameHooks.call = async (m: { id: string; f: string; v: number; b: string }) => 
   if (c?.id === m.id) return; // rang again after reconnecting
   if (c) { sendFrame({ t: 'cend', id: m.id, r: 'busy' }); return; }
   if (!supported() || !getApp().friends[m.f] || await peerKeyChanged(m.f)) { sendFrame({ t: 'cend', id: m.id, r: 'failed' }); return; }
-  let offer: { sdp?: string };
+  let offer: { sdp?: string; at?: number };
   try { offer = await unseal(m.f, m.id, 'offer', m.b); } catch { sendFrame({ t: 'cend', id: m.id, r: 'failed' }); return; }
+  if (!isFresh(offer?.at)) { sendFrame({ t: 'cend', id: m.id, r: 'failed' }); return; }
   if (cur() || typeof offer?.sdp !== 'string') return;
   R = fresh();
   R.offer = offer.sdp;

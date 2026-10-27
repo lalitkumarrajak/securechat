@@ -54,13 +54,13 @@ describe('groups', () => {
     assert.equal((await api(b, '/api/key?u=' + c.u)).status, 200);
     assert.equal((await api(b, '/api/key?u=' + d.u)).status, 404);
     const key = await C.conversationKey(b.priv, c.pub, b.u, c.u);
-    const ct = await C.encryptMessage(key, { type: 'gkey', g: gid, kid: 'k1', key: 'x' }, b.u, c.u, 'gkeycid0001');
-    B.sendJson({ t: 'gkey', g: 'g:' + gid, keys: [{ u: c.u, cid: 'gkeycid0001', b: ct }, { u: d.u, cid: 'gkeycid0002', b: ct }] });
+    const ct = await C.encryptMessage(key, { type: 'gkey', g: gid, kid: 'k1', key: 'x' }, b.u, c.u, 'gk.keycid0001');
+    B.sendJson({ t: 'gkey', g: 'g:' + gid, keys: [{ u: c.u, cid: 'gk.keycid0001', b: ct }, { u: d.u, cid: 'gk.keycid0002', b: ct }] });
     await B.next('gkeyok');
-    const row = await C2.next('m', (m) => m.cid === 'gkeycid0001');
+    const row = await C2.next('m', (m) => m.cid === 'gk.keycid0001');
     assert.equal(row.to, c.u);
     assert.deepEqual(await C.decryptMessage(await C.conversationKey(c.priv, b.pub, c.u, b.u), row.b, b.u, c.u, row.cid), { type: 'gkey', g: gid, kid: 'k1', key: 'x' });
-    assert.equal(await D.gets('m', (m) => m.cid === 'gkeycid0002'), false); // d isn't in the group
+    assert.equal(await D.gets('m', (m) => m.cid === 'gk.keycid0002'), false); // d isn't in the group
   });
 
   it('new members see messages from when they joined, not before', async () => {
@@ -94,7 +94,7 @@ describe('groups', () => {
   it('admins can make it admins-only, and make others admin', async () => {
     await api(a, '/api/groups/update', { id: gid, adminsOnly: true });
     assert.equal((await send(B, b, gid, 'grpmsg00005')).e, 'admins-only');
-    assert.equal((await send(B, b, gid, 'grpmsg00006', 'AAAA', { q: 1 })).t, 'ack'); // reactions still allowed
+    assert.equal((await send(B, b, gid, 'grpmsg00006', 'AAAA', { q: 1 })).e, 'admins-only'); // "quiet" doesn't exempt
     await api(a, '/api/groups/admin', { id: gid, u: b.u, on: true });
     assert.equal((await send(B, b, gid, 'grpmsg00007')).t, 'ack');
     await api(a, '/api/groups/update', { id: gid, adminsOnly: false, name: 'Family 🏠' });
@@ -139,5 +139,50 @@ describe('groups', () => {
     B.sendJson({ t: 'gnew', type: 'ludo', to: [d.u], ref: 'gg' }); // b and d aren't friends, but share a group
     const g = (await B.next('g', (m) => m.ref === 'gg')).g;
     assert.equal(g.players[1].u, d.u);
+  });
+});
+
+// The gkey frame must not be a way around friendship or blocks: handover rows are marked (gk. cid)
+// so clients only take them as keys, and a block stops them altogether.
+describe('group key handovers between non-friends', () => {
+  let srv, a, b, c, A, B, C2, gid;
+  before(async () => {
+    srv = await startServer();
+    [a, b, c] = await Promise.all(['gka', 'gkb', 'gkc'].map((x) => register(srv, name(x))));
+    await befriend(srv, a, b);
+    await befriend(srv, a, c); // b and c share the group but aren't friends
+    [A, B, C2] = await Promise.all([a, b, c].map((x) => connect(srv, x.token)));
+    gid = (await srv.api('/api/groups', { name: 'Keys', members: [b.u, c.u] }, a.token)).data.group.id;
+  });
+  after(async () => { for (const w of [A, B, C2]) w?.close(); await srv?.stop(); });
+
+  const handover = async (ws, from, to, cid) => {
+    const b = await C.encryptMessage(await C.conversationKey(from.priv, to.pub, from.u, to.u), { type: 'text', text: 'hi' }, from.u, to.u, cid);
+    ws.sendJson({ t: 'gkey', g: 'g:' + gid, keys: [{ u: to.u, cid, b }] });
+    await ws.next('gkeyok');
+  };
+
+  it('to a non-friend only as a marked handover, never with a plain message cid', async () => {
+    await handover(B, b, c, 'plaincid0001');
+    assert.equal(await C2.gets('m', (m) => m.cid === 'plaincid0001'), false);
+    await handover(B, b, c, 'gk.marked0001');
+    assert.equal((await C2.next('m', (m) => m.cid === 'gk.marked0001')).f, b.u);
+    await handover(A, a, b, 'plaincid0002'); // friends: older clients' unmarked handovers still go through
+    await B.next('m', (m) => m.cid === 'plaincid0002');
+  });
+
+  it('a normal message can’t use the handover prefix', async () => {
+    A.sendJson({ t: 'msg', cid: 'gk.fakemsg001', to: b.u, b: 'AAAA' });
+    assert.equal((await A.next('err')).e, 'bad cid');
+  });
+
+  it('not through a block, either way', async () => {
+    await srv.api('/api/friends/block', { u: b.u }, c.token);
+    for (const cid of ['gk.blocked001', 'blockedcid01']) {
+      await handover(B, b, c, cid);
+      assert.equal(await C2.gets('m', (m) => m.cid === cid), false);
+      await handover(C2, c, b, cid);
+      assert.equal(await B.gets('m', (m) => m.cid === cid), false);
+    }
   });
 });

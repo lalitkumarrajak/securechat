@@ -99,6 +99,24 @@ describe('push notifications', () => {
     await srv.api('/api/mute', { u: a.u, until: 0 }, b.token);
   });
 
+  it('an endpoint stays with its account: others can neither take it over nor remove it', async () => {
+    const [p, q] = await Promise.all([register(srv, name('xp')), register(srv, name('xq'))]);
+    await befriend(srv, a, p);
+    const sub = subscription('p1');
+    assert.equal((await srv.api('/api/push/subscribe', { sub }, p.token)).status, 200);
+    assert.equal((await srv.api('/api/push/subscribe', { sub }, p.token)).status, 200); // again, e.g. new keys
+    assert.equal((await srv.api('/api/push/subscribe', { sub: subscription('p1') }, q.token)).status, 409);
+    assert.equal((await srv.api('/api/push/unsubscribe', { endpoint: sub.endpoint }, q.token)).status, 200);
+    await sleep(4100);
+    hits.length = 0;
+    await sendText(wa, a, p, 'still yours');
+    await waitHits(1);
+    assert.deepEqual(hits.map((h) => h.path), ['/push/p1']); // p still gets it
+    // p's own unsubscribe removes it.
+    assert.equal((await srv.api('/api/push/unsubscribe', { endpoint: sub.endpoint }, p.token)).status, 200);
+    assert.equal((await srv.api('/api/push/subscribe', { sub: subscription('p1') }, q.token)).status, 200);
+  });
+
   it('notifies about friend requests and drops expired subscriptions', async () => {
     const c = await register(srv, name('xc'));
     await srv.api('/api/push/subscribe', { sub: subscription('gone') }, c.token);

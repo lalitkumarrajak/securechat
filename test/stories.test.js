@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { C, befriend, connect, name, register, sleep, startServer } from './helpers.js';
 
 let srv;
-before(async () => { srv = await startServer({ CALL_RING_MS: '1500', CALL_GRACE_MS: '300' }); });
+before(async () => { srv = await startServer({ CALL_RING_MS: '1500', CALL_GRACE_MS: '300', CALL_DROP_MS: '400', STORIES_MAX_BYTES: '20000' }); });
 after(() => srv.stop());
 
 // Posts a story the way the app does: sealed with a fresh key, wrapped for each friend and for me.
@@ -78,9 +78,11 @@ describe('stories', () => {
     assert.equal((await aws.next('story', (m) => m.like)).like, b.u);
     await srv.api('/api/stories/view', { id }, c.token);
 
+    // Sealed between the commenter and the owner, as the app does.
+    const pair = (x, y) => C.conversationKey(x.priv, y.pub, x.u, y.u);
     const comment = async (who, text) => {
       const cid = C.randomId(18);
-      const body = await C.encryptComment(key, { text }, id, who.u, cid);
+      const body = await C.encryptStoryComment(await pair(who, a), { text }, a.u, id, who.u, cid);
       return { cid, r: await srv.api('/api/stories/comment', { id, cid, body }, who.token) };
     };
     const bc = await comment(b, 'Goa? 🏖️');
@@ -97,9 +99,15 @@ describe('stories', () => {
     assert.deepEqual(act.views.map((v) => [v.u, v.liked]), [[b.u, true], [c.u, false]]);
     assert.equal(act.comments.length, 2);
     const first = act.comments.find((x) => x.u === b.u);
-    assert.deepEqual(await C.decryptComment(key, first.b, id, b.u, first.id), { text: 'Goa? 🏖️' });
-    // A comment can't be passed off as someone else's.
-    await assert.rejects(C.decryptComment(key, first.b, id, c.u, first.id));
+    assert.deepEqual(await C.decryptStoryComment(await pair(a, b), first.b, a.u, id, b.u, first.id), { text: 'Goa? 🏖️' });
+    // A comment can't be passed off as someone else's, or as one on another story.
+    await assert.rejects(C.decryptStoryComment(await pair(a, c), first.b, a.u, id, c.u, first.id));
+    await assert.rejects(C.decryptStoryComment(await pair(a, b), first.b, a.u, C.randomId(18), b.u, first.id));
+    // Another viewer holds the story key and their own key with the owner, but neither opens b's
+    // comment, should a server hand it to them.
+    await assert.rejects(C.decryptStoryComment(key, first.b, a.u, id, b.u, first.id));
+    await assert.rejects(C.decryptStoryComment(await pair(c, a), first.b, a.u, id, b.u, first.id));
+    await assert.rejects(C.decryptComment(key, first.b, id, b.u, first.id));
 
     const bAct = (await srv.api('/api/stories/activity?id=' + id, undefined, b.token)).data;
     assert.deepEqual(bAct.comments.map((x) => x.u), [b.u]);
@@ -118,6 +126,20 @@ describe('stories', () => {
     assert.equal((await srv.api('/api/stories/body?id=' + id, undefined, b.token)).status, 404);
     aws.close();
     bws.close();
+  });
+
+  it('limits the space a person’s current stories take', async () => {
+    const a = await register(srv, name('ula'));
+    const big = async () => {
+      const id = C.randomId(18);
+      const keys = [{ u: a.u, key: 'AAAA' }];
+      return (await srv.api('/api/stories', { id, body: 'A'.repeat(8000), keys }, a.token));
+    };
+    assert.equal((await big()).status, 200);
+    assert.equal((await big()).status, 200);
+    const third = await big(); // 24 000 > STORIES_MAX_BYTES
+    assert.equal(third.status, 400);
+    assert.match(third.data.error, /space/);
   });
 
   it('rejects bad stories', async () => {
@@ -205,6 +227,80 @@ describe('calls', () => {
     assert.equal((await bws.next('cend', (m) => m.id === id, 8000)).r, 'cancelled');
     bws.close();
     await sleep(10);
+  });
+
+  it('a person can be on only a couple of calls at once', async () => {
+    const [a, b, c, d, e] = await Promise.all(['ari', 'ben', 'cal', 'dov', 'eli'].map((n) => register(srv, name(n))));
+    for (const [x, y] of [[a, b], [a, c], [a, d], [d, b], [e, b]]) await befriend(srv, x, y);
+    const [aws, dws, ews] = await Promise.all([a, d, e].map((x) => connect(srv, x.token)));
+    const ring = async (ws, to) => {
+      const id = C.randomId(18);
+      ws.sendJson({ t: 'call', id, to: to.u, v: 0, b: 'eA==' });
+      return { id, got: await ws.next(['cring', 'cend'], (m) => m.id === id) };
+    };
+    const first = await ring(aws, b);
+    assert.equal(first.got.t, 'cring');
+    assert.equal((await ring(aws, c)).got.t, 'cring');
+    const third = await ring(aws, d);
+    assert.deepEqual([third.got.t, third.got.r], ['cend', 'failed']);     // a's third
+    assert.equal((await ring(dws, b)).got.t, 'cring');                    // b's second
+    assert.equal((await ring(ews, b)).got.r, 'busy');                     // b's third
+    aws.sendJson({ t: 'cend', id: first.id, r: 'ended' });                // hanging up frees a place
+    assert.equal((await ring(aws, d)).got.t, 'cring');
+    for (const ws of [aws, dws, ews]) ws.close();
+    await sleep(1600); // let them ring out (CALL_RING_MS)
+  });
+
+  it('an answered call is forgotten once both sides are gone, kept if one comes back', async () => {
+    const [a, b] = await Promise.all(['fay', 'fin'].map((n) => register(srv, name(n))));
+    await befriend(srv, a, b);
+    const answered = async () => {
+      const [aws, bws] = await Promise.all([connect(srv, a.token), connect(srv, b.token)]);
+      const id = C.randomId(18);
+      aws.sendJson({ t: 'call', id, to: b.u, v: 0, b: 'eA==' });
+      await bws.next('call', (m) => m.id === id);
+      bws.sendJson({ t: 'cans', id, b: 'eQ==' });
+      await aws.next('cans');
+      return { id, aws, bws };
+    };
+
+    let { id, aws, bws } = await answered();
+    aws.terminate();
+    const back = await connect(srv, a.token);
+    back.sendJson({ t: 'cre', id });
+    await sleep(700); // past CALL_DROP_MS
+    back.sendJson({ t: 'csig', id, k: 'ice', b: 'Yw==' });
+    assert.equal((await bws.next('csig')).b, 'Yw=='); // still on
+    back.sendJson({ t: 'cend', id, r: 'ended' });
+    await bws.next('cend');
+    back.close();
+    bws.close();
+
+    ({ id, aws, bws } = await answered());
+    aws.terminate();
+    bws.terminate();
+    await sleep(700);
+    const again = await connect(srv, a.token);
+    again.sendJson({ t: 'cre', id });
+    assert.equal((await again.next('cend', (m) => m.id === id)).r, 'ended'); // gone from the server
+    again.close();
+  });
+
+  it('caps the calls the server keeps', async () => {
+    const t = await startServer({ CALL_MAX: '1' });
+    try {
+      const [a, b, c, d] = await Promise.all(['gil', 'gus', 'guy', 'gwen'].map((n) => register(t, name(n))));
+      await befriend(t, a, b);
+      await befriend(t, c, d);
+      const [aws, cws] = await Promise.all([connect(t, a.token), connect(t, c.token)]);
+      aws.sendJson({ t: 'call', id: C.randomId(18), to: b.u, v: 0, b: 'eA==' });
+      await aws.next('cring');
+      const id = C.randomId(18);
+      cws.sendJson({ t: 'call', id, to: d.u, v: 0, b: 'eA==' });
+      assert.equal((await cws.next('cend', (m) => m.id === id)).r, 'failed');
+      aws.close();
+      cws.close();
+    } finally { await t.stop(); }
   });
 
   it('gives the app STUN servers (and TURN when configured)', async () => {

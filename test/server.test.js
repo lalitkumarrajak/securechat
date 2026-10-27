@@ -1,6 +1,7 @@
 // Server integration tests. Run with: npm test (SQLite), or with MONGODB_URI / DATABASE_URL set.
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import WebSocket from 'ws';
 import { C, befriend, connect, decrypt, name, register, sendText, sleep, startServer } from './helpers.js';
 
 let srv;
@@ -42,6 +43,33 @@ describe('basics', () => {
       assert.equal((await closed.api('/api/config')).data.signup, false);
       assert.equal((await closed.api('/api/register', {})).status, 403);
     } finally { await closed.stop(); }
+  });
+
+  it('behind a proxy, takes the client address from the right-most X-Forwarded-For entry', async () => {
+    const proxied = await startServer({ TRUST_PROXY: '1', SIGNUPS_PER_HOUR: '2' });
+    try {
+      // The client writes whatever it likes on the left; the proxy appends the address it saw.
+      const signUp = (xff) => fetch(proxied.base + '/api/register', { method: 'POST', body: '{}', headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': xff } }).then((r) => r.status);
+      assert.equal(await signUp('1.1.1.1, 203.0.113.7'), 400);
+      assert.equal(await signUp('2.2.2.2, 203.0.113.7'), 400);
+      assert.equal(await signUp('3.3.3.3, 203.0.113.7'), 429); // a forged left-most entry doesn't reset the limit
+      assert.equal(await signUp('203.0.113.8'), 400); // another real client has its own
+    } finally { await proxied.stop(); }
+  });
+
+  it('closes a socket that sends a big frame before signing in, but not after', async () => {
+    const raw = new WebSocket(`ws://localhost:${srv.port}/ws`);
+    await new Promise((r) => raw.on('open', r));
+    const closed = new Promise((r) => raw.on('close', (code) => r(code)));
+    raw.send(JSON.stringify({ t: 'auth', token: 'x'.repeat(5000) }));
+    assert.equal(await closed, 1009);
+
+    const [a, b] = await Promise.all([register(srv, name('big1')), register(srv, name('big2'))]);
+    await befriend(srv, a, b);
+    const ws = await connect(srv, a.token);
+    const r = await sendText(ws, a, b, 'x'.repeat(20000));
+    assert.equal(r.t, 'ack');
+    ws.close();
   });
 
   it('relays animated emoji and rejects bad paths', async () => {

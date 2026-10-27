@@ -84,10 +84,13 @@ server.headersTimeout = 15e3;
 server.requestTimeout = 30e3;
 
 // ---------- WebSocket ----------
+// Before auth a socket may only send its small 'auth' frame, so a stranger can't make us buffer
+// and parse megabytes; the full limit applies once signed in.
+const PRE_AUTH_MAX = 4096;
 const wss = new WebSocketServer({
   server,
   path: '/ws',
-  maxPayload: MAX_BODY + 4096,
+  maxPayload: MAX_BODY + 4096, // after auth; see PRE_AUTH_MAX
   // Compress only larger frames; saves bandwidth on slow links without wasting CPU on tiny ones.
   perMessageDeflate: { threshold: 512, zlibDeflateOptions: { level: 6 } },
   verifyClient: ({ req }) => {
@@ -105,14 +108,20 @@ wss.on('connection', (ws, req) => {
   ws.watching = new Set();
   ws.ip = clientIp(req);
   const authTimer = setTimeout(() => ws.close(4000, 'auth timeout'), 10e3);
+  // ws has no public per-socket limit; lowering its receiver's one refuses (1009) a big frame from
+  // its header instead of after buffering it. The size check below still holds if ws changes.
+  if (ws._receiver) ws._receiver._maxPayload = PRE_AUTH_MAX;
 
   ws.on('pong', () => { ws.alive = true; });
+  // A bad or oversized frame is emitted here before ws closes the socket; unhandled, it would crash the server.
+  ws.on('error', () => {});
 
   // Handle each socket's frames one at a time, in order: the database calls are async,
   // and e.g. a 'sync' sent right after 'auth' must not run before auth has finished.
   let queue = Promise.resolve();
   ws.on('message', (data, isBinary) => {
     ws.alive = true;
+    if (!ws.user && data.length > PRE_AUTH_MAX) return ws.close(1009, 'too big');
     if (isBinary) return;
     let m;
     try { m = JSON.parse(data); } catch { return; }
@@ -127,6 +136,7 @@ wss.on('connection', (ws, req) => {
       const user = await userFromToken(m.token);
       if (!user) return ws.close(4001, 'unauthorized');
       clearTimeout(authTimer);
+      if (ws._receiver) ws._receiver._maxPayload = MAX_BODY + 4096;
       ws.user = user;
       ws.tokenHash = sha256(m.token);
       touchSession(ws.tokenHash, ws.ip);

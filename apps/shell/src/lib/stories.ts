@@ -1,5 +1,5 @@
 // Stories: a photo or a few words for your friends, gone after 24 hours. Friends can like them,
-// comment (only you see the comments) and you can tag friends in them.
+// comment (only you and the commenter can read a comment) and you can tag friends in them.
 // Each story is sealed with its own key (crypto.encryptStory), wrapped for every friend it's shared
 // with, so only they can open it; the server just stores and hands out the ciphertext.
 // Opened stories are kept on this device until they expire, so they show instantly the second time.
@@ -171,10 +171,19 @@ export async function likeStory(s: StoryMeta, on: boolean) {
   catch (e) { setMeta(s.id, { liked: !on }); throw e; }
 }
 
+// A comment is between its author and the story's owner, so it's sealed with their conversation key
+// (my own comments on my story with my story self key), not the story key every viewer has: the
+// server can't show one viewer's comment to another.
+function commentKey(s: StoryMeta, author: string) {
+  const { me, priv, pub } = ownIdentity();
+  if (s.u !== me) return peerKey(s.u);
+  return author === me ? C.storySelfKey(priv!, pub) : peerKey(author);
+}
+
 export async function commentOn(s: StoryMeta, text: string) {
   const { me } = ownIdentity();
   const cid = C.randomId(18);
-  const body = await C.encryptComment(await storyKey(s), { text: text.slice(0, 1000) }, s.id, me, cid);
+  const body = await C.encryptStoryComment(await commentKey(s, me), { text: text.slice(0, 1000) }, s.u, s.id, me, cid);
   await api('/api/stories/comment', { id: s.id, cid, body });
 }
 
@@ -183,11 +192,12 @@ export const deleteComment = (s: StoryMeta, cid: string) => api('/api/stories/co
 /** Who viewed and liked (my stories) and the comments I may see, opened. */
 export async function storyActivity(s: StoryMeta): Promise<StoryActivity> {
   const r = await api<{ views?: StoryActivity['views']; comments: { id: string; u: string; b: string; ts: number }[] }>('/api/stories/activity?id=' + encodeURIComponent(s.id));
-  const key = await storyKey(s);
+  const me = ownIdentity().me;
   const comments: StoryComment[] = [];
   for (const c of r.comments) {
     try {
-      const o = await C.decryptComment(key, c.b, s.id, c.u, c.id);
+      if (s.u !== me && c.u !== me) continue; // the server should only send me mine
+      const o = await C.decryptStoryComment(await commentKey(s, c.u), c.b, s.u, s.id, c.u, c.id);
       if (typeof o?.text === 'string') comments.push({ id: c.id, u: c.u, text: o.text.slice(0, 1000), ts: c.ts });
     } catch { /* not readable: skip it */ }
   }

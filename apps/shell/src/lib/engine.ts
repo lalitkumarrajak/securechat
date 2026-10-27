@@ -28,7 +28,7 @@ const S = {
   pingTimer: 0,
   pongTimer: 0,
   convKeys: new Map<string, CryptoKey>(),
-  groupKeys: new Map<string, { key: CryptoKey; from: string }>(), // group key id -> key and whose it is
+  groupKeys: new Map<string, { key: CryptoKey; from: string }>(), // "<sender>/<key id>" -> key and whose it is
   inbox: Promise.resolve() as Promise<unknown>,
   inflight: new Set<string>(),
   rcpt: { 1: new Set<number>(), 2: new Set<number>() } as Record<1 | 2, Set<number>>,
@@ -40,6 +40,8 @@ const S = {
 
 const visible = () => document.visibilityState === 'visible';
 const CONTROL = new Set(['react', 'edit', 'pin', 'gkey']);
+// Cid prefix of group key handovers; the server keeps it out of ordinary messages.
+const GKEY_CID = 'gk.';
 
 // ---------- HTTP ----------
 export async function api<T = any>(path: string, body?: unknown): Promise<T> {
@@ -228,8 +230,9 @@ function resetPong() {
   S.pongTimer = window.setTimeout(() => { if (visible()) S.ws?.close(); }, 50000);
 }
 
+// Only once signed in: before that the server accepts nothing but the (small) sign-in frame.
 function wsSend(obj: unknown) {
-  if (S.ws?.readyState === 1) { S.ws.send(JSON.stringify(obj)); return true; }
+  if (S.ready && S.ws?.readyState === 1) { S.ws.send(JSON.stringify(obj)); return true; }
   return false;
 }
 export { wsSend as sendFrame };
@@ -694,8 +697,8 @@ async function ingest(row: any, fromSync: boolean): Promise<void> {
   let content: any;
   if (group) {
     const kid = C.bodyKeyId(row.b);
-    const gk = await groupKey(kid);
-    if (!gk) return holdForKey(kid, row, peer, fromSync);
+    const gk = await groupKey(row.f, kid);
+    if (!gk) return holdForKey(row.f, kid, row, peer, fromSync);
     // Each member's key only opens that member's messages.
     try { content = gk.from === row.f ? await C.decryptGroup(gk.key, row.b, row.f, row.to, row.cid) : { type: 'err' }; }
     catch { content = { type: 'err' }; }
@@ -703,6 +706,14 @@ async function ingest(row: any, fromSync: boolean): Promise<void> {
     try { content = await C.decryptMessage(await convKey(peer), row.b, row.f, row.to, row.cid); }
     catch { content = { type: 'err' }; }
   }
+
+  // A key handover row (and anything between my own devices) may only carry a group key, and
+  // nothing from someone I blocked is shown: dropped, not shown or stored. The server already only
+  // relays chats between friends and handovers to group-mates who haven't blocked each other; an
+  // unfriended person's earlier messages stay (they were real).
+  if (!group && content?.type !== 'gkey' && (row.cid.startsWith(GKEY_CID) || peer === S.me || (!out && getApp().blocked.includes(peer)))) return;
+  // In an admins-only group, only admins' messages count (the server refuses the rest too).
+  if (group && !CONTROL.has(content?.type) && await adminsOnlyBlocks(row)) return;
 
   if (CONTROL.has(content?.type)) {
     await db.put('kv', 1, 'ctl/' + k); // remember it was a control, not a message
@@ -722,23 +733,44 @@ async function ingest(row: any, fromSync: boolean): Promise<void> {
   if (!out) alertIncoming(peer, msg);
 }
 
+// A group message sent by a non-admin after the group became admins-only (per the system note,
+// which arrives in order before it). Unknown group or member: can't tell, so it's let through.
+async function adminsOnlyBlocks(row: any) {
+  const ao: { on: boolean; ts: number } | undefined = await db.get('kv', 'ao/' + row.to);
+  if (!ao?.on || row.ts < ao.ts) return false;
+  const m = getApp().groups[groupIdOf(row.to)]?.members.find((x) => x.u === row.f);
+  return !!m && !m.admin;
+}
+
 // ---------- groups: keys and system notes ----------
-async function groupKey(kid: string) {
-  if (!S.groupKeys.has(kid)) {
-    const rec = await db.get('kv', 'gk/' + kid);
+// Group keys are filed under sender and key id, so a member can only ever supply their own key:
+// handing someone a bogus key under another member's id doesn't touch that member's messages.
+// Older records sit at gk/<kid> and say whose they are.
+async function groupKeyRec(from: string, kid: string) {
+  const rec = await db.get('kv', 'gk/' + from + '/' + kid);
+  if (rec) return rec;
+  const old = await db.get('kv', 'gk/' + kid);
+  return old?.from === from ? old : null;
+}
+
+async function groupKey(from: string, kid: string) {
+  const id = from + '/' + kid;
+  if (!S.groupKeys.has(id)) {
+    const rec = await groupKeyRec(from, kid);
     if (!rec) return null;
-    S.groupKeys.set(kid, { key: await C.importGroupKey(rec.raw), from: rec.from });
+    S.groupKeys.set(id, { key: await C.importGroupKey(rec.raw), from: rec.from });
   }
-  return S.groupKeys.get(kid)!;
+  return S.groupKeys.get(id)!;
 }
 
 // A group message whose key hasn't reached this device yet: show a placeholder, and decrypt it
 // when the key arrives.
-async function holdForKey(kid: string, row: any, peer: string, fromSync: boolean): Promise<void> {
-  const rows: any[] = (await db.get('kv', 'pend/' + kid)) || [];
+async function holdForKey(from: string, kid: string, row: any, peer: string, fromSync: boolean): Promise<void> {
+  const at = 'pend/' + from + '/' + kid;
+  const rows: any[] = (await db.get('kv', at)) || [];
   if (!rows.some((r) => r.cid === row.cid && r.f === row.f)) rows.push(row);
-  await db.put('kv', rows.slice(-500), 'pend/' + kid);
-  if (await db.get('kv', 'gk/' + kid)) { await db.del('kv', 'pend/' + kid); return ingest(row, fromSync); } // the key just arrived
+  await db.put('kv', rows.slice(-500), at);
+  if (await groupKeyRec(from, kid)) { await db.del('kv', at); return ingest(row, fromSync); } // the key just arrived
   const msg: Msg = { k: row.f + '/' + row.cid, cid: row.cid, id: row.id, peer, out: row.f === S.me, ts: row.ts, s: row.s, type: 'err', pending: true };
   await db.putMsg(msg);
   await bumpChat(peer, msg, false, fromSync);
@@ -747,10 +779,17 @@ async function holdForKey(kid: string, row: any, peer: string, fromSync: boolean
 
 async function storeGroupKey(c: any, from: string) {
   if (typeof c.g !== 'string' || typeof c.kid !== 'string' || c.kid.length !== 16 || typeof c.key !== 'string' || c.key.length !== 44) return;
-  if (await db.get('kv', 'gk/' + c.kid)) return; // first one wins: nobody can replace someone else's key
-  await db.put('kv', { gid: c.g, raw: c.key, from }, 'gk/' + c.kid);
-  const rows: any[] = (await db.get('kv', 'pend/' + c.kid)) || [];
-  await db.del('kv', 'pend/' + c.kid);
+  if (await groupKeyRec(from, c.kid)) return; // first one wins, and it's only ever from its sender
+  await db.put('kv', { gid: c.g, raw: c.key, from }, 'gk/' + from + '/' + c.kid);
+  const rows: any[] = (await db.get('kv', 'pend/' + from + '/' + c.kid)) || [];
+  await db.del('kv', 'pend/' + from + '/' + c.kid);
+  // Rows held under the old key-id-only address: take this sender's, leave the rest waiting.
+  const old: any[] = (await db.get('kv', 'pend/' + c.kid)) || [];
+  if (old.length) {
+    rows.push(...old.filter((r) => r.f === from));
+    const rest = old.filter((r) => r.f !== from);
+    if (rest.length) await db.put('kv', rest, 'pend/' + c.kid); else await db.del('kv', 'pend/' + c.kid);
+  }
   for (const row of rows) {
     await db.del('msgs', row.f + '/' + row.cid);
     await ingest(row, true);
@@ -785,6 +824,10 @@ export function sysText(ev: SysEvent, g?: Group) {
 async function ingestSystem(row: any, peer: string, fromSync: boolean) {
   let ev: SysEvent;
   try { ev = { ...JSON.parse(row.b.slice(4)), by: row.f }; } catch { return; }
+  if (ev.e === 'adminsOnly') { // when it turned on, for adminsOnlyBlocks
+    const ao = await db.get('kv', 'ao/' + peer);
+    if (!ao || row.ts >= ao.ts) await db.put('kv', { on: !!ev.on, ts: row.ts }, 'ao/' + peer);
+  }
   const msg: Msg = { k: row.f + '/' + row.cid, cid: row.cid, id: row.id, peer, out: false, ts: row.ts, s: 2, type: 'sys', sys: ev };
   await db.putMsg(msg);
   await bumpChat(peer, msg, false, fromSync);
@@ -823,13 +866,13 @@ async function groupSendingKey(gid: string) {
   if (!cur || cur.epoch !== g.epoch) {
     const k = C.newGroupKey();
     cur = { kid: k.kid, raw: k.raw, epoch: g.epoch, to: [] };
-    await db.put('kv', { gid: 'g:' + gid, raw: k.raw, from: S.me }, 'gk/' + k.kid);
+    await db.put('kv', { gid: 'g:' + gid, raw: k.raw, from: S.me }, 'gk/' + S.me + '/' + k.kid);
   }
   const keys: { u: string; cid: string; b: string }[] = [];
   for (const m of g.members) {
     if (cur.to.includes(m.u) || (m.u !== S.me && await peerKeyChanged(m.u))) continue;
     try {
-      const cid = C.randomId();
+      const cid = GKEY_CID + C.randomId();
       keys.push({ u: m.u, cid, b: await C.encryptMessage(await convKey(m.u), { type: 'gkey', g: 'g:' + gid, kid: cur.kid, key: cur.raw }, S.me, m.u, cid) });
     } catch { /* their key isn't available yet: next time */ }
   }
@@ -839,7 +882,7 @@ async function groupSendingKey(gid: string) {
     cur.to = [...cur.to, ...keys.map((k) => k.u)];
   }
   await db.put('kv', cur, 'gsend/' + gid);
-  return { kid: cur.kid, key: (await groupKey(cur.kid))!.key };
+  return { kid: cur.kid, key: (await groupKey(S.me, cur.kid))!.key };
 }
 
 async function bumpChat(peer: string, msg: Msg, unread: boolean, fromSync: boolean) {

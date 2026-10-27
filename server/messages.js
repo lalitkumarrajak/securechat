@@ -16,6 +16,10 @@ async function rowOut(r, viewer) {
   return { id: r.id, cid: r.cid, f: r.sender, to: r.recipient, b: r.body, ts: r.ts, s, seq: r.seq };
 }
 
+// Group key handovers carry this cid prefix. The '.' is outside CID_RE, so an ordinary message
+// can never be passed off as a handover (or the reverse); clients only accept these as keys.
+const GKEY_CID_RE = /^gk\.[A-Za-z0-9_-]{8,37}$/;
+
 const idList = (ids, max) => (Array.isArray(ids) && ids.length <= max ? ids.filter(Number.isSafeInteger) : null);
 
 // A message to a group: one ciphertext for everyone, from a member allowed to send.
@@ -23,7 +27,9 @@ async function groupMsg(ws, m) {
   const gid = m.to.slice(2);
   const [g, me] = await Promise.all([ctx.db.get('getGroup', gid), memberOf(gid, ws.user)]);
   if (!g || !me) return send(ws, { t: 'err', cid: m.cid, e: 'not-member' });
-  if (g.admins_only && !me.admin && !m.q) return send(ws, { t: 'err', cid: m.cid, e: 'admins-only' });
+  // Quiet (q) is client-set, so it can't exempt anything: in an admins-only group, members can't
+  // send at all, reactions and edits included.
+  if (g.admins_only && !me.admin) return send(ws, { t: 'err', cid: m.cid, e: 'admins-only' });
   if (typeof m.b !== 'string' || m.b.length > MAX_BODY || !B64_RE.test(m.b)) return send(ws, { t: 'err', cid: m.cid, e: 'Bad message' });
   const res = await ctx.db.run('insertMsg', nextSeq(), m.cid, ws.user, m.to, m.b, Date.now());
   const row = await ctx.db.get('getMsgByCid', ws.user, m.cid);
@@ -87,14 +93,19 @@ export const handlers = {
   },
 
   // A member hands their group sending key to other members (and their own other devices),
-  // each copy encrypted pairwise. Stored as ordinary one-to-one rows; no notifications.
+  // each copy encrypted pairwise. Stored as one-to-one rows with a gk. cid; no notifications.
   async gkey(ws, m) {
     const gid = isGroupPeer(m.g) ? m.g.slice(2) : null;
     const done = () => send(ws, { t: 'gkeyok', g: m.g, ...(typeof m.ref === 'string' && { ref: m.ref.slice(0, 40) }) });
     if (!gid || !Array.isArray(m.keys) || m.keys.length > MAX_MEMBERS || !(await memberOf(gid, ws.user))) return done(); // refused: don't retry
     for (const k of m.keys) {
-      if (typeof k?.u !== 'string' || typeof k.cid !== 'string' || !CID_RE.test(k.cid) || typeof k.b !== 'string' || k.b.length > 2000 || !B64_RE.test(k.b)) continue;
-      if (k.u !== ws.user && !(await memberOf(gid, k.u))) continue;
+      if (typeof k?.u !== 'string' || typeof k.cid !== 'string' || typeof k.b !== 'string' || k.b.length > 2000 || !B64_RE.test(k.b)) continue;
+      if (k.u !== ws.user) {
+        // Group-mates who aren't friends get keys, but never through a block, and only as rows
+        // marked as handovers. Unmarked cids (older clients) only go where a message could.
+        if (!(await memberOf(gid, k.u)) || await ctx.db.get('getBlock', ws.user, k.u, k.u, ws.user)) continue;
+        if (!GKEY_CID_RE.test(k.cid) && !(CID_RE.test(k.cid) && await canChat(ws.user, k.u))) continue;
+      } else if (!GKEY_CID_RE.test(k.cid) && !CID_RE.test(k.cid)) continue;
       const res = await ctx.db.run('insertMsg', nextSeq(), k.cid, ws.user, k.u, k.b, Date.now());
       if (res.changes === 0) continue;
       const row = await ctx.db.get('getMsgByCid', ws.user, k.cid);

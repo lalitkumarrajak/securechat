@@ -1,10 +1,11 @@
 // An app opened on its own page (e.g. /apps/notes/), without the shell. It uses the sign-in this
 // device already has (the same browser storage as the main app) and its own connection to the
-// server. Not signed in yet: it points to the main app to sign in.
+// server. Not signed in yet: it points to the main app to sign in. With an app lock or "sign out when
+// I close the tab" on, it goes to the main app instead, which enforces them (see guarded()).
 import { createElement, useEffect, useState, type ComponentType } from 'react';
 import { createRoot } from 'react-dom/client';
 import { confirm, ConfirmHost } from '@sanga/ui/confirm';
-import { provideSdk, type AppProps, type Sdk } from '@sanga/sdk'; // by name: the same shared copy the app uses
+import { assertAppFrame, provideSdk, scopedStore, type AppProps, type Sdk } from '@sanga/sdk'; // by name: the same shared copy the app uses
 
 const DB_NAME = 'chattrix'; // the main app's on-device database (named before the app became Sanga)
 
@@ -76,17 +77,19 @@ function createSdk(s: Session): Sdk {
     identity: () => ({ me: s.u, priv: s.priv, pub: s.pub }),
     api,
     on(type, fn) {
+      assertAppFrame(type); // the same rule as in the shell, so an app behaves the same in both
       if (!listeners.has(type)) listeners.set(type, new Set());
       listeners.get(type)!.add(fn);
       return () => listeners.get(type)!.delete(fn);
     },
     onReady(fn) { ready.add(fn); return () => ready.delete(fn); },
-    store: {
+    // The main app's table, sign-in token and group keys included: apps only get their own keys.
+    store: scopedStore({
       get: async (k) => wrap((await kv()).get(k)),
       put: async (k, v) => { await wrap((await kv('readwrite')).put(v, k)); },
       del: async (k) => { await wrap((await kv('readwrite')).delete(k)); },
       prefix: async (p) => wrap((await kv()).getAll(IDBKeyRange.bound(p, p + '\uffff'))),
-    },
+    }),
     useOnline() {
       const [on, set] = useState(online);
       useEffect(() => { onlineSubs.add(set); return () => { onlineSubs.delete(set); }; }, []);
@@ -122,8 +125,25 @@ function Initial({ u, name, size = 40, className }: { u: string; name?: string; 
   }, (name || u).replace(/^g:/, '')[0]?.toUpperCase() || '?');
 }
 
+// The main app's settings (apps/shell/src/state/settings.ts, zustand persist). This page has no PIN
+// screen and can't tell a closed tab from a new one, so with an app lock or "sign out when I close
+// the tab" on it doesn't show the app: the main app does, after its lock screen or sign-out check.
+// Unreadable settings count as on: the main app then decides.
+const SETTINGS = 'chattrix-settings';
+function guarded() {
+  try {
+    const raw = localStorage.getItem(SETTINGS);
+    if (!raw) return false;
+    const s = JSON.parse(raw).state || {};
+    return !!s.appLock || !!s.signOutOnClose;
+  } catch { return true; }
+}
+
 /** Start an app on its own page. */
 export async function bootStandalone(App: ComponentType<AppProps>) {
+  if (guarded()) { location.replace('/'); return; }
+  // Turned on in another tab while this page is open: leave too.
+  window.addEventListener('storage', (e) => { if ((e.key === SETTINGS || e.key === null) && guarded()) location.replace('/'); });
   const root = createRoot(document.getElementById('root')!);
   let session: Session | undefined;
   try { session = await wrap((await kv()).get('session')); } catch { /* no database yet */ }

@@ -27,3 +27,5 @@ export function encryptStory(key: CryptoKey, obj: unknown, owner: string, id: st
 export function decryptStory(key: CryptoKey, body: string, owner: string, id: string): Promise<any>;
 export function encryptComment(key: CryptoKey, obj: unknown, id: string, author: string, cid: string): Promise<string>;
 export function decryptComment(key: CryptoKey, body: string, id: string, author: string, cid: string): Promise<any>;
+export function encryptStoryComment(pairKey: CryptoKey, obj: unknown, owner: string, id: string, author: string, cid: string): Promise<string>;
+export function decryptStoryComment(pairKey: CryptoKey, body: string, owner: string, id: string, author: string, cid: string): Promise<any>;

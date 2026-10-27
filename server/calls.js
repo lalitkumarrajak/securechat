@@ -5,6 +5,10 @@
 // A call rings every device of the person called, including ones that connect while it rings (a
 // phone opened from the "incoming call" notification); the first to answer takes it and the others
 // stop ringing. Unanswered calls end after RING_MS.
+//
+// Calls live only in memory, so they are bounded: a person can be on MAX_PER_USER calls at once
+// (ringing or answered) and the server on MAX_CALLS; an answered call drops its sealed offer, and is
+// forgotten once neither side's connection has been back for DROP_MS.
 import crypto from 'node:crypto';
 import { B64_RE, USER_RE } from './config.js';
 import { rateLimited, sendJson } from './http.js';
@@ -15,6 +19,9 @@ import { notify } from './push.js';
 
 const RING_MS = Number(process.env.CALL_RING_MS) || 45e3;
 const GRACE_MS = Number(process.env.CALL_GRACE_MS) || 5000; // a caller's reload or network blip
+const DROP_MS = Number(process.env.CALL_DROP_MS) || 60e3;   // both sides gone from an answered call
+const MAX_CALLS = Number(process.env.CALL_MAX) || 10_000;
+const MAX_PER_USER = 2; // e.g. one call, and one more ringing that they may switch to
 const MAX_SIGNAL = 20_000; // a sealed offer or answer (SDP); candidates are far smaller
 const ID_RE = /^[A-Za-z0-9_-]{16,32}$/;
 
@@ -42,6 +49,8 @@ function toCallee(c, frame) { if (live(c.toWs)) send(c.toWs, frame); else sendTo
 
 const ringFrame = (c) => ({ t: 'call', id: c.id, f: c.from, v: c.video ? 1 : 0, b: c.offer, ts: c.ts });
 
+const callsOf = (u) => { let n = 0; for (const c of calls.values()) if (c.from === u || c.to === u) n++; return n; };
+
 const party = (ws, c) => (c ? (ws.user === c.from ? 'from' : ws.user === c.to ? 'to' : null) : null);
 
 export const handlers = {
@@ -50,6 +59,9 @@ export const handlers = {
     if (rateLimited('call:' + ws.user, 20, 60e3)) return send(ws, { t: 'cend', id: m.id, r: 'failed' });
     if (typeof m.id !== 'string' || !ID_RE.test(m.id) || calls.has(m.id) || !okBody(m.b)) return;
     if (typeof m.to !== 'string' || !USER_RE.test(m.to) || !(await canChat(ws.user, m.to))) return send(ws, { t: 'cend', id: m.id, r: 'failed' });
+    if (calls.size >= MAX_CALLS || callsOf(ws.user) >= MAX_PER_USER) return send(ws, { t: 'cend', id: m.id, r: 'failed' });
+    if (callsOf(m.to) >= MAX_PER_USER) return send(ws, { t: 'cend', id: m.id, r: 'busy' });
+    if (calls.has(m.id)) return; // taken while we checked they're friends
     const c = { id: m.id, from: ws.user, to: m.to, video: !!m.v, offer: m.b, fromWs: ws, toWs: null, answered: false, ts: Date.now() };
     c.timer = setTimeout(() => {
       end(c, 'missed');
@@ -68,6 +80,7 @@ export const handlers = {
     if (c.answered) return send(ws, { t: 'cend', id: c.id, r: 'elsewhere' });
     c.answered = true;
     c.toWs = ws;
+    c.offer = null; // only needed to ring devices; it can be most of MAX_SIGNAL
     clearTimeout(c.timer);
     c.timer = setTimeout(() => calls.delete(c.id), 12 * 3600e3); // forgotten calls don't pile up
     toCaller(c, { t: 'cans', id: c.id, b: m.b });
@@ -109,9 +122,16 @@ export function onConnect(ws) {
   for (const c of calls.values()) if (c.to === ws.user && !c.answered) send(ws, ringFrame(c));
 }
 
-/** A device went away. A call it was placing and nobody answered yet is cancelled. */
+/** A device went away. A call it was placing and nobody answered yet is cancelled; an answered call
+ *  that neither side's connection comes back to is forgotten (its devices may still be talking
+ *  directly, but can't hang up or renegotiate through here any more, and the client ends it). */
 export function onClose(ws) {
   for (const c of calls.values()) {
+    if (c.answered && (c.fromWs === ws || c.toWs === ws)) {
+      setTimeout(() => {
+        if (calls.get(c.id) === c && !live(c.fromWs) && !live(c.toWs)) end(c, 'ended');
+      }, DROP_MS).unref?.();
+    }
     if (c.fromWs === ws && !c.answered) {
       // Give a reload or a quick network blip a moment to come back.
       setTimeout(() => {

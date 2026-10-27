@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { C, connect, name, register, startServer } from './helpers.js';
 
 let srv;
-before(async () => { srv = await startServer(); });
+before(async () => { srv = await startServer({ NOTES_MAX_BYTES: '300000' }); });
 after(() => srv.stop());
 
 describe('notes', () => {
@@ -46,6 +46,20 @@ describe('notes', () => {
     await srv.api('/api/notes', { id: ids[0], body: '' }, a.token); // deleted
     const since = (await srv.api(`/api/notes?since=${times[2]}`, undefined, a.token)).data.notes;
     assert.deepEqual(since.map((n) => [n.id, n.body]), [[ids[2], since[0].body], [ids[0], '']]);
+  });
+
+  it('limits the space an account’s notes take; deleting makes room', async () => {
+    const a = await register(srv, name('opal'));
+    const ids = [C.randomId(18), C.randomId(18), C.randomId(18)];
+    const put = (id, body) => srv.api('/api/notes', { id, body }, a.token);
+    const big = 'A'.repeat(110_000);
+    assert.equal((await put(ids[0], big)).status, 200);
+    assert.equal((await put(ids[1], big)).status, 200);
+    const full = await put(ids[2], big); // 330 000 > NOTES_MAX_BYTES
+    assert.equal(full.status, 400);
+    assert.match(full.data.error, /space/);
+    assert.equal((await put(ids[0], '')).status, 200); // a deletion always goes through
+    assert.equal((await put(ids[2], big)).status, 200);
   });
 
   it('rejects bad ids, oversized or non-base64 bodies', async () => {

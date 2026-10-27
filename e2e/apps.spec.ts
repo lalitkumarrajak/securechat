@@ -77,3 +77,44 @@ test('if an app can’t be downloaded, Sanga keeps working and it can be retried
   await expect(diary.getByRole('heading', { name: 'Diary', exact: true })).toBeVisible();
   await Q.ctx.close();
 });
+
+test('with an app lock on, its own page goes to Sanga’s lock screen instead of showing the diary', async ({ browser }) => {
+  const Q = await phone(browser, uname('applock'));
+  await signUp(Q);
+  await Q.page.getByRole('button', { name: 'Profile and settings' }).click(); // as in lock.spec.ts
+  await Q.page.getByRole('button', { name: /^Privacy/ }).click();
+  await Q.page.getByRole('switch', { name: 'Lock with a PIN' }).click();
+  const pin = Q.page.getByLabel('PIN', { exact: true });
+  await pin.fill('2580');
+  await Q.page.getByRole('button', { name: 'Next' }).click();
+  await pin.fill('2580');
+  await Q.page.getByRole('button', { name: 'Done' }).click();
+  await expect(Q.page.getByText('App lock on').first()).toBeVisible();
+  await Q.page.keyboard.press('Escape');
+
+  await Q.page.goto('/apps/notes/');
+  await expect(Q.page).toHaveURL(/\/$/);
+  const lock = Q.page.getByRole('dialog', { name: 'Sanga is locked' });
+  await expect(lock).toBeVisible();
+  await expect(Q.page.getByRole('heading', { name: 'Diary', exact: true })).toHaveCount(0);
+  await Q.page.keyboard.type('2580');
+  await expect(Q.page.getByRole('heading', { level: 1, name: Q.u })).toBeVisible();
+  expect(Q.errors).toEqual([]);
+  await Q.ctx.close();
+});
+
+test('with “sign out when I close the tab” on, its own page goes to Sanga, which decides', async ({ browser }) => {
+  const Q = await phone(browser, uname('appclose'));
+  await signUp(Q);
+  await Q.page.getByRole('button', { name: 'Profile and settings' }).click();
+  await Q.page.getByRole('button', { name: /^Privacy/ }).click();
+  await Q.page.getByRole('switch', { name: 'Sign out when I close the tab' }).click();
+  await Q.page.keyboard.press('Escape');
+
+  await Q.page.goto('/apps/notes/');
+  await expect(Q.page).toHaveURL(/\/$/);
+  // The same tab a moment later counts as a reload: still signed in, but in the shell, not the diary.
+  await expect(Q.page.getByRole('heading', { level: 1, name: Q.u })).toBeVisible();
+  await expect(Q.page.getByRole('heading', { name: 'Diary', exact: true })).toHaveCount(0);
+  await Q.ctx.close();
+});

@@ -2,7 +2,7 @@
 // Each story is sealed on the device with its own random key; the server keeps the ciphertext and
 // that key wrapped separately for every friend the owner shared it with (and the owner's own devices),
 // so it only ever hands a story to those people and can't read it itself. Comments are sealed with
-// the story's key too, and only the owner and the comment's author get them back.
+// the commenter and owner's conversation key, and only the owner and the comment's author get them back.
 // Who viewed and who liked are plain usernames: the owner is shown them, like on any other app.
 import { B64_RE, USER_RE } from './config.js';
 import { ctx } from './context.js';
@@ -19,6 +19,7 @@ const MAX_KEY = 200;          // a wrapped 32-byte key
 const MAX_COMMENT = 4000;
 const MAX_AUDIENCE = 1000;
 const MAX_ACTIVE = 30;        // stories per person at a time
+const MAX_BYTES = Number(process.env.STORIES_MAX_BYTES) || 30e6; // all of a person's current stories
 const MAX_COMMENTS = 50;      // per person per story
 
 // The story, if `me` may see it: they were given its key and are still friends with its owner.
@@ -94,9 +95,9 @@ export const routes = {
       if (k.u === me || await canChat(me, k.u)) audience.set(k.u, k.key); // people no longer friends are left out
     }
     if (!audience.has(me)) return sendJson(res, 400, { error: 'Invalid story' });
-    if ((await ctx.db.get('storyCount', me, Date.now())).n >= MAX_ACTIVE) {
-      return sendJson(res, 400, { error: `You can have up to ${MAX_ACTIVE} stories at a time. Delete one first.` });
-    }
+    const mine = await ctx.db.get('storyCount', me, Date.now());
+    if (mine.n >= MAX_ACTIVE) return sendJson(res, 400, { error: `You can have up to ${MAX_ACTIVE} stories at a time. Delete one first.` });
+    if (Number(mine.bytes) + body.length > MAX_BYTES) return sendJson(res, 400, { error: 'Your stories are using all their space. Delete one first.' });
     const ts = Date.now();
     if (!(await ctx.db.run('insertStory', id, me, body, ts, ts + STORY_MS)).changes) return sendJson(res, 400, { error: 'Invalid story' });
     for (const [u, key] of audience) await ctx.db.run('insertStoryKey', id, u, key);
@@ -137,7 +138,7 @@ export const routes = {
     sendJson(res, 200, { ok: true });
   },
 
-  // A comment, sealed with the story's key. Only the owner and the author see it.
+  // A comment, sealed between its author and the story's owner. Only they see it.
   'POST /api/stories/comment': async (req, res, me) => {
     if (rateLimited('scomment:' + me, 60, 60e3)) return sendJson(res, 429, { error: 'Slow down' });
     const { id, cid, body } = await readJson(req, MAX_COMMENT + 500);

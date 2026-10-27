@@ -240,9 +240,12 @@ const SQL = {
                ON CONFLICT (username) DO UPDATE SET name = excluded.name, about = excluded.about,
                privacy = excluded.privacy, mutes = excluded.mutes`,
 
+  // An endpoint stays with the account that registered it: changes = 0 if someone else has it.
   setPushSub: `INSERT INTO push_subs (endpoint, username, keys, created) VALUES (?, ?, ?, ?)
-               ON CONFLICT (endpoint) DO UPDATE SET username = excluded.username, keys = excluded.keys, created = excluded.created`,
+               ON CONFLICT (endpoint) DO UPDATE SET keys = excluded.keys, created = excluded.created
+               WHERE push_subs.username = excluded.username`,
   deletePushSub: 'DELETE FROM push_subs WHERE endpoint = ?',
+  deletePushSubOf: 'DELETE FROM push_subs WHERE endpoint = ? AND username = ?',
   pushSubsFor: 'SELECT endpoint, keys FROM push_subs WHERE username = ?',
 
   // Games (Ludo, …): the whole state as JSON, rewritten after every move.
@@ -280,7 +283,8 @@ const SQL = {
   putNote: `INSERT INTO notes (username, id, body, updated) VALUES (?, ?, ?, ?)
             ON CONFLICT (username, id) DO UPDATE SET body = excluded.body, updated = excluded.updated`,
   getNote: 'SELECT updated FROM notes WHERE username = ? AND id = ?',
-  noteStats: 'SELECT COUNT(*) AS n, COALESCE(MAX(updated), 0) AS last FROM notes WHERE username = ?',
+  // octet_length: bytes, from the stored size rather than by reading every body (SQLite 3.43+, Postgres).
+  noteStats: 'SELECT COUNT(*) AS n, COALESCE(MAX(updated), 0) AS last, COALESCE(SUM(octet_length(body)), 0) AS bytes FROM notes WHERE username = ?',
 
   // Stories: ciphertext, plus the story's key wrapped for each person allowed to see it.
   insertStory: 'INSERT INTO stories (id, owner, body, ts, expires) VALUES (?, ?, ?, ?, ?)',
@@ -291,7 +295,7 @@ const SQL = {
                JOIN stories s ON s.id = k.story
                LEFT JOIN story_views v ON v.story = s.id AND v.viewer = ?
                WHERE k.viewer = ? AND s.expires > ? ORDER BY s.ts`,
-  storyCount: 'SELECT COUNT(*) AS n FROM stories WHERE owner = ? AND expires > ?',
+  storyCount: 'SELECT COUNT(*) AS n, COALESCE(SUM(octet_length(body)), 0) AS bytes FROM stories WHERE owner = ? AND expires > ?',
   storyViewers: 'SELECT viewer FROM story_keys WHERE story = ?',
   viewStory: 'INSERT INTO story_views (story, viewer, ts, liked) VALUES (?, ?, ?, 0) ON CONFLICT (story, viewer) DO NOTHING',
   likeStory: `INSERT INTO story_views (story, viewer, ts, liked) VALUES (?, ?, ?, ?)
@@ -431,6 +435,9 @@ async function openMongo(uri) {
     try { await coll.insertOne(doc); return changes(1); }
     catch (e) { if (e.code === 11000) return changes(0); throw e; }
   };
+  // Total size of the bodies (base64, so characters are bytes) of the matching documents.
+  const sumBytes = async (coll, match) => (await coll.aggregate([{ $match: match },
+    { $group: { _id: null, bytes: { $sum: { $strLenBytes: '$body' } } } }]).next())?.bytes ?? 0;
   const pairId = (a, b) => a + '|' + b;
   const friendRow = (d) => d && { a: d.a, b: d.b, status: d.status, requester: d.requester, created: d.created };
 
@@ -535,11 +542,14 @@ async function openMongo(uri) {
       return changes(1);
     },
 
+    // Matching on the owner too: someone else's endpoint makes the upsert insert a duplicate _id.
     setPushSub: async (endpoint, username, keys, created) => {
-      await pushSubs.replaceOne({ _id: endpoint }, { username, keys, created }, { upsert: true });
+      try { await pushSubs.replaceOne({ _id: endpoint, username }, { username, keys, created }, { upsert: true }); }
+      catch (e) { if (e.code === 11000) return changes(0); throw e; }
       return changes(1);
     },
     deletePushSub: async (endpoint) => changes((await pushSubs.deleteOne({ _id: endpoint })).deletedCount),
+    deletePushSubOf: async (endpoint, username) => changes((await pushSubs.deleteOne({ _id: endpoint, username })).deletedCount),
     pushSubsFor: async (u) => (await pushSubs.find({ username: u }).toArray()).map((d) => ({ endpoint: d._id, keys: d.keys })),
 
     saveGame: async (id, type, status, state, updated) => {
@@ -598,6 +608,7 @@ async function openMongo(uri) {
     noteStats: async (u) => ({
       n: await notes.countDocuments({ username: u }),
       last: (await notes.find({ username: u }).sort({ updated: -1 }).limit(1).next())?.updated ?? 0,
+      bytes: await sumBytes(notes, { username: u }),
     }),
 
     insertStory: (id, owner, body, ts, expires) => insertIgnoringDupes(stories, { _id: id, owner, body, ts, expires }),
@@ -613,7 +624,10 @@ async function openMongo(uri) {
       const views = new Map((await storyViews.find({ viewer, story: { $in: list.map((d) => d._id) } }).toArray()).map((v) => [v.story, v]));
       return list.map((d) => ({ id: d._id, owner: d.owner, ts: d.ts, expires: d.expires, key: keys.get(d._id), seen: views.get(d._id)?.ts ?? null, liked: views.get(d._id)?.liked ?? null }));
     },
-    storyCount: async (owner, now) => ({ n: await stories.countDocuments({ owner, expires: { $gt: now } }) }),
+    storyCount: async (owner, now) => ({
+      n: await stories.countDocuments({ owner, expires: { $gt: now } }),
+      bytes: await sumBytes(stories, { owner, expires: { $gt: now } }),
+    }),
     storyViewers: async (story) => (await storyKeys.find({ story }, { projection: { viewer: 1 } }).toArray()).map((d) => ({ viewer: d.viewer })),
     viewStory: (story, viewer, ts) => insertIgnoringDupes(storyViews, { _id: story + '|' + viewer, story, viewer, ts, liked: 0 }),
     likeStory: async (story, viewer, ts, liked) => {
