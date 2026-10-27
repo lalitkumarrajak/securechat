@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import util from 'node:util';
 import zlib from 'node:zlib';
 import { config } from './config.js';
 
@@ -86,7 +87,10 @@ export function compress(raw) {
   };
 }
 
-// ---------- static files (the built web app, pre-compressed in memory) ----------
+// ---------- static files (the built web app, compressed once and kept in memory) ----------
+// The build writes .br/.gz copies next to each file (web/vite.config.ts), so starting the server
+// doesn't spend seconds compressing (on a small cloud CPU, a cold start would wait for it).
+// Without them, small files are compressed now and big ones in the background.
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json',
@@ -94,6 +98,8 @@ const MIME = {
   '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8',
 };
 const staticFiles = new Map();
+const gzipAsync = util.promisify(zlib.gzip);
+const brotliAsync = util.promisify(zlib.brotliCompress);
 
 export function loadStatic(dir = config.webDir) {
   staticFiles.clear();
@@ -101,20 +107,30 @@ export function loadStatic(dir = config.webDir) {
     console.warn(`web app not built (${dir} missing): run "npm run build"`);
     return;
   }
+  const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f) : undefined);
   const walk = (d) => {
     for (const ent of fs.readdirSync(d, { withFileTypes: true })) {
       const full = path.join(d, ent.name);
       if (ent.isDirectory()) { walk(full); continue; }
+      if (/\.(br|gz)$/.test(ent.name)) continue; // the precompressed copies
       const raw = fs.readFileSync(full);
       const rel = '/' + path.relative(dir, full).split(path.sep).join('/');
       const type = MIME[path.extname(ent.name)] || 'application/octet-stream';
-      const compressible = /text|json|svg|javascript|manifest/.test(type);
-      staticFiles.set(rel, {
-        body: raw, ...(compressible ? compress(raw) : {}), type,
+      const file = {
+        body: raw, type,
         etag: '"' + sha256(raw).slice(0, 16) + '"',
         // Vite puts content-hashed files in /assets, so they never change.
         cache: rel.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache',
-      });
+      };
+      if (/text|json|svg|javascript|manifest/.test(type)) {
+        file.gz = read(full + '.gz');
+        file.br = read(full + '.br');
+        if (!file.gz || !file.br) {
+          if (raw.length < 256 * 1024) Object.assign(file, compress(raw));
+          else Promise.all([gzipAsync(raw, { level: 9 }), brotliAsync(raw)]).then(([gz, br]) => Object.assign(file, { gz, br })).catch(() => {});
+        }
+      }
+      staticFiles.set(rel, file);
     }
   };
   walk(dir);

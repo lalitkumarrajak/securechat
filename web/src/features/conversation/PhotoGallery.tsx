@@ -2,10 +2,11 @@
 // newer and older, with who sent it, when, and its caption.
 import { useEffect, useState } from 'react';
 import * as D from '@radix-ui/react-dialog';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, X } from 'lucide-react';
 import { Spinner } from '../../components/ui/button';
 import { senderOf } from '../../lib/controls';
 import { findMessage, photoKeys } from '../../lib/engine';
+import { savePhotos } from '../../lib/files';
 import { fmtClock, fmtDay } from '../../lib/format';
 import { useSwipe } from '../../lib/swipe';
 import { displayName, groupIdOf, isGroup, type Msg } from '../../lib/types';
@@ -72,6 +73,11 @@ function Gallery({ peer, start }: { peer: string; start: string }) {
           {cur && <span className="block truncate text-xs text-white/70">{fmtDay(cur.ts)}, {fmtClock(cur.ts)}</span>}
         </span>
         {keys.length > 1 && <span className="px-2 text-sm text-white/80 tabular-nums" aria-live="polite">{i + 1} of {keys.length}</span>}
+        {cur?.src && (
+          <button onClick={() => savePhotos([{ src: cur.src!, ts: cur.ts }])} aria-label="Save photo" className="grid size-10 place-items-center rounded-full hover:bg-white/15">
+            <Download className="size-5" />
+          </button>
+        )}
       </header>
 
       <div className="relative min-h-0 flex-1 touch-none overflow-hidden select-none" {...handlers}>

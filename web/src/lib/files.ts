@@ -82,11 +82,13 @@ export function fmtSize(bytes: number) {
 export const fileExt = (name: string, mime: string) =>
   (/\.([a-z0-9]{1,5})$/i.exec(name)?.[1] || mime.split('/')[1] || 'file').toUpperCase().slice(0, 5);
 
-/** Download a data: URL as a file (via a blob, which works for large files on phones). */
-export function downloadDataUrl(src: string, name: string) {
-  // Decoded by hand: fetch() on a data: URL is blocked by the connect-src 'self' policy.
+// Decoded by hand: fetch() on a data: URL is blocked by the connect-src 'self' policy.
+function dataUrlBlob(src: string) {
   const comma = src.indexOf(',');
-  const blob = new Blob([unb64(src.slice(comma + 1)) as Uint8Array<ArrayBuffer>], { type: src.slice(5, comma).replace(/;base64$/, '') });
+  return new Blob([unb64(src.slice(comma + 1)) as Uint8Array<ArrayBuffer>], { type: src.slice(5, comma).replace(/;base64$/, '') });
+}
+
+function downloadBlob(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -95,4 +97,26 @@ export function downloadDataUrl(src: string, name: string) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+/** Download a data: URL as a file (via a blob, which works for large files on phones). */
+export const downloadDataUrl = (src: string, name: string) => downloadBlob(dataUrlBlob(src), name);
+
+/** Save photos to the device. On phones this opens the share sheet, whose "Save Image" puts them
+ *  in the gallery (a plain download there ends up in Files, if anywhere); elsewhere they download. */
+export async function savePhotos(photos: { src: string; ts: number }[]) {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const files = photos.map(({ src, ts }, i) => {
+    const blob = dataUrlBlob(src);
+    const d = new Date(ts);
+    const ext = blob.type.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
+    const name = `Chattrix ${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}${photos.length > 1 ? ` (${i + 1})` : ''}.${ext}`;
+    return new File([blob], name, { type: blob.type });
+  });
+  if (matchMedia('(pointer: coarse)').matches && navigator.canShare?.({ files })) {
+    try { await navigator.share({ files }); return; }
+    catch (e) { if ((e as Error).name === 'AbortError') return; } // closed the share sheet
+  }
+  // Several downloads at once get blocked by some browsers, so they go one after another.
+  for (const [i, f] of files.entries()) setTimeout(() => downloadBlob(f, f.name), i * 250);
 }

@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { toast } from 'sonner';
 import { choose } from '../../components/ui/confirm';
 import { canDeleteForEveryone, canEdit, isEditable } from '../../lib/controls';
+import { savePhotos } from '../../lib/files';
 import { copyMessages, deleteForEveryone, deleteForMe, me, react, retry, togglePin } from '../../lib/engine';
 import type { Msg } from '../../lib/types';
 import { getApp, setApp } from '../../state/app';
@@ -76,6 +77,8 @@ export function actionsFor(m: Msg, album?: Msg[] | null): Action[] {
   if (m.s === -2) list.push({ key: 'retry', label: 'Send again', run: () => retry(m) });
   if (live && m.s !== -2) list.push({ key: 'reply', label: 'Reply', run: () => startReply(m) });
   if (live && m.text && !album) list.push({ key: 'copy', label: 'Copy', run: () => copyMessages([m]).then(() => toast.success('Copied')) });
+  const photos = all.filter((x) => x.type === 'img' && x.src);
+  if (live && photos.length) list.push({ key: 'save', label: photos.length > 1 ? `Save ${photos.length} photos` : 'Save photo', run: () => void savePhotos(photos.map((x) => ({ src: x.src!, ts: x.ts }))) });
   if (live && m.s !== -2) list.push({ key: 'forward', label: 'Forward', run: () => setChatUi({ forward: all }) });
   if (live && m.id != null) list.push({ key: 'pin', label: pinned ? 'Unpin' : 'Pin', run: () => togglePin(m) });
   if (canEdit(m)) list.push({ key: 'edit', label: 'Edit', run: () => startEdit(m) });

@@ -147,6 +147,18 @@ test('several photos at once: review, swipe, remove, caption; they arrive as one
   await expect.poll(counter).toBe(start);
   await drag(Q.page, viewer.getByRole('img', { name: new RegExp(`Photo ${start} of`) }), 220); // and further back, to older photos
   await expect.poll(counter).toBe(start - 1);
+
+  // Saving: phones get the share sheet ("Save Image" puts it in the gallery), others a download
+  await Q.page.evaluate(() => {
+    navigator.canShare = () => true;
+    navigator.share = async (d) => { (window as any).shared = d!.files!.map((f) => `${f.type} ${f.size > 100}`); };
+  });
+  await viewer.getByRole('button', { name: 'Save photo' }).click();
+  await expect.poll(() => Q.page.evaluate(() => (window as any).shared)).toEqual([expect.stringMatching(/^image\/\w+ true$/)]);
+  await Q.page.evaluate(() => { (navigator as any).canShare = undefined; });
+  const download = Q.page.waitForEvent('download');
+  await viewer.getByRole('button', { name: 'Save photo' }).click();
+  expect((await download).suggestedFilename()).toMatch(/^Chattrix \d{4}-\d\d-\d\d \d\d\.\d\d\.\d\d\.(png|webp|jpg)$/);
   await Q.page.keyboard.press('Escape');
 });
 
@@ -159,6 +171,7 @@ test('a big album shows four tiles and "+N"; long-press acts on the whole album'
   await longPress(P, P.page.getByRole('group', { name: '6 photos' }));
   const sheet = P.page.getByRole('dialog', { name: 'Message options' });
   await expect(sheet).toContainText('📷 6 photos');
+  await expect(sheet.getByRole('button', { name: 'Save 6 photos' })).toBeVisible();
   await sheet.getByRole('button', { name: 'Delete' }).click();
   await P.page.getByRole('button', { name: 'Delete for everyone' }).click();
   await expect(Q.page.getByRole('group', { name: '6 photos' })).toHaveCount(0, { timeout: 15_000 });
@@ -287,6 +300,13 @@ test('scrolling up loads older messages; search and jumps reach them too', async
   }
   await expect(oldest).toHaveCount(1); // all the way to the first message
   await expect(P.page.getByRole('status', { name: 'Loading older messages' })).toHaveCount(0);
+
+  // Reconnecting (which syncs and reloads the chat) keeps what you scrolled up to
+  await P.page.evaluate(() => window.dispatchEvent(new Event('pagehide'))); // drops the connection; it comes back by itself
+  await box(Q).fill('Back online?');
+  await Q.page.getByRole('button', { name: 'Send' }).tap();
+  await expect(bubble(P, 'Back online?')).toBeAttached({ timeout: 20_000 });
+  await expect(oldest).toHaveCount(1);
   expect(P.errors).toEqual([]);
 });
 

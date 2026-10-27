@@ -492,6 +492,15 @@ async function saveChat(chat: Chat) {
 const PAGE = 150;
 
 async function loadMessages(peer: string) {
+  const s = getApp();
+  // Reloading the open chat (after syncing or reconnecting): keep the older messages you scrolled
+  // up to, instead of going back to the newest page and making the list jump.
+  if (s.active === peer && s.messages[0]?.peer === peer) {
+    const from = s.messages[0].ts;
+    const msgs = await db.olderMessages(peer, Infinity, Infinity, from);
+    if (getApp().active === peer) setApp((st) => ({ messages: [...st.messages.filter((m) => m.ts < from), ...msgs] }));
+    return;
+  }
   const unread = getApp().chats.find((c) => c.peer === peer)?.unread || 0;
   const limit = Math.max(PAGE, unread + 30); // always include the first unread message
   const msgs = await db.recentMessages(peer, limit);

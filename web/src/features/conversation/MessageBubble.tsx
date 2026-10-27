@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import * as M from '@radix-ui/react-dropdown-menu';
-import { Ban, Check, ChevronDown, Copy, Forward, Info, Lock, Pencil, Pin, Reply, RotateCcw, SmilePlus, SquareCheck, Trash2 } from 'lucide-react';
+import { Ban, Check, ChevronDown, Copy, Download, Forward, Info, Lock, Pencil, Pin, Reply, RotateCcw, SmilePlus, SquareCheck, Trash2 } from 'lucide-react';
 import { Ticks } from '../../components/Ticks';
 import { reactionSummary } from '../../lib/controls';
 import { emojiOnly, QUICK_REACTIONS } from '../../lib/emoji';
@@ -16,7 +16,7 @@ import { VoicePlayer } from './VoicePlayer';
 import { actionsFor, canReact, myReaction, openGallery, reactTo, setChatUi, startReply, type Action } from './chatUi';
 
 export const ICONS: Record<string, React.ReactNode> = {
-  retry: <RotateCcw />, reply: <Reply />, copy: <Copy />, forward: <Forward />, pin: <Pin />, edit: <Pencil />,
+  retry: <RotateCcw />, reply: <Reply />, copy: <Copy />, save: <Download />, forward: <Forward />, pin: <Pin />, edit: <Pencil />,
   select: <SquareCheck />, info: <Info />, delete: <Trash2 />,
 };
 

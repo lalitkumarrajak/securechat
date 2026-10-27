@@ -143,7 +143,7 @@ export function MessageList({ peer, peerName, unreadAtOpen }: { peer: string; pe
     const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
     setAtBottom(bottom);
     bottomRef.current = bottom;
-    if (el.scrollTop < 600 && olderLeft) loadOlder(); // getting near the top: load the next older page
+    if (el.scrollTop < 1500 && olderLeft) loadOlder(); // getting near the top: load the next older page in time
     if (bottom) setNewCount(0);
   };
 
