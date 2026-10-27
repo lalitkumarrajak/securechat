@@ -82,6 +82,21 @@ export async function conversationKey(myPriv, theirPubB64, me, them) {
     hk, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
 }
 
+// Notes and diary: a key only this account's own devices can derive (ECDH of the identity key
+// with itself), so the server keeps them but can't read them. Each note is sealed together with
+// its owner and id, so the server can't pass one off as another.
+export async function notesKey(myPriv, myPubB64) {
+  const pub = await subtle.importKey('raw', unb64(myPubB64), EC, false, []);
+  const shared = await subtle.deriveBits({ name: 'ECDH', public: pub }, myPriv, 256);
+  const hk = await subtle.importKey('raw', shared, 'HKDF', false, ['deriveKey']);
+  return subtle.deriveKey({ name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(32), info: te.encode('securechat/notes') },
+    hk, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+export const encryptNote = (key, obj, u, id) => seal(key, te.encode(JSON.stringify(obj)), `note|${u}|${id}`);
+export async function decryptNote(key, body, u, id) {
+  return JSON.parse(td.decode(await open(key, body, `note|${u}|${id}`)));
+}
+
 const msgAad = (from, to, cid) => `${from}>${to}|${cid}`;
 
 export const encryptMessage = (key, obj, from, to, cid) =>

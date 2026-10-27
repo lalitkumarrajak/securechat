@@ -6,6 +6,7 @@ import { ChatPane, EmptyPane } from './conversation/ChatPane';
 import { FriendsPanel } from './friends/FriendsPanel';
 import { SettingsPanel } from './settings/SettingsPanel';
 import { ContactPanel } from './conversation/ContactPanel';
+import { NotesPanel } from './notes/NotesPanel';
 import { PhotoViewer } from './conversation/ChatDialogs';
 import { ProfileCard } from './friends/ProfileCard';
 import { PhotoGallery } from './conversation/PhotoGallery';
@@ -36,6 +37,7 @@ export function Shell() {
       <FriendsPanel />
       <SettingsPanel />
       <ContactPanel />
+      <NotesPanel />
       <Suspense fallback={null}>
         {panel === 'group' && <GroupInfoPanel />}
         {panel === 'newgroup' && <NewGroupPanel />}

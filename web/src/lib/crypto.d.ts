@@ -16,3 +16,6 @@ export function newGroupKey(): { kid: string; raw: string };
 export function encryptGroup(key: CryptoKey, kid: string, obj: unknown, from: string, to: string, cid: string): Promise<string>;
 export function bodyKeyId(body: string): string;
 export function decryptGroup(key: CryptoKey, body: string, from: string, to: string, cid: string): Promise<any>;
+export function notesKey(myPriv: CryptoKey, myPub: string): Promise<CryptoKey>;
+export function encryptNote(key: CryptoKey, obj: unknown, u: string, id: string): Promise<string>;
+export function decryptNote(key: CryptoKey, body: string, u: string, id: string): Promise<any>;

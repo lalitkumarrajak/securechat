@@ -236,7 +236,11 @@ export { wsSend as sendFrame };
 
 /** Other modules (games) handle their own frame types; registered by type, e.g. frameHooks.g = fn. */
 export const frameHooks: Record<string, (m: any) => void> = {};
+/** Run each time the connection is up again (notes sync their changes then). */
+export const readyHooks: (() => void)[] = [];
 export const myName = () => S.me;
+/** This account's own keys, for data only its devices may read (notes). */
+export const ownIdentity = () => ({ me: S.me, priv: S.priv, pub: S.pub });
 
 // Presence: tell the server when this tab is hidden or closed, so friends don't see you
 // "online" after you leave. The server also times out tabs whose heartbeats stop.
@@ -275,6 +279,7 @@ async function handle(m: any) {
       flushHides();
       wsSend({ t: 'glist' });
       refreshGroups().catch(() => {});
+      for (const f of readyHooks) f();
       break;
     case 'batch': {
       for (const row of m.msgs) await ingest(row, true);

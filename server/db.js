@@ -121,6 +121,14 @@ const SCHEMA = (pg) => `
     state   TEXT NOT NULL,
     updated BIGINT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS notes (
+    username TEXT NOT NULL,
+    id       TEXT NOT NULL,
+    body     TEXT NOT NULL,
+    updated  BIGINT NOT NULL,
+    PRIMARY KEY (username, id)
+  );
+  CREATE INDEX IF NOT EXISTS notes_updated ON notes(username, updated);
   CREATE TABLE IF NOT EXISTS config (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -236,6 +244,13 @@ const SQL = {
                   ON CONFLICT (gid) DO UPDATE SET data = excluded.data, type = excluded.type, ver = excluded.ver`,
   deleteGroupPhoto: 'DELETE FROM group_photos WHERE gid = ?',
 
+  // Notes and diary entries: ciphertext only. An empty body is a deleted note.
+  notesSince: 'SELECT id, body, updated FROM notes WHERE username = ? AND updated >= ? ORDER BY updated, id LIMIT ?',
+  putNote: `INSERT INTO notes (username, id, body, updated) VALUES (?, ?, ?, ?)
+            ON CONFLICT (username, id) DO UPDATE SET body = excluded.body, updated = excluded.updated`,
+  getNote: 'SELECT updated FROM notes WHERE username = ? AND id = ?',
+  noteStats: 'SELECT COUNT(*) AS n, COALESCE(MAX(updated), 0) AS last FROM notes WHERE username = ?',
+
   getConfig: 'SELECT value FROM config WHERE key = ?',
   setConfig: 'INSERT INTO config (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value',
 };
@@ -320,9 +335,9 @@ async function openMongo(uri) {
   // Use the database named in the URI, or "securechat" if it names none.
   const mdb = client.db(client.options.dbName === 'test' ? 'securechat' : undefined);
   const c = (name) => mdb.collection(name);
-  const [users, sessions, messages, hidden, avatars, friendships, blocks, profiles, pushSubs, games, config, groups, groupMembers, groupPhotos] =
+  const [users, sessions, messages, hidden, avatars, friendships, blocks, profiles, pushSubs, games, config, groups, groupMembers, groupPhotos, notes] =
     ['users', 'sessions', 'messages', 'message_hidden', 'avatars', 'friendships', 'blocks', 'profiles', 'push_subs', 'games', 'config',
-      'groups', 'group_members', 'group_photos'].map(c);
+      'groups', 'group_members', 'group_photos', 'notes'].map(c);
   await Promise.all([
     sessions.createIndex({ expires: 1 }),
     sessions.createIndex({ username: 1 }),
@@ -339,6 +354,7 @@ async function openMongo(uri) {
     friendships.createIndex({ b: 1 }),
     blocks.createIndex({ blocked: 1 }),
     pushSubs.createIndex({ username: 1 }),
+    notes.createIndex({ username: 1, updated: 1 }),
   ]);
 
   // Shape documents like the SQL rows the server expects.
@@ -507,6 +523,18 @@ async function openMongo(uri) {
       return changes(1);
     },
     deleteGroupPhoto: async (gid) => changes((await groupPhotos.deleteOne({ _id: gid })).deletedCount),
+
+    notesSince: async (u, since, limit) => (await notes.find({ username: u, updated: { $gte: since } })
+      .sort({ updated: 1, id: 1 }).limit(limit).toArray()).map((d) => ({ id: d.id, body: d.body, updated: d.updated })),
+    putNote: async (u, id, body, updated) => {
+      await notes.replaceOne({ _id: u + '|' + id }, { username: u, id, body, updated }, { upsert: true });
+      return changes(1);
+    },
+    getNote: async (u, id) => (await notes.findOne({ _id: u + '|' + id }, { projection: { updated: 1 } })) ?? undefined,
+    noteStats: async (u) => ({
+      n: await notes.countDocuments({ username: u }),
+      last: (await notes.find({ username: u }).sort({ updated: -1 }).limit(1).next())?.updated ?? 0,
+    }),
 
     getConfig: (key) => config.findOne({ _id: key }),
     setConfig: async (key, value) => {

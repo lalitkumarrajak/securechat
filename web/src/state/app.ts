@@ -4,7 +4,7 @@ import type { Chat, Friend, Group, Me, Msg, Presence, Request } from '../lib/typ
 
 export type Status = 'loading' | 'auth' | 'app';
 export type Conn = 'online' | 'connecting' | 'offline';
-export type Panel = null | 'settings' | 'friends' | 'contact' | 'archived' | 'group' | 'newgroup';
+export type Panel = null | 'settings' | 'friends' | 'contact' | 'archived' | 'group' | 'newgroup' | 'notes';
 
 export interface AppState {
   status: Status;

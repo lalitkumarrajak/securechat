@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
   Archive, ArchiveRestore, ArrowLeft, Bell, BellOff, ChevronDown, ChevronUp, Copy, Forward, Gamepad2, Info, Lock, LogOut,
-  MoreVertical, Pencil, Pin, Reply, Search, ShieldAlert, ShieldCheck, SquareCheck, Trash2, UserMinus, UserX, X,
+  MoreVertical, NotebookPen, Pencil, Pin, Reply, Search, ShieldAlert, ShieldCheck, SquareCheck, Trash2, UserMinus, UserX, X,
 } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
+import { openNotes } from '../notes/NotesPanel';
 import { Button, IconButton } from '../../components/ui/button';
 import { confirm } from '../../components/ui/confirm';
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuSub, MenuSubContent, MenuSubTrigger, MenuTrigger } from '../../components/ui/menu';
@@ -185,6 +186,7 @@ function GroupHeader({ peer, name }: { peer: string; name: string }) {
           {group && <MenuItem icon={<Info />} onSelect={() => setApp({ panel: 'group' })}>Group info</MenuItem>}
           <MenuItem icon={<Search />} onSelect={() => setApp({ searchOpen: true })}>Search</MenuItem>
           <MenuItem icon={<SquareCheck />} onSelect={() => setApp({ selection: [] })}>Select messages</MenuItem>
+          <MenuItem icon={<NotebookPen />} onSelect={() => openNotes(peer)}>Notes about this group</MenuItem>
           {group && others.length > 0 && <MenuItem icon={<Gamepad2 />} onSelect={play}>Play a game with the group</MenuItem>}
           <MuteItems peer={peer} />
           <MenuItem icon={archived ? <ArchiveRestore /> : <Archive />} onSelect={() => setArchived(peer, !archived)}>{archived ? 'Unarchive' : 'Archive'}</MenuItem>
@@ -231,6 +233,7 @@ function PersonHeader({ peer, name }: { peer: string; name: string }) {
           <MenuItem icon={<Search />} onSelect={() => setApp({ searchOpen: true })}>Search</MenuItem>
           <MenuItem icon={<SquareCheck />} onSelect={() => setApp({ selection: [] })}>Select messages</MenuItem>
           <MenuItem icon={<Gamepad2 />} onSelect={() => openPicker([peer])}>Play a game</MenuItem>
+          <MenuItem icon={<NotebookPen />} onSelect={() => openNotes(peer)}>Notes about this chat</MenuItem>
           {muted ? (
             <MenuItem icon={<Bell />} onSelect={() => doMute(0, 'Notifications on')}>Unmute</MenuItem>
           ) : (

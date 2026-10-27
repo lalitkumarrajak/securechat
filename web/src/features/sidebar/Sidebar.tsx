@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Archive, ArrowLeft, BellOff, Clock, Eye, EyeOff, Gamepad2, Lock, LogOut, MessageSquarePlus, MoreVertical, Search, Settings, UserPlus, Users, WifiOff, X } from 'lucide-react';
+import { Archive, ArrowLeft, BellOff, Clock, Eye, EyeOff, Gamepad2, Lock, LogOut, MessageSquarePlus, MoreVertical, NotebookPen, Search, Settings, UserPlus, Users, WifiOff, X } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
 import { Ticks } from '../../components/Ticks';
 import { IconButton } from '../../components/ui/button';
@@ -18,6 +18,7 @@ import { togglePeek, usePeek } from '../../lib/privacy';
 import { groupIdOf, isGroup } from '../../lib/types';
 import { openPicker } from '../games/store';
 import { showProfile } from '../friends/ProfileCard';
+import { openNotes } from '../notes/NotesPanel';
 
 export function Sidebar() {
   const me = useApp((s) => s.me)!;
@@ -66,6 +67,7 @@ export function Sidebar() {
             <h1 className="min-w-0 flex-1 truncate pl-1 text-xl font-bold tracking-tight">{headerTitle.trim() || me.u}</h1>
             <PeekButton />
             {appLock && <IconButton label="Lock Chattrix" onClick={lockNow}><Lock /></IconButton>}
+            <IconButton label="Diary" onClick={() => openNotes()}><NotebookPen /></IconButton>
             <IconButton label="Play games" onClick={() => openPicker()}><Gamepad2 /></IconButton>
             <div className="relative">
               <IconButton label="Friends" onClick={() => setApp({ panel: 'friends', friendsTab: incoming ? 'requests' : 'friends' })}>
@@ -82,6 +84,7 @@ export function Sidebar() {
                 <MenuItem icon={<Users />} onSelect={() => setApp({ panel: 'newgroup' })}>New group</MenuItem>
                 <MenuItem icon={<UserPlus />} onSelect={() => setApp({ panel: 'friends', friendsTab: 'add' })}>Add friend</MenuItem>
                 <MenuItem icon={<Gamepad2 />} onSelect={() => openPicker()}>Play games</MenuItem>
+                <MenuItem icon={<NotebookPen />} onSelect={() => openNotes()}>Diary and notes</MenuItem>
                 <MenuItem icon={<Archive />} onSelect={() => setApp({ panel: 'archived' })}>Archived chats</MenuItem>
                 <MenuItem icon={<Settings />} onSelect={() => setApp({ panel: 'settings' })}>Settings</MenuItem>
                 <MenuSeparator />
