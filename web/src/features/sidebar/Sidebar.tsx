@@ -11,6 +11,7 @@ import { displayName, type Chat } from '../../lib/types';
 import { cn } from '../../lib/utils';
 import { setApp, useApp } from '../../state/app';
 import { GamesStrip } from '../games/GamesStrip';
+import { StoriesStrip } from '../stories/StoriesStrip';
 import { ChatListSkeleton } from '../../components/Skeleton';
 import { useSettings } from '../../state/settings';
 import { lockNow } from '../../lib/applock';
@@ -18,7 +19,7 @@ import { togglePeek, usePeek } from '../../lib/privacy';
 import { groupIdOf, isGroup } from '../../lib/types';
 import { openPicker } from '../games/store';
 import { showProfile } from '../friends/ProfileCard';
-import { openNotes } from '../notes/NotesPanel';
+import { openNotes } from '../../lib/notes';
 
 export function Sidebar() {
   const me = useApp((s) => s.me)!;
@@ -135,6 +136,7 @@ export function Sidebar() {
             <span className="text-sm text-muted">{archivedCount}</span>
           </button>
         )}
+        {!archivedView && !query && <StoriesStrip />}
         {!archivedView && !query && <GamesStrip />}
         <ul>{visible.map((c) => <ChatRow key={c.peer} chat={c} />)}</ul>
         {!visible.length && syncing && !waited && conn !== 'offline' && !query && !archivedView ? <ChatListSkeleton rows={6} />

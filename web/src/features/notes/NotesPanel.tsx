@@ -8,18 +8,10 @@ import { IconButton } from '../../components/ui/button';
 import { confirm } from '../../components/ui/confirm';
 import { Panel } from '../../components/ui/dialog';
 import { fmtClock, fmtDay } from '../../lib/format';
-import { dayDate, dayKey, deleteNote, isEmpty, loadNotes, MAX_TEXT, MAX_TITLE, MOODS, newNote, saveNote, syncNotes, today, useNotes, type Note } from '../../lib/notes';
+import { dayDate, dayKey, deleteNote, isEmpty, MAX_TEXT, MAX_TITLE, MOODS, newNote, saveNote, today, useNotes, type Note } from '../../lib/notes';
 import { displayName, groupIdOf, isGroup } from '../../lib/types';
 import { cn } from '../../lib/utils';
 import { setApp, useApp } from '../../state/app';
-
-/** Open the diary: everything (null), the personal diary (''), or one chat's notes. */
-export function openNotes(chat: string | null = null) {
-  useNotes.setState({ filter: chat });
-  setApp({ panel: 'notes' });
-  void loadNotes();
-  void syncNotes();
-}
 
 function useChatName() {
   const friends = useApp((s) => s.friends);

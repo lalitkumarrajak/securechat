@@ -226,7 +226,8 @@ test('the newest messages stay in view when the keyboard opens', async () => {
 
 test('games: the chat offers every game, not just Ludo', async () => {
   await expect(P.page.getByRole('button', { name: 'Play Ludo' })).toHaveCount(0);
-  await P.page.getByRole('button', { name: 'Play a game' }).click();
+  await P.page.getByRole('button', { name: 'Chat options' }).click(); // on phones the header has the call buttons instead
+  await P.page.getByRole('menuitem', { name: 'Play a game' }).click();
   const dlg = P.page.getByRole('dialog', { name: 'Play a game' });
   await expect(dlg.getByRole('button', { name: /UNO/ })).toBeVisible();
   await P.page.keyboard.press('Escape');

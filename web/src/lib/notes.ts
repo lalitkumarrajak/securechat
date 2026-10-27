@@ -7,6 +7,7 @@ import { create } from 'zustand';
 import * as C from './crypto.js';
 import * as db from './db';
 import { api, frameHooks, ownIdentity, readyHooks } from './engine';
+import { setApp } from '../state/app';
 
 export interface Note {
   id: string;
@@ -28,6 +29,14 @@ export const MOODS = ['😀', '🙂', '😐', '😔', '😢', '😡', '🥰', '�
 
 /** `filter`: which notes the panel shows: null = all, '' = personal, or a chat. */
 export const useNotes = create<{ notes: Record<string, Note>; loaded: boolean; filter: string | null }>(() => ({ notes: {}, loaded: false, filter: null }));
+
+/** Open the diary: everything (null), the personal diary (''), or one chat's notes. */
+export function openNotes(chat: string | null = null) {
+  useNotes.setState({ filter: chat });
+  setApp({ panel: 'notes' });
+  void loadNotes();
+  void syncNotes();
+}
 
 const pad = (n: number) => String(n).padStart(2, '0');
 export const dayKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;

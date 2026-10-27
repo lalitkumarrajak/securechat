@@ -3,20 +3,24 @@ import { cn } from '../lib/utils';
 import { useApp } from '../state/app';
 import { Sidebar } from './sidebar/Sidebar';
 import { ChatPane, EmptyPane } from './conversation/ChatPane';
-import { FriendsPanel } from './friends/FriendsPanel';
-import { SettingsPanel } from './settings/SettingsPanel';
 import { ContactPanel } from './conversation/ContactPanel';
-import { NotesPanel } from './notes/NotesPanel';
 import { PhotoViewer } from './conversation/ChatDialogs';
 import { ProfileCard } from './friends/ProfileCard';
 import { PhotoGallery } from './conversation/PhotoGallery';
 import { NewGameDialog } from './games/NewGameDialog';
 import { useGames } from './games/store';
+import { CallScreen } from './calls/CallScreen';
+import { useStories } from '../lib/stories';
 
 // Loaded when a game is opened, so the app starts faster.
 const GameScreen = lazy(() => import('./games/GameScreen').then((m) => ({ default: m.GameScreen })));
+const FriendsPanel = lazy(() => import('./friends/FriendsPanel').then((m) => ({ default: m.FriendsPanel })));
+const SettingsPanel = lazy(() => import('./settings/SettingsPanel').then((m) => ({ default: m.SettingsPanel })));
+const NotesPanel = lazy(() => import('./notes/NotesPanel').then((m) => ({ default: m.NotesPanel })));
 const GroupInfoPanel = lazy(() => import('./groups/GroupInfoPanel').then((m) => ({ default: m.GroupInfoPanel })));
 const NewGroupPanel = lazy(() => import('./groups/NewGroupPanel').then((m) => ({ default: m.NewGroupPanel })));
+const StoryViewer = lazy(() => import('./stories/StoryViewer').then((m) => ({ default: m.StoryViewer })));
+const StoryComposer = lazy(() => import('./stories/StoryComposer').then((m) => ({ default: m.StoryComposer })));
 import { handleInvite } from '../lib/invite';
 
 /** Two panes on desktop; on phones, the chat list or the open chat. */
@@ -24,7 +28,10 @@ export function Shell() {
   const active = useApp((s) => s.active);
   const gameOpen = useGames((s) => !!s.open);
   const panel = useApp((s) => s.panel);
+  const storyOpen = useStories((s) => !!s.viewer);
+  const composing = useStories((s) => !!s.composer);
   useEffect(() => { handleInvite(); }, []); // opened from someone's invite link
+  usePrefetch();
   useKeyboardHeight();
   return (
     <div className="mx-auto flex h-[var(--app-h,100dvh)] max-w-[1600px] overflow-hidden bg-panel md:border-x md:border-line">
@@ -34,21 +41,36 @@ export function Shell() {
       <main className={cn('min-w-0 flex-1 flex-col', active ? 'flex' : 'hidden md:flex')}>
         {active ? <ChatPane key={active} peer={active} /> : <EmptyPane />}
       </main>
-      <FriendsPanel />
-      <SettingsPanel />
       <ContactPanel />
-      <NotesPanel />
       <Suspense fallback={null}>
+        {panel === 'friends' && <FriendsPanel />}
+        {panel === 'settings' && <SettingsPanel />}
+        {panel === 'notes' && <NotesPanel />}
         {panel === 'group' && <GroupInfoPanel />}
         {panel === 'newgroup' && <NewGroupPanel />}
+        {storyOpen && <StoryViewer />}
+        {composing && <StoryComposer />}
       </Suspense>
       <NewGameDialog />
       <ProfileCard />
       <PhotoViewer />
       <PhotoGallery />
       {gameOpen && <Suspense fallback={null}><GameScreen /></Suspense>}
+      <CallScreen />
     </div>
   );
+}
+
+// Screens that load when first opened, fetched once the app has settled, so opening one is instant
+// without slowing down the start.
+function usePrefetch() {
+  useEffect(() => {
+    const t = setTimeout(() => {
+      for (const load of [() => import('./settings/SettingsPanel'), () => import('./friends/FriendsPanel'), () => import('./notes/NotesPanel'),
+        () => import('./stories/StoryViewer'), () => import('./stories/StoryComposer'), () => import('./groups/GroupInfoPanel')]) load().catch(() => {});
+    }, 4000);
+    return () => clearTimeout(t);
+  }, []);
 }
 
 // iPhones don't shrink the page when the keyboard opens (Android does, see index.html); they slide

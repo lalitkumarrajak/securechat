@@ -1,5 +1,5 @@
 // Service worker: offline app shell and push notifications.
-const CACHE = 'chattrix-v2'; // bump when the shell files change
+const CACHE = 'chattrix-v3'; // bump when the shell files change
 const SHELL = ['/', '/theme-boot.js', '/logo-mark.png', '/icon-192.png', '/manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
@@ -12,29 +12,29 @@ self.addEventListener('activate', (e) => {
     .then(() => self.clients.claim()));
 });
 
-// The page is network-first (so a new version shows up right away), falling back to the cache
-// offline. Hashed /assets and emoji animations never change, so they're cache-first.
+// The app opens from the copy saved on the device straight away, and fetches the latest copy in the
+// background for next time. Waiting for the network first made phones sit on a blank screen while a
+// sleeping server (free hosting) woke up. Hashed /assets and emoji animations never change, so
+// they're cache-first; an old saved page still finds the old assets it names.
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   if (url.pathname.startsWith('/api/') || url.pathname === '/ws') return;
   const immutable = url.pathname.startsWith('/assets/') || url.pathname.startsWith('/emoji/');
-  const key = url.pathname === '/index.html' ? '/' : url.pathname;
+  const page = e.request.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html';
+  const key = page ? '/' : url.pathname;
   e.respondWith(caches.open(CACHE).then(async (cache) => {
-    if (immutable) {
-      const hit = await cache.match(key);
-      if (hit) return hit;
-      const res = await fetch(e.request);
-      if (res.ok) cache.put(key, res.clone());
+    const hit = await cache.match(key);
+    if (immutable && hit) return hit;
+    const fresh = fetch(e.request).then((res) => {
+      if (res.ok && (!page || res.headers.get('content-type')?.includes('text/html'))) cache.put(key, res.clone());
       return res;
+    });
+    if (hit) {
+      e.waitUntil(fresh.then(() => {}, () => {}));
+      return hit;
     }
-    try {
-      const res = await fetch(e.request);
-      if (res.ok) cache.put(key, res.clone());
-      return res;
-    } catch {
-      return (await cache.match(key)) || Response.error();
-    }
+    try { return await fresh; } catch { return Response.error(); }
   }));
 });
 
@@ -49,15 +49,22 @@ self.addEventListener('push', (e) => {
     : d.t === 'gmention' ? `mentioned you in ${d.game || 'a game'}`
     : d.t === 'gmsg' ? `${name}${d.mention ? ' mentioned you' : ': New message'}`
     : d.t === 'signin' ? `A device signed in${d.where || ''}. If this wasn’t you, open Chattrix → Settings → Active sessions.`
+    : d.t === 'call' ? `Incoming ${d.v ? 'video' : 'voice'} call`
+    : d.t === 'missed' ? `Missed ${d.v ? 'video' : 'voice'} call`
+    : d.t === 'stag' ? 'tagged you in their story'
+    : d.t === 'scmt' ? 'commented on your story'
     : 'New message';
+  const call = d.t === 'call' || d.t === 'missed';
   e.waitUntil((async () => {
     // Don't notify if the app is open and visible: the page shows the message itself.
     const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     if (wins.some((w) => w.visibilityState === 'visible')) return;
     await self.registration.showNotification(title, {
       body, icon: '/icon-192.png', badge: '/icon-192.png',
-      tag: (d.t || 'msg') + '-' + (d.peer || d.from || ''), renotify: true,
-      data: { peer: d.t === 'msg' ? d.from : d.t === 'gmsg' ? d.peer : null },
+      // A missed call replaces its "incoming call" notification.
+      tag: (call ? 'call' : d.t || 'msg') + '-' + (d.peer || d.from || ''), renotify: true,
+      ...(d.t === 'call' && { requireInteraction: true, vibrate: [400, 200, 400, 200, 400] }),
+      data: { peer: d.t === 'msg' || call ? d.from : d.t === 'gmsg' ? d.peer : null, stories: d.t === 'stag' || d.t === 'scmt' },
     });
   })());
 });

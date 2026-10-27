@@ -17,6 +17,8 @@ import { routes as gifRoutes } from './gifs.js';
 import { routes as previewRoutes } from './preview.js';
 import { routes as groupRoutes } from './groups.js';
 import { routes as noteRoutes } from './notes.js';
+import { purgeStories, routes as storyRoutes } from './stories.js';
+import { handlers as callHandlers, onClose as callClosed, onConnect as callConnected, routes as callRoutes } from './calls.js';
 import { handlers as messageHandlers } from './messages.js';
 import { handlers as gameHandlers, loadGames, purgeGames } from './games.js';
 import { EMOJI_RE, serveEmoji } from './emoji.js';
@@ -32,6 +34,7 @@ async function cleanup() {
   await ctx.db.run('purgeSessions', Date.now());
   await ctx.db.run('purgeSessionInfo');
   await purgeGames();
+  await purgeStories();
 }
 await cleanup();
 setInterval(() => cleanup().catch((e) => console.error('cleanup failed', e.message)), 3600e3).unref();
@@ -42,10 +45,10 @@ await initPush();
 await loadGames();
 loadStatic();
 
-const handlers = { ...messageHandlers, ...gameHandlers };
+const handlers = { ...messageHandlers, ...gameHandlers, ...callHandlers };
 
 // ---------- HTTP ----------
-const routes = { ...authRoutes, ...profileRoutes, ...friendRoutes, ...pushRoutes, ...gifRoutes, ...previewRoutes, ...groupRoutes, ...noteRoutes };
+const routes = { ...authRoutes, ...profileRoutes, ...friendRoutes, ...pushRoutes, ...gifRoutes, ...previewRoutes, ...groupRoutes, ...noteRoutes, ...storyRoutes, ...callRoutes };
 
 async function handleHttp(req, res) {
   const url = new URL(req.url, 'http://x');
@@ -130,6 +133,7 @@ wss.on('connection', (ws, req) => {
       ws.beat = Date.now();
       addSocket(ws);
       send(ws, { t: 'ok', u: user, av: await avatarVersion(user) });
+      callConnected(ws);
       await refreshPresence(user);
       return;
     }
@@ -144,6 +148,7 @@ wss.on('connection', (ws, req) => {
     clearTimeout(authTimer);
     if (!ws.user) return;
     removeSocket(ws);
+    callClosed(ws);
     refreshPresence(ws.user).catch((err) => console.error('presence update failed', err.message));
   });
 });

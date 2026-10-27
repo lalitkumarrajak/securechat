@@ -18,7 +18,7 @@ export default defineConfig({
     baseURL: `http://localhost:${PORT}`,
     channel: 'chrome',
     headless: true,
-    permissions: ['notifications', 'microphone', 'clipboard-read', 'clipboard-write', 'geolocation'],
+    permissions: ['notifications', 'microphone', 'camera', 'clipboard-read', 'clipboard-write', 'geolocation'],
     geolocation: { latitude: 28.6129, longitude: 77.2295, accuracy: 12 },
     // Fake microphone for voice messages; keep every "phone" window visible (not backgrounded),
     // since presence correctly treats hidden tabs as away.

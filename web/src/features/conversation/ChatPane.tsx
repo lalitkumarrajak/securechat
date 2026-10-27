@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
   Archive, ArchiveRestore, ArrowLeft, Bell, BellOff, ChevronDown, ChevronUp, Copy, Forward, Gamepad2, Info, Lock, LogOut,
-  MoreVertical, NotebookPen, Pencil, Pin, Reply, Search, ShieldAlert, ShieldCheck, SquareCheck, Trash2, UserMinus, UserX, X,
+  MoreVertical, NotebookPen, Pencil, Phone, Pin, Reply, Search, ShieldAlert, ShieldCheck, SquareCheck, Trash2, UserMinus, UserX, Video, X,
 } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
-import { openNotes } from '../notes/NotesPanel';
+import { openNotes } from '../../lib/notes';
+import { startCall } from '../../lib/calls';
 import { Button, IconButton } from '../../components/ui/button';
 import { confirm } from '../../components/ui/confirm';
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuSub, MenuSubContent, MenuSubTrigger, MenuTrigger } from '../../components/ui/menu';
@@ -223,7 +224,13 @@ function PersonHeader({ peer, name }: { peer: string; name: string }) {
           <span className={`block truncate text-xs ${typing || presence?.on ? 'text-accent-ink' : 'text-muted'}`}>{status}</span>
         </span>
       </button>
-      <IconButton label="Play a game" onClick={() => openPicker([peer])}><Gamepad2 /></IconButton>
+      {friend && !blocked && (
+        <>
+          <IconButton label="Video call" onClick={() => void startCall(peer, true)}><Video /></IconButton>
+          <IconButton label="Voice call" onClick={() => void startCall(peer, false)}><Phone /></IconButton>
+        </>
+      )}
+      <IconButton label="Play a game" className="hidden md:inline-flex" onClick={() => openPicker([peer])}><Gamepad2 /></IconButton>
       <PeekButton />
       <IconButton label="Search in chat" className="hidden md:inline-flex" onClick={() => setApp({ searchOpen: true })}><Search /></IconButton>
       <Menu>

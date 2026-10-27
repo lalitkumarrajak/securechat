@@ -18,7 +18,7 @@ export const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'no-referrer',
-  'Permissions-Policy': 'camera=(), microphone=(self), geolocation=(self)',
+  'Permissions-Policy': 'camera=(self), microphone=(self), geolocation=(self)', // camera: video calls
   'Cross-Origin-Opener-Policy': 'same-origin',
   'Cross-Origin-Resource-Policy': 'same-origin',
   ...(config.tlsCert || config.trustProxy ? { 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains' } : {}),

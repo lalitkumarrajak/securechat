@@ -129,6 +129,37 @@ const SCHEMA = (pg) => `
     PRIMARY KEY (username, id)
   );
   CREATE INDEX IF NOT EXISTS notes_updated ON notes(username, updated);
+  CREATE TABLE IF NOT EXISTS stories (
+    id      TEXT PRIMARY KEY,
+    owner   TEXT NOT NULL,
+    body    TEXT NOT NULL,
+    ts      BIGINT NOT NULL,
+    expires BIGINT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS stories_owner ON stories(owner, expires);
+  CREATE INDEX IF NOT EXISTS stories_expires ON stories(expires);
+  CREATE TABLE IF NOT EXISTS story_keys (
+    story  TEXT NOT NULL,
+    viewer TEXT NOT NULL,
+    key    TEXT NOT NULL,
+    PRIMARY KEY (story, viewer)
+  );
+  CREATE INDEX IF NOT EXISTS story_keys_viewer ON story_keys(viewer);
+  CREATE TABLE IF NOT EXISTS story_views (
+    story  TEXT NOT NULL,
+    viewer TEXT NOT NULL,
+    ts     BIGINT NOT NULL,
+    liked  INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (story, viewer)
+  );
+  CREATE TABLE IF NOT EXISTS story_comments (
+    id     TEXT NOT NULL,
+    story  TEXT NOT NULL,
+    author TEXT NOT NULL,
+    body   TEXT NOT NULL,
+    ts     BIGINT NOT NULL,
+    PRIMARY KEY (story, id)
+  );
   CREATE TABLE IF NOT EXISTS config (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -251,6 +282,32 @@ const SQL = {
   getNote: 'SELECT updated FROM notes WHERE username = ? AND id = ?',
   noteStats: 'SELECT COUNT(*) AS n, COALESCE(MAX(updated), 0) AS last FROM notes WHERE username = ?',
 
+  // Stories: ciphertext, plus the story's key wrapped for each person allowed to see it.
+  insertStory: 'INSERT INTO stories (id, owner, body, ts, expires) VALUES (?, ?, ?, ?, ?)',
+  insertStoryKey: 'INSERT INTO story_keys (story, viewer, key) VALUES (?, ?, ?) ON CONFLICT (story, viewer) DO NOTHING',
+  getStory: 'SELECT id, owner, body, ts, expires FROM stories WHERE id = ? AND expires > ?',
+  getStoryKey: 'SELECT key FROM story_keys WHERE story = ? AND viewer = ?',
+  storiesFor: `SELECT s.id, s.owner, s.ts, s.expires, k.key, v.ts AS seen, v.liked FROM story_keys k
+               JOIN stories s ON s.id = k.story
+               LEFT JOIN story_views v ON v.story = s.id AND v.viewer = ?
+               WHERE k.viewer = ? AND s.expires > ? ORDER BY s.ts`,
+  storyCount: 'SELECT COUNT(*) AS n FROM stories WHERE owner = ? AND expires > ?',
+  storyViewers: 'SELECT viewer FROM story_keys WHERE story = ?',
+  viewStory: 'INSERT INTO story_views (story, viewer, ts, liked) VALUES (?, ?, ?, 0) ON CONFLICT (story, viewer) DO NOTHING',
+  likeStory: `INSERT INTO story_views (story, viewer, ts, liked) VALUES (?, ?, ?, ?)
+              ON CONFLICT (story, viewer) DO UPDATE SET liked = excluded.liked`,
+  storyViews: 'SELECT viewer, ts, liked FROM story_views WHERE story = ? ORDER BY ts',
+  insertComment: 'INSERT INTO story_comments (id, story, author, body, ts) VALUES (?, ?, ?, ?, ?) ON CONFLICT (story, id) DO NOTHING',
+  storyComments: 'SELECT id, author, body, ts FROM story_comments WHERE story = ? ORDER BY ts LIMIT 1000',
+  getComment: 'SELECT id, author FROM story_comments WHERE story = ? AND id = ?',
+  commentCount: 'SELECT COUNT(*) AS n FROM story_comments WHERE story = ? AND author = ?',
+  deleteComment: 'DELETE FROM story_comments WHERE story = ? AND id = ?',
+  deleteStoryComments: 'DELETE FROM story_comments WHERE story = ?',
+  deleteStoryViews: 'DELETE FROM story_views WHERE story = ?',
+  deleteStoryKeys: 'DELETE FROM story_keys WHERE story = ?',
+  deleteStory: 'DELETE FROM stories WHERE id = ?',
+  expiredStories: 'SELECT id FROM stories WHERE expires <= ? LIMIT 500',
+
   getConfig: 'SELECT value FROM config WHERE key = ?',
   setConfig: 'INSERT INTO config (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value',
 };
@@ -335,9 +392,10 @@ async function openMongo(uri) {
   // Use the database named in the URI, or "securechat" if it names none.
   const mdb = client.db(client.options.dbName === 'test' ? 'securechat' : undefined);
   const c = (name) => mdb.collection(name);
-  const [users, sessions, messages, hidden, avatars, friendships, blocks, profiles, pushSubs, games, config, groups, groupMembers, groupPhotos, notes] =
+  const [users, sessions, messages, hidden, avatars, friendships, blocks, profiles, pushSubs, games, config, groups, groupMembers, groupPhotos, notes,
+    stories, storyKeys, storyViews, storyComments] =
     ['users', 'sessions', 'messages', 'message_hidden', 'avatars', 'friendships', 'blocks', 'profiles', 'push_subs', 'games', 'config',
-      'groups', 'group_members', 'group_photos', 'notes'].map(c);
+      'groups', 'group_members', 'group_photos', 'notes', 'stories', 'story_keys', 'story_views', 'story_comments'].map(c);
   await Promise.all([
     sessions.createIndex({ expires: 1 }),
     sessions.createIndex({ username: 1 }),
@@ -355,6 +413,12 @@ async function openMongo(uri) {
     blocks.createIndex({ blocked: 1 }),
     pushSubs.createIndex({ username: 1 }),
     notes.createIndex({ username: 1, updated: 1 }),
+    stories.createIndex({ owner: 1, expires: 1 }),
+    stories.createIndex({ expires: 1 }),
+    storyKeys.createIndex({ viewer: 1 }),
+    storyKeys.createIndex({ story: 1 }),
+    storyViews.createIndex({ story: 1, ts: 1 }),
+    storyComments.createIndex({ story: 1, ts: 1 }),
   ]);
 
   // Shape documents like the SQL rows the server expects.
@@ -535,6 +599,42 @@ async function openMongo(uri) {
       n: await notes.countDocuments({ username: u }),
       last: (await notes.find({ username: u }).sort({ updated: -1 }).limit(1).next())?.updated ?? 0,
     }),
+
+    insertStory: (id, owner, body, ts, expires) => insertIgnoringDupes(stories, { _id: id, owner, body, ts, expires }),
+    insertStoryKey: (story, viewer, key) => insertIgnoringDupes(storyKeys, { _id: story + '|' + viewer, story, viewer, key }),
+    getStory: async (id, now) => {
+      const d = await stories.findOne({ _id: id, expires: { $gt: now } });
+      return d ? { id: d._id, owner: d.owner, body: d.body, ts: d.ts, expires: d.expires } : undefined;
+    },
+    getStoryKey: async (story, viewer) => (await storyKeys.findOne({ _id: story + '|' + viewer }, { projection: { key: 1 } })) ?? undefined,
+    storiesFor: async (_viewer, viewer, now) => {
+      const keys = new Map((await storyKeys.find({ viewer }).toArray()).map((k) => [k.story, k.key]));
+      const list = await stories.find({ _id: { $in: [...keys.keys()] }, expires: { $gt: now } }, { projection: { body: 0 } }).sort({ ts: 1 }).toArray();
+      const views = new Map((await storyViews.find({ viewer, story: { $in: list.map((d) => d._id) } }).toArray()).map((v) => [v.story, v]));
+      return list.map((d) => ({ id: d._id, owner: d.owner, ts: d.ts, expires: d.expires, key: keys.get(d._id), seen: views.get(d._id)?.ts ?? null, liked: views.get(d._id)?.liked ?? null }));
+    },
+    storyCount: async (owner, now) => ({ n: await stories.countDocuments({ owner, expires: { $gt: now } }) }),
+    storyViewers: async (story) => (await storyKeys.find({ story }, { projection: { viewer: 1 } }).toArray()).map((d) => ({ viewer: d.viewer })),
+    viewStory: (story, viewer, ts) => insertIgnoringDupes(storyViews, { _id: story + '|' + viewer, story, viewer, ts, liked: 0 }),
+    likeStory: async (story, viewer, ts, liked) => {
+      await storyViews.updateOne({ _id: story + '|' + viewer }, { $set: { liked }, $setOnInsert: { story, viewer, ts } }, { upsert: true });
+      return changes(1);
+    },
+    storyViews: async (story) => (await storyViews.find({ story }).sort({ ts: 1 }).toArray()).map((d) => ({ viewer: d.viewer, ts: d.ts, liked: d.liked })),
+    insertComment: (id, story, author, body, ts) => insertIgnoringDupes(storyComments, { _id: story + '|' + id, id, story, author, body, ts }),
+    storyComments: async (story) => (await storyComments.find({ story }).sort({ ts: 1 }).limit(1000).toArray())
+      .map((d) => ({ id: d.id, author: d.author, body: d.body, ts: d.ts })),
+    getComment: async (story, id) => {
+      const d = await storyComments.findOne({ _id: story + '|' + id }, { projection: { author: 1 } });
+      return d ? { id, author: d.author } : undefined;
+    },
+    commentCount: async (story, author) => ({ n: await storyComments.countDocuments({ story, author }) }),
+    deleteComment: async (story, id) => changes((await storyComments.deleteOne({ _id: story + '|' + id })).deletedCount),
+    deleteStoryComments: async (story) => changes((await storyComments.deleteMany({ story })).deletedCount),
+    deleteStoryViews: async (story) => changes((await storyViews.deleteMany({ story })).deletedCount),
+    deleteStoryKeys: async (story) => changes((await storyKeys.deleteMany({ story })).deletedCount),
+    deleteStory: async (id) => changes((await stories.deleteOne({ _id: id })).deletedCount),
+    expiredStories: async (now) => (await stories.find({ expires: { $lte: now } }, { projection: { _id: 1 } }).limit(500).toArray()).map((d) => ({ id: d._id })),
 
     getConfig: (key) => config.findOne({ _id: key }),
     setConfig: async (key, value) => {

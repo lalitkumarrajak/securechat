@@ -85,13 +85,14 @@ export async function conversationKey(myPriv, theirPubB64, me, them) {
 // Notes and diary: a key only this account's own devices can derive (ECDH of the identity key
 // with itself), so the server keeps them but can't read them. Each note is sealed together with
 // its owner and id, so the server can't pass one off as another.
-export async function notesKey(myPriv, myPubB64) {
+async function selfKey(myPriv, myPubB64, purpose) {
   const pub = await subtle.importKey('raw', unb64(myPubB64), EC, false, []);
   const shared = await subtle.deriveBits({ name: 'ECDH', public: pub }, myPriv, 256);
   const hk = await subtle.importKey('raw', shared, 'HKDF', false, ['deriveKey']);
-  return subtle.deriveKey({ name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(32), info: te.encode('securechat/notes') },
+  return subtle.deriveKey({ name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(32), info: te.encode('securechat/' + purpose) },
     hk, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
 }
+export const notesKey = (myPriv, myPubB64) => selfKey(myPriv, myPubB64, 'notes');
 export const encryptNote = (key, obj, u, id) => seal(key, te.encode(JSON.stringify(obj)), `note|${u}|${id}`);
 export async function decryptNote(key, body, u, id) {
   return JSON.parse(td.decode(await open(key, body, `note|${u}|${id}`)));
@@ -135,4 +136,26 @@ export const bodyKeyId = (body) => body.slice(0, 16);
 export async function decryptGroup(key, body, from, to, cid) {
   const kid = body.slice(0, 16);
   return JSON.parse(td.decode(await open(key, body.slice(16), groupAad(from, to, cid, kid))));
+}
+
+// Stories: each is sealed with its own random key, which is then wrapped for every friend allowed to
+// see it (with that pair's conversation key) and for the owner's own devices (with a key only they
+// can derive). Comments are sealed with the story's key. Everything is bound to the story's owner and id.
+export const storySelfKey = (myPriv, myPubB64) => selfKey(myPriv, myPubB64, 'stories');
+export function newStoryKey() {
+  const raw = crypto.getRandomValues(new Uint8Array(32));
+  return { raw, key: subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']) };
+}
+export const wrapStoryKey = (wrapKey, raw, owner, id, viewer) => seal(wrapKey, raw, `skey|${owner}|${id}|${viewer}`);
+export async function unwrapStoryKey(wrapKey, wrapped, owner, id, viewer) {
+  const raw = await open(wrapKey, wrapped, `skey|${owner}|${id}|${viewer}`);
+  return subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
+}
+export const encryptStory = (key, obj, owner, id) => seal(key, te.encode(JSON.stringify(obj)), `story|${owner}|${id}`);
+export async function decryptStory(key, body, owner, id) {
+  return JSON.parse(td.decode(await open(key, body, `story|${owner}|${id}`)));
+}
+export const encryptComment = (key, obj, id, author, cid) => seal(key, te.encode(JSON.stringify(obj)), `scmt|${id}|${author}|${cid}`);
+export async function decryptComment(key, body, id, author, cid) {
+  return JSON.parse(td.decode(await open(key, body, `scmt|${id}|${author}|${cid}`)));
 }

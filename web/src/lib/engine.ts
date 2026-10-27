@@ -5,7 +5,7 @@ import * as C from './crypto.js';
 import * as db from './db';
 import { applyEdit, applyPin, applyReact, senderOf } from './controls';
 import { compressImage, squarePhoto, type Crop } from './image';
-import type { Chat, Content, Friend, GifItem, Group, LinkPreview, Me, Msg, Request, SearchHit, Session, SysEvent } from './types';
+import type { CallLog, Chat, Content, Friend, GifItem, Group, LinkPreview, Me, Msg, Request, SearchHit, Session, SysEvent } from './types';
 import { groupIdOf, isGroup } from './types';
 import { prepareFile } from './files';
 import type { LocationContent } from './location';
@@ -241,6 +241,8 @@ export const readyHooks: (() => void)[] = [];
 export const myName = () => S.me;
 /** This account's own keys, for data only its devices may read (notes). */
 export const ownIdentity = () => ({ me: S.me, priv: S.priv, pub: S.pub });
+/** The key shared with one friend (stories wrap their keys with it; calls seal their setup with it). */
+export const peerKey = (u: string) => convKey(u);
 
 // Presence: tell the server when this tab is hidden or closed, so friends don't see you
 // "online" after you leave. The server also times out tabs whose heartbeats stop.
@@ -572,7 +574,16 @@ async function updateStatus(m: Msg) {
   if (chat?.lastK === m.k && chat.lastS !== m.s) await saveChat({ ...chat, lastS: m.s });
 }
 
-export const preview = (m: Pick<Msg, 'type' | 'text' | 'dur' | 'file'> & Partial<Pick<Msg, 'sys' | 'pending' | 'peer'>>): string =>
+/** "Missed voice call", "Outgoing video call", … */
+export function callText(c: CallLog, out: boolean) {
+  const kind = c.v ? 'video call' : 'voice call';
+  if (c.st === 'ok') return `${out ? 'Outgoing' : 'Incoming'} ${kind}`;
+  if (out) return c.st === 'declined' ? `${cap(kind)} declined` : c.st === 'busy' ? `${cap(kind)} · busy` : c.st === 'failed' ? `${cap(kind)} failed` : `${cap(kind)} · no answer`;
+  return c.st === 'declined' ? `Declined ${kind}` : c.st === 'failed' ? `${cap(kind)} failed` : `Missed ${kind}`;
+}
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+
+export const preview = (m: Pick<Msg, 'type' | 'text' | 'dur' | 'file' | 'call'> & Partial<Pick<Msg, 'sys' | 'pending' | 'peer' | 'out'>>): string =>
   m.type === 'sys' && m.sys ? sysText(m.sys, m.peer ? getApp().groups[groupIdOf(m.peer)] : undefined)
     : m.pending ? '🔒 Waiting for this message'
     : m.type === 'img' ? '📷 Photo' + (m.text ? ': ' + m.text : '')
@@ -580,6 +591,7 @@ export const preview = (m: Pick<Msg, 'type' | 'text' | 'dur' | 'file'> & Partial
     : m.type === 'gif' ? 'GIF'
     : m.type === 'file' ? '📄 ' + (m.file?.name || 'File')
     : m.type === 'location' ? '📍 Location'
+    : m.type === 'call' && m.call ? (m.call.v ? '🎥 ' : '📞 ') + callText(m.call, !!m.out)
     : m.type === 'sticker' ? 'Sticker'
     : m.type === 'deleted' ? '🚫 This message was deleted'
     : m.type === 'err' ? '🔒 Unable to decrypt'
@@ -632,6 +644,9 @@ function pick(c: any): Partial<Msg> {
   }
   if (c.type === 'sticker' && typeof c.src === 'string' && (c.src.startsWith(KLIPY_MEDIA) || /^noto:\S{1,16}$/u.test(c.src))) {
     return { type: 'sticker', src: c.src, w: c.w | 0, h: c.h | 0, ...extra };
+  }
+  if (c.type === 'call' && ['ok', 'missed', 'cancelled', 'declined', 'busy', 'failed'].includes(c.st)) {
+    return { type: 'call', call: { v: !!c.v, dur: Math.max(0, Math.min(86400, +c.dur || 0)), st: c.st } };
   }
   if (c.type === 'voice' && typeof c.src === 'string' && c.src.startsWith('data:audio/') && Array.isArray(c.peaks)) {
     return { type: 'voice', src: c.src, dur: +c.dur || 0, peaks: c.peaks.slice(0, 64).map((v: unknown) => Math.min(1, Math.max(0, +(v as number) || 0))), ...extra };
@@ -918,7 +933,7 @@ export async function markRead(peer: string) {
 }
 
 // ---------- sending ----------
-async function peerKeyChanged(peer: string) {
+export async function peerKeyChanged(peer: string) {
   const p = await db.get('peers', peer);
   return !!p?.changed;
 }
@@ -936,7 +951,7 @@ async function encryptAndQueue(peer: string, content: Content, quiet: boolean, m
 }
 
 /** Send a message bubble (text, photo or voice). */
-export async function sendContent(peer: string, content: Extract<Content, { type: 'text' | 'img' | 'voice' | 'gif' | 'sticker' | 'file' | 'location' }>, mn?: string[]) {
+export async function sendContent(peer: string, content: Extract<Content, { type: 'text' | 'img' | 'voice' | 'gif' | 'sticker' | 'file' | 'location' | 'call' }>, mn?: string[], quiet = false) {
   if (isGroup(peer)) {
     const g = getApp().groups[groupIdOf(peer)];
     if (!g) { toast.error('You’re no longer in this group'); return; }
@@ -948,7 +963,7 @@ export async function sendContent(peer: string, content: Extract<Content, { type
     toast.warning('Sending is paused', { description: 'This contact’s security code changed. Verify it first.' });
     return;
   }
-  const { cid, ts } = await encryptAndQueue(peer, content, false, mn);
+  const { cid, ts } = await encryptAndQueue(peer, content, quiet, mn);
   const msg = { k: S.me + '/' + cid, cid, peer, out: true, ts, s: -1, ...pick(content), ...(mn?.length && { mn }) } as Msg;
   await db.putMsg(msg);
   await bumpChat(peer, msg, false, false);

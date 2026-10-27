@@ -1,7 +1,11 @@
 export type Reply = { f: string; c: string; p: string }; // quoted message: sender, cid, preview
 export interface LinkPreview { url: string; title: string; desc: string; site: string; img?: string }
 
-export type MsgType = 'text' | 'img' | 'voice' | 'gif' | 'sticker' | 'file' | 'location' | 'deleted' | 'err' | 'sys';
+export type MsgType = 'text' | 'img' | 'voice' | 'gif' | 'sticker' | 'file' | 'location' | 'call' | 'deleted' | 'err' | 'sys';
+
+/** How a call went: answered (dur seconds), or why not. Logged in the chat by whoever called. */
+export type CallStatus = 'ok' | 'missed' | 'cancelled' | 'declined' | 'busy' | 'failed';
+export interface CallLog { v: boolean; dur: number; st: CallStatus }
 
 /** A group event shown in the chat ("Lalit added Rakhi"). Sent by the server, not encrypted. */
 export interface SysEvent { e: string; by: string; u?: string[]; name?: string; on?: boolean; auto?: boolean }
@@ -33,6 +37,7 @@ export interface Msg {
   pending?: boolean;      // group message whose key hasn't arrived yet
   mn?: string[];          // usernames @mentioned (groups)
   al?: string;            // album: photos sent together share this id and show as one grid
+  call?: CallLog;
 }
 
 export interface Pin { k: string; ts: number }
@@ -79,6 +84,7 @@ export type Content =
   | { type: 'voice'; src: string; dur: number; peaks: number[]; re?: Reply; fwd?: boolean }
   | { type: 'gif'; src: string; w: number; h: number; re?: Reply; fwd?: boolean }
   | { type: 'sticker'; src: string; w?: number; h?: number; re?: Reply; fwd?: boolean }
+  | { type: 'call'; v: boolean; dur: number; st: CallStatus }
   | { type: 'react'; k: string; e: string }
   | { type: 'edit'; k: string; text: string }
   | { type: 'pin'; k: string; on: boolean };

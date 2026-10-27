@@ -14,6 +14,8 @@ Private, end-to-end encrypted messaging with the people you choose. Built to wor
 - **Settings:** theme (system / light / dark), 6 accent colours, 5 chat wallpapers, text size, profile photo (choose the part to show: drag and zoom; tap to view it full size), name and about, last-seen and read-receipt privacy, push notifications, sounds, Enter to send, change password, sign out of all devices.
 - **Groups:** up to 50 people, end-to-end encrypted (each member's app has its own group key, handed to the others pairwise and replaced when someone leaves or is removed). Everything a chat has, plus @mentions, admins (add/remove people, make admins, edit name/photo/description, only-admins-can-send), invite links, and games (Ludo, UNO) with the group. New members see messages from when they joined.
 - **Diary and notes:** write about any day, for yourself or about a chat (from its menu). A calendar marks the days you wrote something; filter by chat, search, add a mood. End-to-end encrypted with a key only your own devices have, synced between them, never deleted after the message retention period.
+- **Stories:** a photo with a caption or a few words on a colour, for 24 hours. Share with all friends or only the ones you pick, tag friends (they're notified and can add it to their own story). Friends like and comment (only you see the comments); you see who viewed, liked and commented. Each story is sealed with its own key, wrapped for each friend it's shared with.
+- **Voice and video calls:** with any friend, from the chat header. Ringing on all their devices (the first to answer takes it), mute, camera off, front/back camera, minimise to keep chatting. Sound and video go directly between the phones (WebRTC); the setup is sealed with your conversation key, so the server can't listen in. Calls show in the chat (missed, declined, how long) with a call-back button.
 - **Games:** Ludo (Ludo King Classic rules, 2–6 players, 6-arm board for 5–6) and UNO (standard 108-card deck, 2–8 players, UNO! calls and catching). Invite friends or group-mates, share a link anyone can join, or fill seats with computer players. 30-second turns (the game plays for you when time runs out; 5 missed turns and you're out), emoji, quick phrases, @mentions and chat in the game. The server deals, rolls and checks every move, and each UNO player only ever receives their own cards. Game moves and game chat aren't end-to-end encrypted, and are deleted after the game.
 - **Works offline:** messages queue on the device and send when you're back. Installable as an app (PWA), with push notifications when it's closed.
 
@@ -69,6 +71,9 @@ Caddy gets a free HTTPS certificate automatically.
 | `GAME_LOBBY_MS` | `600000` | How long a game waits for players before it's called off |
 | `GEOIP_URL` | `https://ipwho.is/{ip}` | Looks up the approximate location of sign-ins for Active sessions; set empty to turn off |
 | `KLIPY_API_KEY` | – | Turns on GIF and sticker search ([KLIPY](https://docs.klipy.com)) |
+| `CLOUDFLARE_TURN_KEY_ID`, `CLOUDFLARE_TURN_API_TOKEN` | – | A TURN relay for calls ([Cloudflare Realtime TURN](https://developers.cloudflare.com/realtime/turn/), free tier). Without one, most calls connect directly, but some mobile networks block that |
+| `TURN_URLS` + `TURN_USERNAME`, `TURN_CREDENTIAL` | – | Or any other TURN service (comma-separated `turn:` URLs) |
+| `TURN_URLS` + `TURN_SECRET` | – | Or your own coturn with `use-auth-secret` (short-lived credentials per user) |
 
 ## Adding a game
 

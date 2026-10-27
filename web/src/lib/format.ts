@@ -35,3 +35,11 @@ export function fmtDuration(sec: number) {
   const s = Math.max(0, Math.round(sec));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
+
+/** "just now", "5m", "3h": how long ago, for stories. */
+export function fmtAgo(ts: number, now = Date.now()) {
+  const m = Math.floor((now - ts) / 60e3);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m`;
+  return `${Math.floor(m / 60)}h`;
+}

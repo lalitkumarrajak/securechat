@@ -71,7 +71,7 @@ export interface Action { key: string; label: string; danger?: boolean; disabled
  *  forward, select and delete take them all; reply, react, pin and info use the last one. */
 export function actionsFor(m: Msg, album?: Msg[] | null): Action[] {
   const all = album?.length ? album : [m];
-  const live = m.type !== 'deleted' && m.type !== 'err';
+  const live = m.type !== 'deleted' && m.type !== 'err' && m.type !== 'call'; // a call's entry can only be deleted
   const pinned = !!getApp().chats.find((c) => c.peer === m.peer)?.pins?.some((p) => p.k === m.k);
   const list: Action[] = [];
   if (m.s === -2) list.push({ key: 'retry', label: 'Send again', run: () => retry(m) });

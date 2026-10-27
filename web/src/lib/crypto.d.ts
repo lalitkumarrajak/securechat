@@ -19,3 +19,11 @@ export function decryptGroup(key: CryptoKey, body: string, from: string, to: str
 export function notesKey(myPriv: CryptoKey, myPub: string): Promise<CryptoKey>;
 export function encryptNote(key: CryptoKey, obj: unknown, u: string, id: string): Promise<string>;
 export function decryptNote(key: CryptoKey, body: string, u: string, id: string): Promise<any>;
+export function storySelfKey(myPriv: CryptoKey, myPub: string): Promise<CryptoKey>;
+export function newStoryKey(): { raw: Uint8Array; key: Promise<CryptoKey> };
+export function wrapStoryKey(wrapKey: CryptoKey, raw: Uint8Array, owner: string, id: string, viewer: string): Promise<string>;
+export function unwrapStoryKey(wrapKey: CryptoKey, wrapped: string, owner: string, id: string, viewer: string): Promise<CryptoKey>;
+export function encryptStory(key: CryptoKey, obj: unknown, owner: string, id: string): Promise<string>;
+export function decryptStory(key: CryptoKey, body: string, owner: string, id: string): Promise<any>;
+export function encryptComment(key: CryptoKey, obj: unknown, id: string, author: string, cid: string): Promise<string>;
+export function decryptComment(key: CryptoKey, body: string, id: string, author: string, cid: string): Promise<any>;

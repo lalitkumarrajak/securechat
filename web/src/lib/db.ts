@@ -47,6 +47,7 @@ export const del = async (name: string, key: IDBValidKey) => wrap((await store(n
 export const all = async <T = any>(name: string) => wrap<T[]>((await store(name)).getAll());
 /** Every value in the kv store whose key starts with `prefix` (e.g. 'note/'). */
 export const kvPrefix = async <T = any>(prefix: string) => wrap<T[]>((await store('kv')).getAll(IDBKeyRange.bound(prefix, prefix + '\uffff')));
+export const kvKeys = async (prefix: string) => wrap<string[]>((await store('kv')).getAllKeys(IDBKeyRange.bound(prefix, prefix + '\uffff')) as IDBRequest<string[]>);
 export const msgById = async (id: number) => wrap<Msg | undefined>((await store('msgs')).index('id').get(id));
 
 export const getMsg = (k: string) => get<Msg>('msgs', k);
