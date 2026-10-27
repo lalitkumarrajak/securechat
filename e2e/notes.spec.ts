@@ -19,7 +19,7 @@ test('set up: two friends', async () => {
   await P.page.getByRole('button', { name: 'Friends' }).click();
   await P.page.getByRole('tab', { name: 'Add' }).click();
   await P.page.getByPlaceholder('Search by username').fill(Q.u);
-  await P.page.locator('li').filter({ hasText: '@' + Q.u }).getByRole('button', { name: 'Add' }).click();
+  await P.page.locator('li').filter({ hasText: '@' + Q.u }).getByRole('button', { name: 'Add', exact: true }).click();
   await P.page.keyboard.press('Escape');
   await Q.page.getByRole('button', { name: 'Friends' }).click();
   await Q.page.locator('li').filter({ hasText: P.u }).getByRole('button', { name: 'Accept' }).click();

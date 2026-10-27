@@ -47,7 +47,7 @@ test('friend request: send, receive live, accept', async () => {
   await A.page.getByRole('tab', { name: 'Add' }).click();
   await A.page.getByPlaceholder('Search by username').fill(B.u);
   const row = A.page.locator('li').filter({ hasText: '@' + B.u });
-  await row.getByRole('button', { name: 'Add' }).click();
+  await row.getByRole('button', { name: 'Add', exact: true }).click();
   await expect(A.page.getByText('Friend request sent').first()).toBeVisible();
   await expect(row.getByRole('button', { name: 'Requested' })).toBeVisible();
 
@@ -64,7 +64,7 @@ test('friend request: send, receive live, accept', async () => {
 
   // A and C become friends too (for forwarding later)
   await A.page.getByPlaceholder('Search by username').fill(C.u);
-  await A.page.locator('li').filter({ hasText: '@' + C.u }).getByRole('button', { name: 'Add' }).click();
+  await A.page.locator('li').filter({ hasText: '@' + C.u }).getByRole('button', { name: 'Add', exact: true }).click();
   await C.page.getByRole('button', { name: 'Friends' }).click();
   await C.page.locator('li').filter({ hasText: A.u }).getByRole('button', { name: 'Accept' }).click();
   await C.page.keyboard.press('Escape');
@@ -75,7 +75,7 @@ test('non-friends cannot chat', async () => {
   await C.page.getByRole('button', { name: 'Friends' }).click();
   await C.page.getByRole('tab', { name: 'Add' }).click();
   await C.page.getByPlaceholder('Search by username').fill(B.u);
-  await expect(C.page.locator('li').filter({ hasText: '@' + B.u }).getByRole('button', { name: 'Add' })).toBeVisible();
+  await expect(C.page.locator('li').filter({ hasText: '@' + B.u }).getByRole('button', { name: 'Add', exact: true })).toBeVisible();
   await C.page.keyboard.press('Escape');
 });
 

@@ -125,7 +125,7 @@ export async function makeFriends(a: Phone, b: Phone) {
   await a.page.getByRole('button', { name: 'Friends' }).click();
   await a.page.getByRole('tab', { name: 'Add' }).click();
   await a.page.getByPlaceholder('Search by username').fill(b.u);
-  await a.page.locator('li').filter({ hasText: '@' + b.u }).getByRole('button', { name: 'Add' }).click();
+  await a.page.locator('li').filter({ hasText: '@' + b.u }).getByRole('button', { name: 'Add', exact: true }).click();
   await a.page.keyboard.press('Escape');
   await b.page.getByRole('button', { name: 'Friends' }).click();
   await b.page.locator('li').filter({ hasText: a.u }).getByRole('button', { name: 'Accept' }).click();

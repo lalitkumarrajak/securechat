@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Archive, ArrowLeft, BellOff, Clock, Eye, EyeOff, Gamepad2, Lock, LogOut, MessageSquarePlus, MoreVertical, NotebookPen, Search, Settings, UserPlus, Users, WifiOff, X } from 'lucide-react';
+import { Archive, ArrowLeft, BellOff, CirclePlus, Clock, Eye, EyeOff, Gamepad2, Lock, LogOut, MessageSquarePlus, MoreVertical, NotebookPen, Search, Settings, UserPlus, Users, WifiOff, X } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
 import { Ticks } from '../../components/Ticks';
 import { IconButton } from '../../components/ui/button';
@@ -12,6 +12,7 @@ import { cn } from '../../lib/utils';
 import { setApp, useApp } from '../../state/app';
 import { GamesStrip } from '../games/GamesStrip';
 import { StoriesStrip } from '../stories/StoriesStrip';
+import { openComposer } from '../../lib/stories';
 import { ChatListSkeleton } from '../../components/Skeleton';
 import { useSettings } from '../../state/settings';
 import { lockNow } from '../../lib/applock';
@@ -54,7 +55,7 @@ export function Sidebar() {
 
   return (
     <>
-      <header className="flex h-16 shrink-0 items-center gap-2 px-3">
+      <header className="flex h-14 shrink-0 items-center gap-2 px-3 md:h-16">
         {archivedView ? (
           <>
             <IconButton label="Back" onClick={() => setApp({ panel: null })}><ArrowLeft /></IconButton>
@@ -83,6 +84,7 @@ export function Sidebar() {
               <MenuContent>
                 <MenuItem icon={<MessageSquarePlus />} onSelect={() => setApp({ panel: 'friends', friendsTab: 'friends' })}>New chat</MenuItem>
                 <MenuItem icon={<Users />} onSelect={() => setApp({ panel: 'newgroup' })}>New group</MenuItem>
+                <MenuItem icon={<CirclePlus />} onSelect={() => openComposer()}>New story</MenuItem>
                 <MenuItem icon={<UserPlus />} onSelect={() => setApp({ panel: 'friends', friendsTab: 'add' })}>Add friend</MenuItem>
                 <MenuItem icon={<Gamepad2 />} onSelect={() => openPicker()}>Play games</MenuItem>
                 <MenuItem icon={<NotebookPen />} onSelect={() => openNotes()}>Diary and notes</MenuItem>
@@ -105,30 +107,28 @@ export function Sidebar() {
         </div>
       )}
 
-      <div className="px-3 pb-2">
-        <div className="relative">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search chats"
-            className="h-10 w-full rounded-xl bg-panel-2 pr-9 pl-9 text-sm outline-none placeholder:text-muted focus:ring-2 focus:ring-accent/30" />
-          {query && (
-            <button onClick={() => setQuery('')} aria-label="Clear search" className="absolute top-1/2 right-2 -translate-y-1/2 rounded-full p-1 text-muted hover:text-ink">
-              <X className="size-4" />
-            </button>
-          )}
-        </div>
-        {!archivedView && (
-          <div className="mt-2 flex gap-2">
-            {(['all', 'unread'] as const).map((f) => (
-              <button key={f} onClick={() => setFilter(f)}
-                className={cn('rounded-full px-3 py-1 text-sm font-medium transition', filter === f ? 'bg-accent/15 text-accent-ink' : 'bg-panel-2 text-muted hover:text-ink')}>
-                {f === 'all' ? 'All' : 'Unread'}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
+      {/* Only the header stays put: search, stories and games scroll away with the chats, so on a
+          phone the list gets nearly the whole screen. */}
       <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="flex items-center gap-2 px-3 pb-2">
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search chats"
+              className="h-9 w-full rounded-xl bg-panel-2 pr-8 pl-9 text-sm outline-none placeholder:text-muted focus:ring-2 focus:ring-accent/30" />
+            {query && (
+              <button onClick={() => setQuery('')} aria-label="Clear search" className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded-full p-1 text-muted hover:text-ink">
+                <X className="size-4" />
+              </button>
+            )}
+          </div>
+          {!archivedView && (['all', 'unread'] as const).map((f) => (
+            <button key={f} onClick={() => setFilter(f)} aria-pressed={filter === f}
+              className={cn('h-9 shrink-0 rounded-full px-3 text-sm font-medium transition', filter === f ? 'bg-accent/15 text-accent-ink' : 'bg-panel-2 text-muted hover:text-ink')}>
+              {f === 'all' ? 'All' : 'Unread'}
+            </button>
+          ))}
+        </div>
+        {!archivedView && !query && <StoriesStrip />}
         {!archivedView && archivedCount > 0 && !query && (
           <button onClick={() => setApp({ panel: 'archived' })} className="flex w-full items-center gap-4 px-5 py-3 text-left hover:bg-hover">
             <Archive className="size-5 text-accent-ink" />
@@ -136,7 +136,6 @@ export function Sidebar() {
             <span className="text-sm text-muted">{archivedCount}</span>
           </button>
         )}
-        {!archivedView && !query && <StoriesStrip />}
         {!archivedView && !query && <GamesStrip />}
         <ul>{visible.map((c) => <ChatRow key={c.peer} chat={c} />)}</ul>
         {!visible.length && syncing && !waited && conn !== 'offline' && !query && !archivedView ? <ChatListSkeleton rows={6} />

@@ -105,6 +105,8 @@ test('P deletes a story; it disappears for Q', async () => {
   await P.page.getByRole('button', { name: 'Delete', exact: true }).click();
   await expect(P.page.getByText('Story deleted')).toBeVisible();
   await P.page.keyboard.press('Escape');
+  // Notices from earlier stay up in a background test window; they now sit over the stories row.
+  for (const b of await Q.page.getByRole('button', { name: 'Close toast' }).all()) await b.click().catch(() => {});
   await strip(Q).getByRole('button', { name: `${P.u}’s story`, exact: true }).click();
   await expect(viewer(Q).getByRole('img', { name: 'Sunset at the beach' })).toBeVisible();
   await expect(viewer(Q).getByTestId('story-progress').locator('> span')).toHaveCount(1); // one story left
