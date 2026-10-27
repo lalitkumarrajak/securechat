@@ -7,13 +7,13 @@ import {
 import { Avatar } from '../../components/Avatar';
 import { openNotes } from '../../lib/notes';
 import { startCall } from '../../lib/calls';
-import { Button, IconButton } from '../../components/ui/button';
-import { confirm } from '../../components/ui/confirm';
-import { Menu, MenuContent, MenuItem, MenuSeparator, MenuSub, MenuSubContent, MenuSubTrigger, MenuTrigger } from '../../components/ui/menu';
+import { Button, IconButton } from '@sanga/ui/button';
+import { confirm } from '@sanga/ui/confirm';
+import { Menu, MenuContent, MenuItem, MenuSeparator, MenuSub, MenuSubContent, MenuSubTrigger, MenuTrigger } from '@sanga/ui/menu';
 import {
   acceptRequest, blockUser, findMessage, messageTexts, closeChat, copyMessages, deleteChatHere, isMuted, mute, preview, removeFriend, sendRequest, setArchived, togglePin, unblockUser,
 } from '../../lib/engine';
-import { fmtLastSeen } from '../../lib/format';
+import { fmtLastSeen } from '@sanga/ui/format';
 import { displayName } from '../../lib/types';
 import { getApp, setApp, useApp } from '../../state/app';
 import { useSettings } from '../../state/settings';
@@ -35,7 +35,7 @@ export function EmptyPane() {
     <div className={`wallpaper wp-${wallpaper} grid h-full place-items-center p-8`}>
       <div className="max-w-sm text-center">
         <img src="/logo-mark.png" alt="" className="mx-auto size-20 rounded-3xl opacity-90" />
-        <h2 className="mt-5 text-2xl font-semibold">Chattrix</h2>
+        <h2 className="mt-5 text-2xl font-semibold">Sanga</h2>
         <p className="mt-2 text-sm text-muted">Pick a chat on the left, or add a friend to start a new one.</p>
         <p className="mt-6 inline-flex items-center gap-1.5 text-xs text-muted"><Lock className="size-3.5" /> Your messages are end-to-end encrypted</p>
       </div>

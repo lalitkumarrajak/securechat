@@ -1,4 +1,4 @@
-// End-to-end: two (sometimes three) phones using Chattrix the way people do.
+// End-to-end: two (sometimes three) phones using Sanga the way people do.
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import { bubble, longPress, newTab, phone, signIn, signUp, stubExternalImages, swipeRight, testPdf, testPng, uname, type Phone } from './helpers';
@@ -305,7 +305,7 @@ test('settings: theme, accent, text size persist; profile name reaches friends',
   await A.page.getByRole('button', { name: 'Profile and settings' }).click();
   await A.page.getByRole('button', { name: new RegExp(A.u) }).click();
   await A.page.getByLabel('Name').fill('Lalit Rajak');
-  await A.page.getByLabel('About').fill('Building Chattrix 🚀');
+  await A.page.getByLabel('About').fill('Building Sanga 🚀');
   await A.page.getByRole('button', { name: 'Save' }).click();
   await expect(A.page.getByText('Profile saved')).toBeVisible();
   await expect(B.page.locator('header').getByText('Lalit Rajak')).toBeVisible();
@@ -420,16 +420,16 @@ test('documents arrive with a preview; locations show on a map', async () => {
 test('links get a preview card', async () => {
   const input = A.page.getByRole('textbox', { name: 'Message' });
   await input.fill('Look at this http://localhost:4322/article');
-  await expect(A.page.getByText('Chattrix launches link previews')).toBeVisible();
+  await expect(A.page.getByText('Sanga launches link previews')).toBeVisible();
   await A.page.getByRole('button', { name: 'Send' }).click();
   const msg = B.page.locator('[data-k]').filter({ hasText: 'Look at this' }).last();
-  await expect(msg.getByText('Chattrix launches link previews')).toBeVisible();
-  await expect(msg.getByText('Chattrix Blog')).toBeVisible();
+  await expect(msg.getByText('Sanga launches link previews')).toBeVisible();
+  await expect(msg.getByText('Sanga Blog')).toBeVisible();
   // Dismissing the preview sends the link without one
   await input.fill('No card please http://localhost:4322/article');
   await A.page.getByRole('button', { name: 'Remove link preview' }).click();
   await A.page.getByRole('button', { name: 'Send' }).click();
-  await expect(B.page.locator('[data-k]').filter({ hasText: 'No card please' }).last().getByText('Chattrix Blog')).toHaveCount(0);
+  await expect(B.page.locator('[data-k]').filter({ hasText: 'No card please' }).last().getByText('Sanga Blog')).toHaveCount(0);
 });
 
 test('select several to forward or delete; edit from the selection bar', async () => {

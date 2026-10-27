@@ -1,0 +1,19 @@
+{
+  "name": "@sanga/ui",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Sanga's shared look: theme, buttons, dialogs, menus, formatting helpers",
+  "exports": {
+    "./theme.css": "./src/theme.css",
+    "./button": "./src/button.tsx",
+    "./confirm": "./src/confirm.tsx",
+    "./dialog": "./src/dialog.tsx",
+    "./input": "./src/input.tsx",
+    "./menu": "./src/menu.tsx",
+    "./switch": "./src/switch.tsx",
+    "./tabs": "./src/tabs.tsx",
+    "./format": "./src/format.ts",
+    "./utils": "./src/utils.ts"
+  }
+}

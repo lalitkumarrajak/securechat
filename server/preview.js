@@ -42,7 +42,7 @@ async function safeFetch(start, accept, maxBytes) {
     const res = await fetch(url, {
       redirect: 'manual',
       signal: AbortSignal.timeout(TIMEOUT),
-      headers: { Accept: accept, 'User-Agent': 'Mozilla/5.0 (compatible; ChattrixLinkPreview/1.0)', 'Accept-Language': 'en' },
+      headers: { Accept: accept, 'User-Agent': 'Mozilla/5.0 (compatible; SangaLinkPreview/1.0)', 'Accept-Language': 'en' },
     });
     if (res.status >= 300 && res.status < 400 && res.headers.get('location')) {
       url = new URL(res.headers.get('location'), url);

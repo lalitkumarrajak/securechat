@@ -51,7 +51,7 @@ async function alertSignIn(username, s) {
   const loc = await locate(s.ip);
   sendTo(username, { t: 'signin', id: s.id, ua: s.ua, device: s.device, ip: s.ip, loc });
   const where = loc?.city ? ` near ${[loc.city, loc.country].filter(Boolean).join(', ')}` : '';
-  await notify(username, { t: 'signin', name: 'Chattrix', where });
+  await notify(username, { t: 'signin', name: 'Sanga', where });
 }
 
 // Record when each session was last used, at most every 5 minutes (it's only for the sessions list).

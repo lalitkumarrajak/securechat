@@ -110,7 +110,7 @@ export async function savePhotos(photos: { src: string; ts: number }[]) {
     const blob = dataUrlBlob(src);
     const d = new Date(ts);
     const ext = blob.type.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
-    const name = `Chattrix ${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}${photos.length > 1 ? ` (${i + 1})` : ''}.${ext}`;
+    const name = `Sanga ${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}${photos.length > 1 ? ` (${i + 1})` : ''}.${ext}`;
     return new File([blob], name, { type: blob.type });
   });
   if (matchMedia('(pointer: coarse)').matches && navigator.canShare?.({ files })) {

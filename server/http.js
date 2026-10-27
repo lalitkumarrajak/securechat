@@ -101,12 +101,30 @@ const staticFiles = new Map();
 const gzipAsync = util.promisify(zlib.gzip);
 const brotliAsync = util.promisify(zlib.brotliCompress);
 
-export function loadStatic(dir = config.webDir) {
+const installed = []; // the other apps found next to the shell, for /apps.json
+
+/** The shell at /, and every other built app (apps/<name>/dist with an app.json) at /apps/<name>/. */
+export function loadStatic(dir = config.webDir, appsDir = config.appsDir) {
   staticFiles.clear();
-  if (!fs.existsSync(dir)) {
-    console.warn(`web app not built (${dir} missing): run "npm run build"`);
-    return;
+  installed.length = 0;
+  if (!fs.existsSync(dir)) console.warn(`web app not built (${dir} missing): run "npm run build"`);
+  else loadDir(dir, '');
+  if (!appsDir || !fs.existsSync(appsDir)) return;
+  for (const ent of fs.readdirSync(appsDir, { withFileTypes: true })) {
+    const dist = path.join(appsDir, ent.name, 'dist');
+    if (!ent.isDirectory() || path.resolve(dist) === path.resolve(dir) || !fs.existsSync(path.join(dist, 'app.json'))) continue;
+    try {
+      const info = JSON.parse(fs.readFileSync(path.join(dist, 'app.json'), 'utf8'));
+      loadDir(dist, '/apps/' + ent.name);
+      installed.push({ ...info, id: ent.name, entry: `/apps/${ent.name}/remoteEntry.js` });
+    } catch (err) { console.warn(`app ${ent.name} skipped:`, err.message); }
   }
+}
+
+/** The apps the shell can open: [{ id, name, icon, expose, entry }]. */
+export const installedApps = () => installed;
+
+function loadDir(dir, prefix) {
   const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f) : undefined);
   const walk = (d) => {
     for (const ent of fs.readdirSync(d, { withFileTypes: true })) {
@@ -114,13 +132,13 @@ export function loadStatic(dir = config.webDir) {
       if (ent.isDirectory()) { walk(full); continue; }
       if (/\.(br|gz)$/.test(ent.name)) continue; // the precompressed copies
       const raw = fs.readFileSync(full);
-      const rel = '/' + path.relative(dir, full).split(path.sep).join('/');
+      const rel = prefix + '/' + path.relative(dir, full).split(path.sep).join('/');
       const type = MIME[path.extname(ent.name)] || 'application/octet-stream';
       const file = {
         body: raw, type,
         etag: '"' + sha256(raw).slice(0, 16) + '"',
-        // Vite puts content-hashed files in /assets, so they never change.
-        cache: rel.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache',
+        // Vite puts content-hashed files in assets/, so they never change.
+        cache: rel.includes('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache',
       };
       if (/text|json|svg|javascript|manifest/.test(type)) {
         file.gz = read(full + '.gz');
@@ -137,7 +155,9 @@ export function loadStatic(dir = config.webDir) {
 }
 
 export function serveStatic(req, res, pathname) {
-  const file = staticFiles.get(pathname === '/' ? '/index.html' : pathname);
+  // An app's own page: /apps/notes/ (or /apps/notes) is its index.html.
+  const file = staticFiles.get(pathname === '/' ? '/index.html' : pathname)
+    || (pathname.startsWith('/apps/') && staticFiles.get(pathname.replace(/\/?$/, '/index.html')));
   if (!file) return sendJson(res, 404, { error: 'not found' });
   sendBody(req, res, file);
 }

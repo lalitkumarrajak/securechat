@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { Eye, EyeOff, Lock, MessageCircleHeart, ShieldCheck, Smartphone, Smile, UserPlus, Wifi } from 'lucide-react';
-import { Button } from '../../components/ui/button';
-import { Input, Label } from '../../components/ui/input';
-import { Tabs, TabsContent, TabsList } from '../../components/ui/tabs';
+import { Button } from '@sanga/ui/button';
+import { Input, Label } from '@sanga/ui/input';
+import { Tabs, TabsContent, TabsList } from '@sanga/ui/tabs';
 import { login, register } from '../../lib/engine';
 import { hasPendingLink } from '../games/store';
 import { pendingGroupInvite, pendingInviter } from '../../lib/invite';
@@ -33,14 +33,14 @@ export function Landing() {
       )}
       {!hasPendingLink() && !pendingGroupInvite() && pendingInviter() && (
         <div className="bg-accent px-4 py-3 text-center text-sm font-medium text-accent-ink" role="status">
-          👋 @{pendingInviter()} invited you to Chattrix. Create a free account, or sign in, to chat.
+          👋 @{pendingInviter()} invited you to Sanga. Create a free account, or sign in, to chat.
         </div>
       )}
       <div className="mx-auto grid min-h-full max-w-6xl items-center gap-10 px-5 py-8 md:grid-cols-[1.1fr_1fr] md:gap-16 md:px-10">
         <section>
           <div className="flex items-center gap-3">
             <img src="/logo-mark.png" alt="" className="size-11 rounded-xl" />
-            <span className="text-2xl font-bold tracking-tight">Chattrix</span>
+            <span className="text-2xl font-bold tracking-tight">Sanga</span>
           </div>
           <h1 className="mt-8 text-4xl font-bold leading-tight tracking-tight md:text-5xl">
             Private chats with the people <span className="text-accent-ink">you choose.</span>
@@ -85,7 +85,7 @@ export function Landing() {
           ))}
         </ul>
         <footer className="flex items-center gap-4 text-xs text-muted md:col-span-2">
-          <span className="flex items-center gap-1.5"><MessageCircleHeart className="size-4" /> Chattrix</span>
+          <span className="flex items-center gap-1.5"><MessageCircleHeart className="size-4" /> Sanga</span>
           <span className="flex items-center gap-1.5"><Smartphone className="size-4" /> Works as an app: install it from your browser menu</span>
         </footer>
       </div>

@@ -2,9 +2,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Camera } from 'lucide-react';
 import { toast } from 'sonner';
-import { Button, IconButton } from '../../components/ui/button';
-import { Panel } from '../../components/ui/dialog';
-import { Input, Label, Textarea } from '../../components/ui/input';
+import { Button, IconButton } from '@sanga/ui/button';
+import { Panel } from '@sanga/ui/dialog';
+import { Input, Label, Textarea } from '@sanga/ui/input';
 import { createGroup, setGroupPhoto } from '../../lib/groups';
 import { setApp, useApp } from '../../state/app';
 import { FriendPicker } from './FriendPicker';

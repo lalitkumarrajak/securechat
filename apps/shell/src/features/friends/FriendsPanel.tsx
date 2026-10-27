@@ -3,9 +3,9 @@ import { toast } from 'sonner';
 import { ArrowLeft, Check, Clock, Copy, MessageCircle, Search, UserPlus, X } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
 import { showProfile } from './ProfileCard';
-import { Button, IconButton, Spinner } from '../../components/ui/button';
-import { Panel } from '../../components/ui/dialog';
-import { Tabs, TabsContent, TabsList } from '../../components/ui/tabs';
+import { Button, IconButton, Spinner } from '@sanga/ui/button';
+import { Panel } from '@sanga/ui/dialog';
+import { Tabs, TabsContent, TabsList } from '@sanga/ui/tabs';
 import { acceptRequest, declineRequest, openChat, searchUsers, sendRequest, unblockUser } from '../../lib/engine';
 import { displayName, type Person, type SearchHit } from '../../lib/types';
 import { LinkBox } from '../../components/LinkBox';
@@ -188,9 +188,9 @@ function AddFriend() {
         <>
           <p className="mt-4 text-center text-sm text-muted">Type at least 2 letters of a username. They’ll get your request and can accept or decline it.</p>
           <div className="mt-6 rounded-2xl border border-line p-4">
-            <p className="font-semibold">Invite someone to Chattrix</p>
+            <p className="font-semibold">Invite someone to Sanga</p>
             <p className="mt-1 mb-3 text-sm text-muted">Send this link anywhere. They can sign up, and you’ll get their friend request.</p>
-            <LinkBox url={inviteLink(me.u)} title="Chattrix" text={`Chat with me on Chattrix, I’m @${me.u}`} />
+            <LinkBox url={inviteLink(me.u)} title="Sanga" text={`Chat with me on Sanga, I’m @${me.u}`} />
           </div>
         </>
       )}

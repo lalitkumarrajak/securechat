@@ -2,13 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { Archive, ArrowLeft, BellOff, CirclePlus, Clock, Eye, EyeOff, Gamepad2, Lock, LogOut, MessageSquarePlus, MoreVertical, NotebookPen, Search, Settings, UserPlus, Users, WifiOff, X } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
 import { Ticks } from '../../components/Ticks';
-import { IconButton } from '../../components/ui/button';
-import { confirm } from '../../components/ui/confirm';
-import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '../../components/ui/menu';
+import { IconButton } from '@sanga/ui/button';
+import { confirm } from '@sanga/ui/confirm';
+import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '@sanga/ui/menu';
 import { isMuted, logout, openChat } from '../../lib/engine';
-import { fmtListTime } from '../../lib/format';
+import { fmtListTime } from '@sanga/ui/format';
 import { displayName, type Chat } from '../../lib/types';
-import { cn } from '../../lib/utils';
+import { cn } from '@sanga/ui/utils';
 import { setApp, useApp } from '../../state/app';
 import { GamesStrip } from '../games/GamesStrip';
 import { StoriesStrip } from '../stories/StoriesStrip';
@@ -68,7 +68,7 @@ export function Sidebar() {
             </button>
             <h1 className="min-w-0 flex-1 truncate pl-1 text-xl font-bold tracking-tight">{headerTitle.trim() || me.u}</h1>
             <PeekButton />
-            {appLock && <IconButton label="Lock Chattrix" onClick={lockNow}><Lock /></IconButton>}
+            {appLock && <IconButton label="Lock Sanga" onClick={lockNow}><Lock /></IconButton>}
             <IconButton label="Diary" onClick={() => openNotes()}><NotebookPen /></IconButton>
             <IconButton label="Play games" onClick={() => openPicker()}><Gamepad2 /></IconButton>
             <div className="relative">

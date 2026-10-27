@@ -10,5 +10,9 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": { "@sanga/crypto": "*", "@sanga/game-rules": "*" }
+  "dependencies": {
+    "@sanga/crypto": "*",
+    "@sanga/game-rules": "*",
+    "@sanga/ui": "*"
+  }
 }

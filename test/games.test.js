@@ -150,11 +150,15 @@ describe('games', () => {
       X.sendJson({ t: 'gbot', id: gid, drop: lobby.players[2].u });
       await frame(X, (g) => g.id === gid && g.players.length === 2);
       X.sendJson({ t: 'gstart', id: gid });
-      await frame(X, (g) => g.id === gid && g.status === 'play' && g.turn === 0);
-      X.sendJson({ t: 'gact', id: gid, a: { a: 'roll' } });
-      // the bot takes its turn by itself, and it's back to me
-      const back = await frame(X, (g) => g.id === gid && g.status === 'play' && g.turn === 0 && g.ev.some((e) => e.k === 'roll' && e.s === 1), 10_000);
-      assert.equal(back.players[1].missed, 0);
+      let g = await frame(X, (x) => x.id === gid && x.status === 'play' && x.turn === 0);
+      // Play my turns (a 6 means another roll for me) until the bot has taken its turn by itself and
+      // it's back to me.
+      for (let i = 0; i < 30 && !(g.turn === 0 && g.ev.some((e) => e.k === 'roll' && e.s === 1)); i++) {
+        if (g.turn === 0) X.sendJson({ t: 'gact', id: gid, a: g.s.phase === 'roll' ? { a: 'roll' } : { a: 'move', t: g.s.moves[0] } });
+        g = await frame(X, (x) => x.id === gid && x.status === 'play', 10_000);
+      }
+      assert.ok(g.ev.some((e) => e.k === 'roll' && e.s === 1), 'the bot rolled');
+      assert.equal(g.players[1].missed, 0);
       X.close();
     } finally { await s2.stop(); }
   });

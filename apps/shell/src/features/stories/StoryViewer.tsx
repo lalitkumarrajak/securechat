@@ -6,16 +6,16 @@ import * as D from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
 import { Eye, Heart, ImagePlus, MoreVertical, Pause, Play, Send, Trash2, X } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
-import { Spinner } from '../../components/ui/button';
-import { confirm } from '../../components/ui/confirm';
-import { Dialog } from '../../components/ui/dialog';
-import { Menu, MenuContent, MenuItem, MenuTrigger } from '../../components/ui/menu';
+import { Spinner } from '@sanga/ui/button';
+import { confirm } from '@sanga/ui/confirm';
+import { Dialog } from '@sanga/ui/dialog';
+import { Menu, MenuContent, MenuItem, MenuTrigger } from '@sanga/ui/menu';
 import { myName } from '../../lib/engine';
-import { fmtAgo } from '../../lib/format';
+import { fmtAgo } from '@sanga/ui/format';
 import { BACKGROUNDS, closeStories, commentOn, deleteComment, deleteStory, likeStory, loadStory, markSeen, openComposer, storyActivity, useStories,
   type StoryActivity, type StoryContent, type StoryMeta } from '../../lib/stories';
 import { displayName } from '../../lib/types';
-import { cn } from '../../lib/utils';
+import { cn } from '@sanga/ui/utils';
 import { useApp } from '../../state/app';
 import { showProfile } from '../friends/ProfileCard';
 

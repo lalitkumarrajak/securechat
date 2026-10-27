@@ -2,10 +2,10 @@
 import { useMemo, useState } from 'react';
 import { Check, Link2, Search } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
-import { Button } from '../../components/ui/button';
-import { Dialog } from '../../components/ui/dialog';
+import { Button } from '@sanga/ui/button';
+import { Dialog } from '@sanga/ui/dialog';
 import { displayName } from '../../lib/types';
-import { cn } from '../../lib/utils';
+import { cn } from '@sanga/ui/utils';
 import { useApp } from '../../state/app';
 import { GAME_UI } from './registry';
 import { ChatRowSkeleton } from '../../components/Skeleton';

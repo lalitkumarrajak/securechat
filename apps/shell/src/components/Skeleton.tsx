@@ -1,5 +1,5 @@
 // Grey placeholders shown while the app or the chat list is loading, shaped like what's coming.
-import { cn } from '../lib/utils';
+import { cn } from '@sanga/ui/utils';
 
 const bar = 'rounded-full bg-line/70 animate-pulse';
 
@@ -27,7 +27,7 @@ export function ChatListSkeleton({ rows = 8 }: { rows?: number }) {
 /** The whole app while it starts: the chat list on the left, an empty pane on wide screens. */
 export function ShellSkeleton() {
   return (
-    <div className="mx-auto flex h-dvh max-w-[1600px] overflow-hidden bg-panel md:border-x md:border-line" role="status" aria-label="Loading Chattrix">
+    <div className="mx-auto flex h-dvh max-w-[1600px] overflow-hidden bg-panel md:border-x md:border-line" role="status" aria-label="Loading Sanga">
       <aside className="flex w-full flex-col md:w-[360px] md:shrink-0 md:border-r md:border-line lg:w-[400px]">
         <div className="flex h-16 shrink-0 items-center gap-3 px-3">
           <span className="size-10 rounded-full bg-line/70 animate-pulse" />

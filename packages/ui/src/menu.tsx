@@ -1,6 +1,6 @@
 import * as M from '@radix-ui/react-dropdown-menu';
 import type { ReactNode } from 'react';
-import { cn } from '../../lib/utils';
+import { cn } from './utils';
 
 export const Menu = M.Root;
 export const MenuTrigger = M.Trigger;

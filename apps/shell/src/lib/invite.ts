@@ -1,7 +1,7 @@
-// "Join me on Chattrix" links: /?add=<username>. The invite waits through sign-up or sign-in,
+// "Join me on Sanga" links: /?add=<username>. The invite waits through sign-up or sign-in,
 // then offers to send that person a friend request.
 import { toast } from 'sonner';
-import { confirm } from '../components/ui/confirm';
+import { confirm } from '@sanga/ui/confirm';
 import { getApp } from '../state/app';
 import { openChat, sendRequest } from './engine';
 import { joinGroup, previewGroup } from './groups';
@@ -49,7 +49,7 @@ export async function handleInvite() {
   if (!me || u === me.u) return;
   if (friends[u]) return openChat(u);
   if (outgoing.some((r) => r.u === u)) return toast('Friend request already sent', { description: `@${u} will see it.` });
-  const ok = await confirm({ title: `Add @${u} as a friend?`, description: `@${u} invited you to Chattrix. Once they accept, you can chat.`, confirmText: 'Send friend request' });
+  const ok = await confirm({ title: `Add @${u} as a friend?`, description: `@${u} invited you to Sanga. Once they accept, you can chat.`, confirmText: 'Send friend request' });
   if (!ok) return;
   try {
     const r = await sendRequest(u);

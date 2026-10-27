@@ -1,7 +1,7 @@
 // Dialogs and sheets opened from inside a conversation.
 import { create } from 'zustand';
 import { toast } from 'sonner';
-import { choose } from '../../components/ui/confirm';
+import { choose } from '@sanga/ui/confirm';
 import { canDeleteForEveryone, canEdit, isEditable } from '../../lib/controls';
 import { savePhotos } from '../../lib/files';
 import { copyMessages, deleteForEveryone, deleteForMe, me, react, retry, togglePin } from '../../lib/engine';

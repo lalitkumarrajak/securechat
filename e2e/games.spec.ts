@@ -83,6 +83,7 @@ test('dice, tokens and turns', async () => {
   await token(A, 'Move token 2').click();
   await expect(tokenAt(B, 0, 1)).toHaveAttribute('data-p', '0', { timeout: 5000 });
   await A.page.getByRole('button', { name: 'Roll dice' }).click(); // 5: two tokens out, choose again
+  await expect(A.page.getByRole('button', { name: 'Rolled 5' })).toBeVisible({ timeout: 5000 }); // like a person: look at the dice, then pick
   await token(A, 'Move token 1').click();
   await expect(tokenAt(C, 0, 0)).toHaveAttribute('data-p', '8', { timeout: 5000 });
 });

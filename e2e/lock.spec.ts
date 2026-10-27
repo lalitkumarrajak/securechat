@@ -5,7 +5,7 @@ import { phone, signUp, uname, type Phone } from './helpers';
 test.describe.configure({ mode: 'serial' });
 let P: Phone;
 const shots = (name: string) => `e2e/.artifacts/screens/${name}.png`;
-const lockScreen = (p: Phone) => p.page.getByRole('dialog', { name: 'Chattrix is locked' });
+const lockScreen = (p: Phone) => p.page.getByRole('dialog', { name: 'Sanga is locked' });
 const tapPin = async (p: Phone, pin: string) => { for (const d of pin) await lockScreen(p).getByRole('button', { name: d, exact: true }).click(); };
 
 test.beforeAll(async ({ browser }) => { P = await phone(browser, uname('lock')); });
@@ -30,7 +30,7 @@ test('turn on app lock with a PIN', async () => {
 });
 
 test('Lock hides everything; a wrong PIN is refused, the right one unlocks', async () => {
-  await P.page.getByRole('button', { name: 'Lock Chattrix' }).click();
+  await P.page.getByRole('button', { name: 'Lock Sanga' }).click();
   await expect(lockScreen(P)).toBeVisible();
   await expect(P.page.getByRole('heading', { level: 1, name: P.u })).toHaveCount(0); // the app isn't on the page
   await tapPin(P, '1111');
@@ -49,7 +49,7 @@ test('locked again after a reload; typing the PIN works too', async () => {
 });
 
 test('5 wrong PINs mean a wait', async () => {
-  await P.page.getByRole('button', { name: 'Lock Chattrix' }).click();
+  await P.page.getByRole('button', { name: 'Lock Sanga' }).click();
   for (let i = 0; i < 5; i++) { await tapPin(P, '0000'); await P.page.waitForTimeout(150); }
   await expect(lockScreen(P).getByRole('alert')).toContainText('Try again in');
   await expect(lockScreen(P).getByRole('button', { name: '1', exact: true })).toBeDisabled();
@@ -71,6 +71,6 @@ test('turning it off needs the PIN', async () => {
   await P.page.getByRole('button', { name: 'Done' }).click();
   await expect(P.page.getByText('App lock off').first()).toBeVisible();
   await P.page.keyboard.press('Escape');
-  await expect(P.page.getByRole('button', { name: 'Lock Chattrix' })).toHaveCount(0);
+  await expect(P.page.getByRole('button', { name: 'Lock Sanga' })).toHaveCount(0);
   expect(P.errors).toEqual([]);
 });

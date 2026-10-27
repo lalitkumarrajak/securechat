@@ -3,7 +3,7 @@ import { Download, ExternalLink, FileText, MapPin } from 'lucide-react';
 import { downloadDataUrl, fileExt, fmtSize } from '../../lib/files';
 import { mapsLink, tileOf } from '../../lib/location';
 import type { LinkPreview, Msg } from '../../lib/types';
-import { cn } from '../../lib/utils';
+import { cn } from '@sanga/ui/utils';
 import { setChatUi } from './chatUi';
 
 const stop = (e: React.SyntheticEvent) => e.stopPropagation();

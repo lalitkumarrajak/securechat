@@ -8,18 +8,18 @@ import { PhotoCropper } from '../../components/PhotoCropper';
 import { pickPhoto } from '../../lib/image';
 import { setChatUi } from '../conversation/chatUi';
 import type { Crop } from '../../lib/image';
-import { Button, IconButton, Spinner } from '../../components/ui/button';
-import { confirm } from '../../components/ui/confirm';
-import { Panel } from '../../components/ui/dialog';
-import { Input, Label, Textarea } from '../../components/ui/input';
-import { Switch } from '../../components/ui/switch';
+import { Button, IconButton, Spinner } from '@sanga/ui/button';
+import { confirm } from '@sanga/ui/confirm';
+import { Panel } from '@sanga/ui/dialog';
+import { Input, Label, Textarea } from '@sanga/ui/input';
+import { Switch } from '@sanga/ui/switch';
 import {
   changePassword, disablePush, enablePush, listSessions, logout, pushSupported, removeAvatar, revokeSession, setAvatar, unblockUser, updateProfile,
 } from '../../lib/engine';
 import { deviceName, osVersion, parseDevice, placeName } from '../../lib/device';
-import { fmtListTime } from '../../lib/format';
+import { fmtListTime } from '@sanga/ui/format';
 import type { Session } from '../../lib/types';
-import { cn } from '../../lib/utils';
+import { cn } from '@sanga/ui/utils';
 import { getApp, setApp, useApp } from '../../state/app';
 import { PinDialog } from './PinDialog';
 import { LOCK_AFTER, removeLock, setPin } from '../../lib/applock';
@@ -28,7 +28,7 @@ import { ACCENTS, setSettings, useSettings, type FontSize, type Theme, type Wall
 type Page = 'main' | 'profile' | 'appearance' | 'privacy' | 'notifications' | 'chats' | 'account' | 'sessions' | 'about';
 const TITLES: Record<Page, string> = {
   main: 'Settings', profile: 'Profile', appearance: 'Appearance', privacy: 'Privacy', notifications: 'Notifications',
-  chats: 'Chats', account: 'Account', sessions: 'Active sessions', about: 'About Chattrix',
+  chats: 'Chats', account: 'Account', sessions: 'Active sessions', about: 'About Sanga',
 };
 
 export function SettingsPanel() {
@@ -183,7 +183,7 @@ function Profile() {
           </div>
           <div>
             <Label htmlFor="p-about" hint={`${about.length}/140`}>About</Label>
-            <Textarea id="p-about" value={about} maxLength={140} rows={2} onChange={(e) => setAbout(e.target.value)} placeholder="Hey there! I’m using Chattrix." />
+            <Textarea id="p-about" value={about} maxLength={140} rows={2} onChange={(e) => setAbout(e.target.value)} placeholder="Hey there! I’m using Sanga." />
           </div>
           <div>
             <Label htmlFor="p-title" hint={`${title.length}/30`}>Title at the top</Label>
@@ -291,7 +291,7 @@ function Privacy() {
       <PrivacyScreenSection />
       <Section title="On this device">
         <ToggleRow label="Sign out when I close the tab"
-          sub="For shared computers or a quick exit: closing Chattrix signs you out and erases chats saved on this device. Reloading keeps you signed in. Your chats come back when you sign in again."
+          sub="For shared computers or a quick exit: closing Sanga signs you out and erases chats saved on this device. Reloading keeps you signed in. Your chats come back when you sign in again."
           checked={signOutOnClose} onChange={(v) => {
             setSettings({ signOutOnClose: v });
             toast(v ? 'You’ll be signed out when you close this tab' : 'You’ll stay signed in on this device');
@@ -340,7 +340,7 @@ function PrivacyScreenSection() {
               ))}
             </div>
           </div>
-          <ToggleRow label="Blur when I leave Chattrix" sub="Blurs the whole screen while you’re in another app or window, and in the app switcher."
+          <ToggleRow label="Blur when I leave Sanga" sub="Blurs the whole screen while you’re in another app or window, and in the app switcher."
             checked={away} onChange={(v) => setSettings({ privacyBlurAway: v })} />
         </>
       )}
@@ -354,12 +354,12 @@ function AppLockSection() {
   const [dialog, setDialog] = useState<null | 'set' | 'change' | 'off'>(null);
   return (
     <Section title="App lock">
-      <ToggleRow label="Lock with a PIN" sub="Ask for a PIN whenever Chattrix is opened on this device."
+      <ToggleRow label="Lock with a PIN" sub="Ask for a PIN whenever Sanga is opened on this device."
         checked={enabled} onChange={(v) => setDialog(v ? 'set' : 'off')} />
       {enabled && (
         <>
           <div className="px-5 pt-1 pb-3" role="radiogroup" aria-label="Lock automatically">
-            <p className="mb-2 text-sm text-muted">Lock automatically when I leave Chattrix</p>
+            <p className="mb-2 text-sm text-muted">Lock automatically when I leave Sanga</p>
             <div className="flex flex-wrap gap-2">
               {LOCK_AFTER.map((o) => (
                 <button key={o.ms} role="radio" aria-checked={after === o.ms} onClick={() => setSettings({ lockAfterMs: o.ms })}
@@ -376,7 +376,7 @@ function AppLockSection() {
         <PinDialog mode={dialog === 'set' ? 'set' : dialog === 'change' ? 'change' : 'verify'} onClose={() => setDialog(null)}
           onDone={async (pin) => {
             if (dialog === 'off') { removeLock(); toast('App lock off'); }
-            else { await setPin(pin); toast.success(dialog === 'set' ? 'App lock on' : 'PIN changed', { description: dialog === 'set' ? 'Tap the lock at the top to lock Chattrix right away.' : undefined }); }
+            else { await setPin(pin); toast.success(dialog === 'set' ? 'App lock on' : 'PIN changed', { description: dialog === 'set' ? 'Tap the lock at the top to lock Sanga right away.' : undefined }); }
             setDialog(null);
           }} />
       )}
@@ -400,13 +400,13 @@ function Notifications() {
   return (
     <>
       <Section>
-        <ToggleRow label="Push notifications" sub="Get notified even when Chattrix is closed. Notifications never include message text."
+        <ToggleRow label="Push notifications" sub="Get notified even when Sanga is closed. Notifications never include message text."
           checked={push} onChange={togglePush} disabled={busy} />
         <ToggleRow label="Sounds" sub="Play a sound for new messages while the app is open." checked={sound} onChange={(v) => setSettings({ sound: v })} />
       </Section>
       {!pushSupported() && (
         <Section className="px-5 py-4"><p className="text-sm text-muted">
-          This browser doesn’t support push notifications here. On iPhone, add Chattrix to your Home Screen first (Share → Add to Home Screen), then turn them on.
+          This browser doesn’t support push notifications here. On iPhone, add Sanga to your Home Screen first (Share → Add to Home Screen), then turn them on.
         </p></Section>
       )}
       <Section className="px-5 py-4"><p className="text-sm text-muted">Mute a single chat from its menu (⋮ → Mute notifications).</p></Section>
@@ -560,7 +560,7 @@ function About() {
   return (
     <Section className="px-5 py-6 text-center">
       <img src="/logo-mark.png" alt="" className="mx-auto size-16 rounded-2xl" />
-      <h3 className="mt-3 text-xl font-semibold">Chattrix</h3>
+      <h3 className="mt-3 text-xl font-semibold">Sanga</h3>
       <p className="text-sm text-muted">Version 2.0</p>
       <p className="mx-auto mt-4 max-w-xs text-sm text-muted">
         Private messaging with friends. Messages are encrypted on your device with keys only you and your friend have.

@@ -1,0 +1,9 @@
+/* The diary's own styles, loaded with it. Inside the shell most of this is already there and the
+   duplicates are harmless; on its own page (/apps/notes/) it's everything the diary needs. */
+@import "tailwindcss";
+@import "@sanga/ui/theme.css";
+@source "../../../packages/ui/src";
+
+/* Privacy screen (Settings → Privacy), as in the shell. */
+[data-privacy=on] .priv { filter: blur(7px); transition: filter 0.15s; }
+@media (hover: hover) { [data-privacy=on] .priv-scope:hover .priv { filter: none; } }

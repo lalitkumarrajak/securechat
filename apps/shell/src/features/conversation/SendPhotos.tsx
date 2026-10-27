@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import * as D from '@radix-ui/react-dialog';
 import { Plus, SendHorizontal, X } from 'lucide-react';
-import { Spinner } from '../../components/ui/button';
+import { Spinner } from '@sanga/ui/button';
 import { readablePhoto } from '../../lib/image';
 import { useSwipe } from '../../lib/swipe';
-import { cn } from '../../lib/utils';
+import { cn } from '@sanga/ui/utils';
 
 export const MAX_PHOTOS = 100;
 

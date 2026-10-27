@@ -4,13 +4,13 @@ import { Ban, Check, ChevronDown, Copy, Download, Forward, Info, Lock, Pencil, P
 import { Ticks } from '../../components/Ticks';
 import { reactionSummary } from '../../lib/controls';
 import { emojiOnly, QUICK_REACTIONS } from '../../lib/emoji';
-import { fmtClock, fmtDuration } from '../../lib/format';
+import { fmtClock, fmtDuration } from '@sanga/ui/format';
 import { callText } from '../../lib/engine';
 import { startCall } from '../../lib/calls';
 import { groupIdOf, isGroup, type Group, type Msg } from '../../lib/types';
 import { senderOf } from '../../lib/controls';
 import { splitMentions } from '../../lib/mentions';
-import { cn, isTouch } from '../../lib/utils';
+import { cn, isTouch } from '@sanga/ui/utils';
 import { setApp, useApp } from '../../state/app';
 import { BigEmoji, Emoji } from './BigEmoji';
 import { FileCard, LinkPreviewCard, LocationCard } from './Attachments';

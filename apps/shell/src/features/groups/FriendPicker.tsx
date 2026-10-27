@@ -4,7 +4,7 @@ import { Check, Search } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
 import { ChatRowSkeleton } from '../../components/Skeleton';
 import { displayName } from '../../lib/types';
-import { cn } from '../../lib/utils';
+import { cn } from '@sanga/ui/utils';
 import { useApp } from '../../state/app';
 
 export function FriendPicker({ picked, onChange, max, exclude = [] }: {

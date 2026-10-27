@@ -1,5 +1,5 @@
 import { forwardRef, type InputHTMLAttributes, type TextareaHTMLAttributes } from 'react';
-import { cn } from '../../lib/utils';
+import { cn } from './utils';
 
 const field = 'w-full rounded-xl border border-line bg-panel-2 px-3.5 text-ink placeholder:text-muted outline-none transition focus:border-accent focus:bg-panel focus:ring-3 focus:ring-accent/15';
 

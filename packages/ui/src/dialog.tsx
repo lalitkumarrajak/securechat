@@ -1,7 +1,7 @@
 import * as D from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { cn } from '../../lib/utils';
+import { cn } from './utils';
 
 /** A centred dialog on desktop that becomes a bottom sheet on phones. */
 export function Dialog({ open, onOpenChange, title, description, children, className, hideTitle, keepFocus }: {

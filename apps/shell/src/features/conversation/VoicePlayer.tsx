@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pause, Play } from 'lucide-react';
-import { fmtDuration } from '../../lib/format';
-import { cn } from '../../lib/utils';
+import { fmtDuration } from '@sanga/ui/format';
+import { cn } from '@sanga/ui/utils';
 
 let playing: HTMLAudioElement | null = null; // only one voice message plays at a time
 const SPEEDS = [1, 1.5, 2];

@@ -1,5 +1,5 @@
 import { AlertCircle, Check, CheckCheck, Clock } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn } from '@sanga/ui/utils';
 
 /** Message status: 🕓 sending, ✓ sent, ✓✓ delivered, blue ✓✓ read, ! failed. */
 export function Ticks({ s, className }: { s: number; className?: string }) {

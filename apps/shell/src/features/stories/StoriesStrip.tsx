@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { Plus } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
 import { displayName } from '../../lib/types';
-import { cn } from '../../lib/utils';
+import { cn } from '@sanga/ui/utils';
 import { openComposer, openStories, rings, useStories } from '../../lib/stories';
 import { useApp } from '../../state/app';
 

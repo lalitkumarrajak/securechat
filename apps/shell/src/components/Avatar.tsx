@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { loadAvatar } from '../lib/engine';
 import { Bot, Users } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn } from '@sanga/ui/utils';
 import { useApp } from '../state/app';
 
 const hue = (name: string) => { let h = 0; for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h % 360; };

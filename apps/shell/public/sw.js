@@ -1,5 +1,5 @@
 // Service worker: offline app shell and push notifications.
-const CACHE = 'chattrix-v3'; // bump when the shell files change
+const CACHE = 'chattrix-v3'; // bumping it empties the saved copy: the next start waits for the network // bump when the shell files change
 const SHELL = ['/', '/theme-boot.js', '/logo-mark.png', '/icon-192.png', '/manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
@@ -20,9 +20,22 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   if (url.pathname.startsWith('/api/') || url.pathname === '/ws') return;
-  const immutable = url.pathname.startsWith('/assets/') || url.pathname.startsWith('/emoji/');
-  const page = e.request.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html';
+  const immutable = url.pathname.startsWith('/assets/') || url.pathname.startsWith('/emoji/') || /^\/apps\/[^/]+\/assets\//.test(url.pathname);
+  // The other apps (/apps/<name>/): the list of apps and each app's entry file must be current, or
+  // an old entry would ask for files a new version no longer has. Network first, saved copy offline.
+  const current = url.pathname === '/apps.json' || url.pathname.endsWith('/remoteEntry.js') || /^\/apps\/[^/]+\/?(index\.html)?$/.test(url.pathname);
+  const page = !current && (e.request.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html');
   const key = page ? '/' : url.pathname;
+  if (current) {
+    e.respondWith(caches.open(CACHE).then(async (cache) => {
+      try {
+        const res = await fetch(e.request);
+        if (res.ok) cache.put(key, res.clone());
+        return res;
+      } catch { return (await cache.match(key)) || Response.error(); }
+    }));
+    return;
+  }
   e.respondWith(caches.open(CACHE).then(async (cache) => {
     const hit = await cache.match(key);
     if (immutable && hit) return hit;
@@ -48,7 +61,7 @@ self.addEventListener('push', (e) => {
     : d.t === 'game' ? `invited you to play ${d.game || 'a game'} 🎲`
     : d.t === 'gmention' ? `mentioned you in ${d.game || 'a game'}`
     : d.t === 'gmsg' ? `${name}${d.mention ? ' mentioned you' : ': New message'}`
-    : d.t === 'signin' ? `A device signed in${d.where || ''}. If this wasn’t you, open Chattrix → Settings → Active sessions.`
+    : d.t === 'signin' ? `A device signed in${d.where || ''}. If this wasn’t you, open Sanga → Settings → Active sessions.`
     : d.t === 'call' ? `Incoming ${d.v ? 'video' : 'voice'} call`
     : d.t === 'missed' ? `Missed ${d.v ? 'video' : 'voice'} call`
     : d.t === 'stag' ? 'tagged you in their story'

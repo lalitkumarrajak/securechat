@@ -22,8 +22,8 @@ http.createServer((req, res) => {
     }));
   } else if (url.pathname === '/article') {
     res.writeHead(200, { 'Content-Type': 'text/html' }).end(`<html><head><title>x</title>
-      <meta property="og:title" content="Chattrix launches link previews">
+      <meta property="og:title" content="Sanga launches link previews">
       <meta property="og:description" content="Titles and pictures for the links you share.">
-      <meta property="og:site_name" content="Chattrix Blog"></head><body></body></html>`);
+      <meta property="og:site_name" content="Sanga Blog"></head><body></body></html>`);
   } else res.writeHead(404).end();
 }).listen(PORT, () => console.log('fake services on ' + PORT));

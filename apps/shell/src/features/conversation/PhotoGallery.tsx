@@ -3,11 +3,11 @@
 import { useEffect, useState } from 'react';
 import * as D from '@radix-ui/react-dialog';
 import { ChevronLeft, ChevronRight, Download, X } from 'lucide-react';
-import { Spinner } from '../../components/ui/button';
+import { Spinner } from '@sanga/ui/button';
 import { senderOf } from '../../lib/controls';
 import { findMessage, photoKeys } from '../../lib/engine';
 import { savePhotos } from '../../lib/files';
-import { fmtClock, fmtDay } from '../../lib/format';
+import { fmtClock, fmtDay } from '@sanga/ui/format';
 import { useSwipe } from '../../lib/swipe';
 import { displayName, groupIdOf, isGroup, type Msg } from '../../lib/types';
 import { useApp } from '../../state/app';

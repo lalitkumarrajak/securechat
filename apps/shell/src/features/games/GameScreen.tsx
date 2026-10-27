@@ -4,12 +4,12 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Bot, Check, Clock, Crown, LogOut, MessageCircle, MoreVertical, SendHorizontal, Smile, Volume2, VolumeX, X } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
 import { LinkBox } from '../../components/LinkBox';
-import { Button, IconButton, Spinner } from '../../components/ui/button';
-import { confirm } from '../../components/ui/confirm';
-import { Dialog } from '../../components/ui/dialog';
-import { Menu, MenuContent, MenuItem, MenuTrigger } from '../../components/ui/menu';
+import { Button, IconButton, Spinner } from '@sanga/ui/button';
+import { confirm } from '@sanga/ui/confirm';
+import { Dialog } from '@sanga/ui/dialog';
+import { Menu, MenuContent, MenuItem, MenuTrigger } from '@sanga/ui/menu';
 import { myName } from '../../lib/engine';
-import { cn } from '../../lib/utils';
+import { cn } from '@sanga/ui/utils';
 import { useApp } from '../../state/app';
 import { setSettings, useSettings } from '../../state/settings';
 import { GAME_UI } from './registry';
@@ -266,7 +266,7 @@ function Lobby({ g, me, onLeave }: { g: Game; me: string; onLeave: () => void })
       {mine?.state === 'joined' && (
         <div className="w-full rounded-2xl bg-white/10 p-3 text-left">
           <p className="mb-2 text-sm font-semibold">Invite anyone with this link</p>
-          <LinkBox dark url={shareLink(g.id)} title={gameName(g.type)} text={`Play ${gameName(g.type)} with me on Chattrix!`}
+          <LinkBox dark url={shareLink(g.id)} title={gameName(g.type)} text={`Play ${gameName(g.type)} with me on Sanga!`}
             onUse={() => linkShared(g)} />
           <p className="mt-2 text-xs text-white/60">They don’t need to be your friend. New people can sign up from the link.</p>
         </div>

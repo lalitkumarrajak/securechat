@@ -1,0 +1,12 @@
+{
+  "name": "@sanga/sdk",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The contract between the Sanga shell and its apps: session, server, live updates, storage, people",
+  "exports": {
+    ".": "./src/index.ts",
+    "./standalone": "./src/standalone.tsx"
+  },
+  "dependencies": { "@sanga/ui": "*" }
+}

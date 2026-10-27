@@ -1,4 +1,4 @@
-// Chattrix server: relays end-to-end encrypted messages. It never sees plaintext,
+// Sanga server: relays end-to-end encrypted messages. It never sees plaintext,
 // passwords, or private keys — only ciphertext blobs and public keys.
 import http from 'node:http';
 import https from 'node:https';
@@ -7,7 +7,7 @@ import { WebSocketServer } from 'ws';
 import { config, MAX_BODY } from './config.js';
 import { ctx } from './context.js';
 import { openDatabase } from './db.js';
-import { clientIp, loadStatic, rateLimited, sendJson, serveStatic, sha256 } from './http.js';
+import { clientIp, installedApps, loadStatic, rateLimited, sendJson, serveStatic, sha256 } from './http.js';
 import { addSocket, removeSocket, refreshPresence, send, startPresenceSweep } from './hub.js';
 import { PUBLIC_ROUTES, routes as authRoutes, touchSession, userFromToken } from './auth.js';
 import { routes as profileRoutes, avatarVersion } from './profiles.js';
@@ -57,6 +57,7 @@ async function handleHttp(req, res) {
   if (!route) {
     if (url.pathname.startsWith('/api/')) return sendJson(res, 404, { error: 'not found' });
     if (req.method !== 'GET' && req.method !== 'HEAD') return sendJson(res, 405, { error: 'method not allowed' });
+    if (url.pathname === '/apps.json') return sendJson(res, 200, installedApps());
     const emoji = EMOJI_RE.exec(url.pathname);
     if (emoji) return serveEmoji(req, res, emoji[1]);
     return serveStatic(req, res, url.pathname);
@@ -165,7 +166,7 @@ startPresenceSweep();
 
 server.listen(config.port, config.host, () => {
   const proto = config.tlsCert ? 'https' : 'http';
-  console.log(`Chattrix running at ${proto}://localhost:${config.port} (${ctx.db.kind})`);
+  console.log(`Sanga running at ${proto}://localhost:${config.port} (${ctx.db.kind})`);
 });
 
 for (const sig of ['SIGINT', 'SIGTERM']) {

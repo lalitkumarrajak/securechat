@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Toaster } from 'sonner';
-import { ConfirmHost } from './components/ui/confirm';
+import { ConfirmHost } from '@sanga/ui/confirm';
 import { ShellSkeleton } from './components/Skeleton';
 import { boot, openChat } from './lib/engine';
 import { useApp } from './state/app';
@@ -26,7 +26,7 @@ export function App() {
     const params = new URLSearchParams(location.search);
     const play = params.get('play');
     if (play) { history.replaceState(null, '', '/'); joinFromLink(play); }
-    // "Join me on Chattrix": /?add=<username>, offered as a friend request once signed in.
+    // "Join me on Sanga": /?add=<username>, offered as a friend request once signed in.
     const add = params.get('add');
     if (add) { history.replaceState(null, '', '/'); rememberInvite(add); }
     const group = params.get('group'); // group invite link

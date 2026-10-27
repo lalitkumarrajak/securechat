@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from 'react';
 import * as D from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
 import { ArrowLeft, Check, ImagePlus, Lock, Palette, Send, Type, UserPlus, Users, X } from 'lucide-react';
-import { Spinner } from '../../components/ui/button';
+import { Spinner } from '@sanga/ui/button';
 import { compressImage } from '../../lib/image';
 import { BACKGROUNDS, MAX_CAPTION, MAX_TEXT, postStory, useStories, type StoryContent } from '../../lib/stories';
 import { displayName } from '../../lib/types';
-import { cn } from '../../lib/utils';
+import { cn } from '@sanga/ui/utils';
 import { useApp } from '../../state/app';
 import { FriendPicker } from '../groups/FriendPicker';
 

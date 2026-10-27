@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { Check, Copy, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { cn } from '../lib/utils';
+import { cn } from '@sanga/ui/utils';
 
 export function LinkBox({ url, title, text, onUse, dark, className }: {
   url: string; title: string; text: string;

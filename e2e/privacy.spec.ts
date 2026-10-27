@@ -1,4 +1,4 @@
-// End-to-end: "sign out when I close the tab", and "join me on Chattrix" invite links.
+// End-to-end: "sign out when I close the tab", and "join me on Sanga" invite links.
 import { test, expect } from '@playwright/test';
 import { PASSWORD, newTab, phone, signUp, uname, type Phone } from './helpers';
 
@@ -19,7 +19,7 @@ test('invite link: someone signs up from it and sends a friend request', async (
   await signUp(P);
   await P.page.getByRole('button', { name: 'Friends' }).click();
   await P.page.getByRole('tab', { name: /Add/ }).click();
-  await expect(P.page.getByText('Invite someone to Chattrix')).toBeVisible();
+  await expect(P.page.getByText('Invite someone to Sanga')).toBeVisible();
   await P.page.getByRole('button', { name: 'Copy link' }).click();
   await expect(P.page.getByText('Link copied').first()).toBeVisible();
   const link = await P.page.evaluate(() => navigator.clipboard.readText());
@@ -27,7 +27,7 @@ test('invite link: someone signs up from it and sends a friend request', async (
   await P.page.keyboard.press('Escape');
 
   await Q.page.goto(link);
-  await expect(Q.page.getByText(`@${P.u} invited you to Chattrix`)).toBeVisible();
+  await expect(Q.page.getByText(`@${P.u} invited you to Sanga`)).toBeVisible();
   // Sign up by hand: the app opens the friend-request prompt straight away, over the chat list
   await Q.page.getByRole('tab', { name: 'Create account' }).click();
   const form = Q.page.getByRole('tabpanel');
@@ -69,7 +69,7 @@ test('with the setting on: reloads and extra tabs keep you in, closing the tab s
   await P.page.close();
   P.page = first;
 
-  // Close the last tab, open Chattrix again: signed out, nothing left on the device
+  // Close the last tab, open Sanga again: signed out, nothing left on the device
   await P.page.close({ runBeforeUnload: true });
   await newTab(P);
   await P.page.goto('/');

@@ -3,7 +3,7 @@
 // relayed by our server (/emoji/<codepoints>.json).
 import { useEffect, useRef } from 'react';
 import { codepoints } from '../../lib/emoji';
-import { cn } from '../../lib/utils';
+import { cn } from '@sanga/ui/utils';
 
 type Lottie = typeof import('lottie-web').default;
 type Anim = ReturnType<Lottie['loadAnimation']>;

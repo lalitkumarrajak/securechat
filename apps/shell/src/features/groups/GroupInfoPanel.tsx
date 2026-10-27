@@ -9,12 +9,12 @@ import { LinkBox } from '../../components/LinkBox';
 import { PhotoCropper } from '../../components/PhotoCropper';
 import { pickPhoto } from '../../lib/image';
 import { setChatUi } from '../conversation/chatUi';
-import { Button, IconButton } from '../../components/ui/button';
-import { confirm } from '../../components/ui/confirm';
-import { Panel } from '../../components/ui/dialog';
-import { Input, Textarea } from '../../components/ui/input';
-import { Menu, MenuContent, MenuItem, MenuTrigger } from '../../components/ui/menu';
-import { Switch } from '../../components/ui/switch';
+import { Button, IconButton } from '@sanga/ui/button';
+import { confirm } from '@sanga/ui/confirm';
+import { Panel } from '@sanga/ui/dialog';
+import { Input, Textarea } from '@sanga/ui/input';
+import { Menu, MenuContent, MenuItem, MenuTrigger } from '@sanga/ui/menu';
+import { Switch } from '@sanga/ui/switch';
 import { isMuted, mute, openChat } from '../../lib/engine';
 import { addMembers, groupLink, leaveGroup, removeMember, setAdmin, setGroupPhoto, updateGroup } from '../../lib/groups';
 import { groupIdOf, isGroup, type Group, type GroupMember } from '../../lib/types';
@@ -142,7 +142,7 @@ function Info({ g }: { g: Group }) {
             {link ? (
               <div className="px-6 py-3">
                 <p className="mb-2 text-sm font-medium">Invite link</p>
-                <LinkBox url={link} title={g.name} text={`Join my group “${g.name}” on Chattrix`} />
+                <LinkBox url={link} title={g.name} text={`Join my group “${g.name}” on Sanga`} />
                 <div className="mt-2 flex gap-4 text-sm">
                   <button className="font-medium text-accent-ink hover:underline" onClick={() => showLink('reset')}>Reset link</button>
                   <button className="font-medium text-danger hover:underline" onClick={() => showLink('off')}>Turn off link</button>

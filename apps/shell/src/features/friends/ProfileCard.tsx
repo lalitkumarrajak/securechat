@@ -3,7 +3,7 @@ import * as D from '@radix-ui/react-dialog';
 import { Gamepad2, Info, MessageCircle } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
 import { openChat } from '../../lib/engine';
-import { fmtLastSeen } from '../../lib/format';
+import { fmtLastSeen } from '@sanga/ui/format';
 import { displayName, groupIdOf, isGroup } from '../../lib/types';
 import { setApp, useApp } from '../../state/app';
 import { setChatUi, useChatUi } from '../conversation/chatUi';

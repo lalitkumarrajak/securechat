@@ -1,8 +1,8 @@
 // Setting, changing or confirming the app lock PIN.
 import { useState, type FormEvent } from 'react';
-import { Button } from '../../components/ui/button';
-import { Dialog } from '../../components/ui/dialog';
-import { Input, Label } from '../../components/ui/input';
+import { Button } from '@sanga/ui/button';
+import { Dialog } from '@sanga/ui/dialog';
+import { Input, Label } from '@sanga/ui/input';
 import { checkPin, PIN_RE } from '../../lib/pin';
 import { useSettings } from '../../state/settings';
 
@@ -45,7 +45,7 @@ export function PinDialog({ mode, onDone, onClose }: {
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()} title={titles[step]}
-      description={step === 'new' ? 'You’ll enter it whenever Chattrix is opened on this device. 4 to 6 digits.' : undefined}>
+      description={step === 'new' ? 'You’ll enter it whenever Sanga is opened on this device. 4 to 6 digits.' : undefined}>
       <form onSubmit={next} className="grid gap-4">
         <div>
           <Label htmlFor="pin-input">PIN</Label>

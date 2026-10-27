@@ -119,7 +119,7 @@ export async function logout(everywhere = false) {
 
 // ---------- "sign out when I close the tab" (Settings → Privacy, this device only) ----------
 // sessionStorage survives a reload but not closing the tab, so a tab that opens without our
-// marker was closed, unless another Chattrix tab is still open (asked over a BroadcastChannel).
+// marker was closed, unless another Sanga tab is still open (asked over a BroadcastChannel).
 // A tab restored after being closed for a while ("reopen closed tab" brings sessionStorage back)
 // is caught by the time of the last close. Closing also tells the server to end the sign-in,
 // unless a tab with it reconnects within a few seconds (a reload).
@@ -1236,7 +1236,7 @@ function alertIncoming(peer: string, msg: Msg) {
   if (!visible() && !useSettings.getState().push && 'Notification' in window && Notification.permission === 'granted') {
     const group = isGroup(peer) ? getApp().groups[groupIdOf(peer)] : undefined;
     const hide = useSettings.getState().privacyScreen; // privacy screen: no names or text on the lock screen either
-    const name = hide ? 'Chattrix' : group?.name || getApp().friends[peer]?.name || peer;
+    const name = hide ? 'Sanga' : group?.name || getApp().friends[peer]?.name || peer;
     const body = hide ? 'New message' : group ? `${nameOf(senderOf(msg), group)}${mentioned ? ' mentioned you' : ''}: ${preview(msg)}` : preview(msg);
     navigator.serviceWorker?.ready.then((reg) => reg.showNotification(name, {
       body, icon: '/icon-192.png', tag: 'chat-' + peer, data: { peer },
@@ -1262,7 +1262,7 @@ export const pushSupported = () => 'serviceWorker' in navigator && 'PushManager'
 export async function enablePush(silent = false) {
   if (!pushSupported()) {
     throw new Error(/iPhone|iPad/.test(navigator.userAgent)
-      ? 'On iPhone, add Chattrix to your Home Screen first (Share → Add to Home Screen).'
+      ? 'On iPhone, add Sanga to your Home Screen first (Share → Add to Home Screen).'
       : 'This browser doesn’t support push notifications.');
   }
   const perm = silent ? Notification.permission : await Notification.requestPermission();

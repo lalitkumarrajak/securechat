@@ -6,9 +6,9 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, Mic, MicOff, Phone, PhoneOff, SwitchCamera, Video, VideoOff } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
 import { accept, decline, hangUp, setMinimized, switchCamera, toggleCamera, toggleMute, useCall, type Call } from '../../lib/calls';
-import { fmtDuration } from '../../lib/format';
+import { fmtDuration } from '@sanga/ui/format';
 import { displayName } from '../../lib/types';
-import { cn } from '../../lib/utils';
+import { cn } from '@sanga/ui/utils';
 import { useApp } from '../../state/app';
 
 export function CallScreen() {

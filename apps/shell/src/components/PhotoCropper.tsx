@@ -5,7 +5,7 @@ import * as D from '@radix-ui/react-dialog';
 import { Minus, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Crop } from '../lib/image';
-import { Button } from './ui/button';
+import { Button } from '@sanga/ui/button';
 
 const MAX_ZOOM = 5;
 

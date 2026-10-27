@@ -3,11 +3,11 @@ import { ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { senderOf } from '../../lib/controls';
 import { loadOlder, loadUntil, me as myName, preview } from '../../lib/engine';
-import { fmtDay } from '../../lib/format';
+import { fmtDay } from '@sanga/ui/format';
 import { setApp, useApp } from '../../state/app';
 import { useSettings } from '../../state/settings';
 import { MessageBubble } from './MessageBubble';
-import { cn } from '../../lib/utils';
+import { cn } from '@sanga/ui/utils';
 import type { Msg } from '../../lib/types';
 
 const GROUP_MS = 5 * 60e3;

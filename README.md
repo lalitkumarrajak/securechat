@@ -1,13 +1,13 @@
-# Chattrix
+# Sanga
 
-Private, end-to-end encrypted messaging with the people you choose. Built to work well on slow, flaky connections.
+Private, end-to-end encrypted messaging with the people you choose: chats, stories, calls, a diary and games, made of separate apps that load when you open them. Built to work well on slow, flaky connections.
 
 - **Friends only:** search a username, send a friend request; you can chat once they accept. Block or remove friends any time Tap a friend's photo for their profile card (photo, about, Message / Play / Info).
 - **Messages:** text, photos (pick up to 100 at once and review them first: swipe through, remove, add more, a caption on each; they arrive as one album grid; any format the phone takes, including HEIC/HEIF camera photos; swipe through a chat's photos full screen), voice messages (hold the mic), big animated emoji, replies (swipe right), reactions, edit (15 min), forward, copy, pin (up to 3 per chat), select several, delete for me or for everyone (5 min).
 - **Chats:** the whole history on the device (older messages load as you scroll up), unread divider, search inside a chat (matches highlighted), drafts, mute (8 h / 1 week / always), archive, sent / delivered / read ticks, typing and "recording audio…".
-- **Presence that's honest:** you show as online only while Chattrix is open in front of you; closing the tab switches you to "last seen" immediately.
+- **Presence that's honest:** you show as online only while Sanga is open in front of you; closing the tab switches you to "last seen" immediately.
 - **Account security:** Active sessions shows each device (phone model where the browser shares it) and its approximate location and network; a new sign-in alerts your other devices straight away.
-- **App lock:** a 4–6 digit PIN (Settings → Privacy, per device), asked whenever Chattrix opens or after you've been away; Lock now button in the header. 5 wrong PINs mean a 30 s wait, 10 sign the device out.
+- **App lock:** a 4–6 digit PIN (Settings → Privacy, per device), asked whenever Sanga opens or after you've been away; Lock now button in the header. 5 wrong PINs mean a 30 s wait, 10 sign the device out.
 - **Privacy screen:** blur names, photos, previews and messages on this device (Settings → Privacy), keeping the newest 0–5 messages readable if you like. Hover or tap one to read it, or the eye button shows everything for 30 s. Optionally the whole app blurs while you're in another app or window. Notifications from the open page then say only "New message".
 - **Quick exit:** turn on *Sign out when I close the tab* (Settings → Privacy, per device) and closing the tab ends your sign-in on the server and erases chats saved on that device. Reloading keeps you signed in.
 - **Invite links:** share a link anywhere; people sign up from it and send you a friend request. Game links let anyone join a game.
@@ -25,11 +25,11 @@ Requires Node.js 22.13 or newer.
 
 ```sh
 npm install
-npm run build      # build the web app into web/dist
+npm run build      # build every app (apps/*/dist) with Turborepo
 npm start          # http://localhost:3000
 ```
 
-While developing the UI, `npm run dev` runs the server and Vite with hot reload (open the URL Vite prints).
+While developing the UI, `npm run dev` runs the server and the shell with hot reload (open the URL Vite prints). The other apps are served from their last build; to work on one, `npm run dev -w @sanga/notes` runs it on its own with hot reload.
 
 **On your phone, same Wi-Fi:** browsers only allow the encryption APIs on `https://` or `localhost`, so use HTTPS:
 
@@ -45,6 +45,7 @@ TLS_CERT=certs/cert.pem TLS_KEY=certs/key.pem npm start
 npm test               # server integration tests (SQLite)
 MONGODB_URI=mongodb://localhost:27017 npm test   # …or against MongoDB / Postgres (DATABASE_URL)
 npm run test:unit      # client logic (edits, reactions, pins, delete rules, emoji)
+npm run typecheck      # every app and package
 npm run build && npm run test:e2e   # Playwright: two phones in Chrome doing everything above
 ```
 
@@ -79,9 +80,9 @@ Caddy gets a free HTTPS certificate automatically.
 
 Games plug into a shared platform: invites and share links, lobby, turns and the turn timer, saving and restoring, in-game chat, and results all come for free.
 
-1. **Rules:** `shared/games/<game>.js` exports a definition (`type`, `name`, `min`, `max`, `turnMs`, `begin`, `act`, `auto`, `pass`, `removed`); see `shared/games/core.js` for the contract and `ludo.js` for an example. The server runs it; the app imports it too.
-2. **Register:** add it to `shared/games/index.js`.
-3. **Board:** a React component in `web/src/features/games/<game>/`, listed in `web/src/features/games/registry.ts`. It gets the game state, an `act()` function and chat bubbles.
+1. **Rules:** `packages/game-rules/<game>.js` exports a definition (`type`, `name`, `min`, `max`, `turnMs`, `begin`, `act`, `auto`, `pass`, `removed`); see `packages/game-rules/core.js` for the contract and `ludo.js` for an example. The server runs it; the app imports it too (`@sanga/game-rules/<game>.js`).
+2. **Register:** add it to `packages/game-rules/index.js`.
+3. **Board:** a React component in `apps/shell/src/features/games/<game>/`, listed in `apps/shell/src/features/games/registry.ts`. It gets the game state, an `act()` function and chat bubbles.
 | `TRUST_PROXY` | – | Set to `1` behind a reverse proxy so rate limits see real client IPs |
 | `TLS_CERT`, `TLS_KEY` | – | Serve HTTPS directly |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | generated | Web Push keys; generated once and stored in the database if not set |
@@ -103,22 +104,63 @@ Games plug into a shared platform: invites and share links, lobby, turns and the
 
 **Not end-to-end encrypted:** profile photos, names and "about", friend lists, and who talks to whom and when (like WhatsApp). **Limits compared with WhatsApp:** one long-term key pair per user instead of the Signal protocol's per-message keys, so a stolen device key (or a guessed password plus a copy of the server database) would expose that user's past messages. Use a strong password. No group chats or calls yet.
 
+## Apps (micro-frontends)
+
+Sanga is a **shell** plus separate apps, each built and deployed on its own with Vite and
+[Module Federation](https://module-federation.io):
+
+- **The shell** (`apps/shell`) loads first: sign-in, chats and stories, calls, games, settings,
+  notifications. It knows the other apps only from `/apps.json`, which the server builds from every
+  `apps/<name>/dist/app.json`.
+- **An app** (today: the diary, `apps/notes`) is downloaded **only when it's opened**: the first
+  time, the shell fetches `/apps.json` and that app's `remoteEntry.js` and code, nothing else. It is
+  also a page of its own (`/apps/notes/`), using the sign-in the device already has.
+- **Apps never import the shell or each other.** Everything outside them comes from the SDK
+  (`@sanga/sdk`): who's signed in and their keys, server requests, live updates, on-device storage,
+  friends and groups, photos, confirmations. The shell provides it; a standalone page uses
+  `@sanga/sdk/standalone`.
+- **Shared once:** React and the SDK (`vite.shared.ts`). Everything else, including the UI kit
+  (`@sanga/ui`), each app bundles itself.
+- **Same address for all:** apps are served from `/apps/<name>/` on the same domain, so the
+  sign-in, encryption keys and saved data on the device are shared, and one deploy ships them all
+  (Turborepo rebuilds only what changed).
+- **Failures stay contained:** an app that can't download (offline) or crashes shows "Couldn't
+  open … Try again" in its place; the rest keeps working.
+
+### Adding an app
+
+1. Copy `apps/notes`: rename it in `package.json`, `vite.config.ts` (`name`, `base: '/apps/<name>/'`)
+   and `public/app.json` (`id`, `name`, `icon`).
+2. Its `src/App.tsx` default-exports a component taking `{ onClose, params }` (`AppProps`) and uses
+   `sdk()` for everything outside the app.
+3. In the shell, open it with `<AppFrame id="<name>" name="…" onClose={…} />` (see
+   `features/notes/NotesPanel.tsx`).
+4. Its server part goes in `server/<name>.js` (routes, plus live messages through `sendTo`).
+
 ## Project layout
 
 ```
+apps/
+  shell/             the main app (React + TypeScript + Tailwind, Vite): chats, stories, calls, games, settings
+    src/lib/         local database, sync engine, message rules, sdk.ts (the shell's side of the SDK), apps.ts (loads apps)
+    public/sw.js     offline cache and push notifications
+  notes/             the diary, a separate app (loaded when opened, or on its own at /apps/notes/)
+packages/
+  sdk/               the contract between the shell and the apps
+  ui/                theme, buttons, dialogs, menus, formatting helpers
+  crypto/            end-to-end encryption (WebCrypto), also used by the server tests
+  game-rules/        Ludo, UNO, …: rules the server runs and the boards draw
 server/              Node HTTP + WebSocket server
   index.js           startup, routing, sockets
+  http.js            serves the shell at / and each app at /apps/<name>/
   auth.js            accounts, sessions, password change
   friends.js         friend requests, blocking (enforced for every message)
   messages.js        relay, receipts, delete for me / everyone
+  stories.js, calls.js, notes.js, games.js, groups.js
   hub.js             connected sockets and activity-based presence
-  profiles.js        name, about, privacy, mutes, profile photos
-  push.js            Web Push
   db.js              storage: MongoDB, Postgres or SQLite behind one interface
-web/                 React + TypeScript + Tailwind app (Vite)
-  src/lib/           crypto, local database, sync engine, message rules
-  src/features/      landing, chat list, friends, conversation, settings
-  public/sw.js       offline cache and push notifications
+vite.shared.ts       build settings every app uses (what's shared, compression)
+turbo.json           builds and tests only what changed
 test/                server tests (node:test)
 e2e/                 Playwright end-to-end tests
 ```

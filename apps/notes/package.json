@@ -1,0 +1,13 @@
+{
+  "name": "@sanga/notes",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Sanga Diary: notes by day, personal or about a chat. Loaded by the shell when opened, or on its own at /apps/notes/",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": { "@sanga/crypto": "*", "@sanga/sdk": "*", "@sanga/ui": "*" }
+}

@@ -1,8 +1,8 @@
 // The PIN screen shown while the app is locked. Nothing else of the app is on the page.
 import { useCallback, useEffect, useState } from 'react';
 import { Delete } from 'lucide-react';
-import { confirm } from '../../components/ui/confirm';
-import { cn } from '../../lib/utils';
+import { confirm } from '@sanga/ui/confirm';
+import { cn } from '@sanga/ui/utils';
 import { failedTries, forgetAndSignOut, MAX_TRIES, unlock, waitLeft } from '../../lib/applock';
 import { useSettings } from '../../state/settings';
 
@@ -50,7 +50,7 @@ export function LockScreen() {
   const forgot = async () => {
     const ok = await confirm({
       title: 'Forgot your PIN?',
-      description: 'Sign out of Chattrix on this device. Chats saved here are erased; sign in with your password to get them back.',
+      description: 'Sign out of Sanga on this device. Chats saved here are erased; sign in with your password to get them back.',
       confirmText: 'Sign out', destructive: true,
     });
     if (ok) await forgetAndSignOut();
@@ -69,12 +69,12 @@ export function LockScreen() {
   const secs = Math.ceil(wait / 1000);
   return (
     <div className="fixed inset-0 z-[45] flex flex-col items-center justify-center gap-7 bg-gradient-to-b from-[#0b1240] to-[#040828] px-6 pb-[env(safe-area-inset-bottom)] text-white"
-      role="dialog" aria-label="Chattrix is locked">
+      role="dialog" aria-label="Sanga is locked">
       <img src="/logo-mark.png" alt="" className="size-16 rounded-2xl shadow-lg" />
       <div className="text-center">
         <h1 className="text-xl font-semibold">Enter your PIN</h1>
         <p className={cn('mt-1 h-10 max-w-xs text-sm', error ? 'text-red-300' : 'text-white/60')} role="alert">
-          {wait ? `Too many wrong PINs. Try again in ${secs} s.` : error || 'Chattrix is locked'}
+          {wait ? `Too many wrong PINs. Try again in ${secs} s.` : error || 'Sanga is locked'}
         </p>
       </div>
       <div key={shake} className={cn('flex gap-4', shake && 'animate-shake')} aria-label={`${pin.length} of ${len} digits entered`}>

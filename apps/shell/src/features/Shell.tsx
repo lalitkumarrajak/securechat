@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { cn } from '../lib/utils';
+import { cn } from '@sanga/ui/utils';
 import { useApp } from '../state/app';
 import { Sidebar } from './sidebar/Sidebar';
 import { ChatPane, EmptyPane } from './conversation/ChatPane';

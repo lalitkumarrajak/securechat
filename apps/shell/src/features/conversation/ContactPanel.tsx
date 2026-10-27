@@ -1,13 +1,13 @@
 import { toast } from 'sonner';
 import { Archive, ArchiveRestore, ArrowLeft, Bell, BellOff, Lock, Search, ShieldCheck, UserMinus, UserX } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
-import { IconButton } from '../../components/ui/button';
-import { confirm } from '../../components/ui/confirm';
-import { Panel } from '../../components/ui/dialog';
+import { IconButton } from '@sanga/ui/button';
+import { confirm } from '@sanga/ui/confirm';
+import { Panel } from '@sanga/ui/dialog';
 import { blockUser, isMuted, mute, removeFriend, setArchived, unblockUser } from '../../lib/engine';
-import { fmtLastSeen } from '../../lib/format';
+import { fmtLastSeen } from '@sanga/ui/format';
 import { displayName } from '../../lib/types';
-import { cn } from '../../lib/utils';
+import { cn } from '@sanga/ui/utils';
 import { setApp, useApp } from '../../state/app';
 import { setChatUi } from './chatUi';
 

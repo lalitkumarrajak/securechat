@@ -158,7 +158,7 @@ test('several photos at once: review, swipe, remove, caption; they arrive as one
   await Q.page.evaluate(() => { (navigator as any).canShare = undefined; });
   const download = Q.page.waitForEvent('download');
   await viewer.getByRole('button', { name: 'Save photo' }).click();
-  expect((await download).suggestedFilename()).toMatch(/^Chattrix \d{4}-\d\d-\d\d \d\d\.\d\d\.\d\d\.(png|webp|jpg)$/);
+  expect((await download).suggestedFilename()).toMatch(/^Sanga \d{4}-\d\d-\d\d \d\d\.\d\d\.\d\d\.(png|webp|jpg)$/);
   await Q.page.keyboard.press('Escape');
 });
 

@@ -1,0 +1,121 @@
+/* Sanga's look, shared by every app: colour tokens (light, dark, accent colours), text size,
+   animations and base styles. Each app's stylesheet starts with @import "tailwindcss" and this. */
+/* Dark mode follows the data-theme attribute (set from the user's setting), not the OS directly. */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+/* ---------- design tokens ---------- */
+:root {
+  --bg: #f7f8fa;
+  --panel: #ffffff;
+  --panel-2: #f2f4f7;
+  --hover: #eef1f5;
+  --border: #e4e7ec;
+  --text: #101828;
+  --muted: #667085;
+  --chat: #efe9e1;
+  --bubble-in: #ffffff;
+  --bubble-out: color-mix(in oklab, var(--accent) 17%, #ffffff);
+  --bubble-out-text: var(--text);
+  --danger: #d92d20;
+  --warn-bg: #fef0c7;
+  --read: #2e90fa;
+  --overlay: rgb(16 24 40 / 0.45);
+  --shadow: 0 1px 2px rgb(16 24 40 / 0.08);
+  --pattern: #0000000d;
+}
+[data-theme=dark] {
+  --bg: #0f1419;
+  --panel: #161c23;
+  --panel-2: #1d252e;
+  --hover: #222b35;
+  --border: #27313c;
+  --text: #e6eaef;
+  --muted: #8a96a3;
+  --chat: #0c1116;
+  --bubble-in: #1d252e;
+  --bubble-out: color-mix(in oklab, var(--accent) 38%, #0c1116);
+  --warn-bg: #3a2f10;
+  --read: #53b1fd;
+  --overlay: rgb(0 0 0 / 0.6);
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+  --pattern: #ffffff0a;
+  color-scheme: dark;
+}
+
+/* Accent colours (Settings → Appearance). --accent-ink is the readable text shade on panels. */
+[data-accent=teal]   { --accent: #0d9488; --accent-ink: #0f766e; }
+[data-accent=blue]   { --accent: #2563eb; --accent-ink: #1d4ed8; }
+[data-accent=violet] { --accent: #7c3aed; --accent-ink: #6d28d9; }
+[data-accent=pink]   { --accent: #db2777; --accent-ink: #be185d; }
+[data-accent=orange] { --accent: #ea580c; --accent-ink: #c2410c; }
+[data-accent=green]  { --accent: #16a34a; --accent-ink: #15803d; }
+[data-theme=dark][data-accent=teal]   { --accent-ink: #2dd4bf; }
+[data-theme=dark][data-accent=blue]   { --accent-ink: #60a5fa; }
+[data-theme=dark][data-accent=violet] { --accent-ink: #a78bfa; }
+[data-theme=dark][data-accent=pink]   { --accent-ink: #f472b6; }
+[data-theme=dark][data-accent=orange] { --accent-ink: #fb923c; }
+[data-theme=dark][data-accent=green]  { --accent-ink: #4ade80; }
+
+/* Font size (Settings → Appearance): everything is in rem, so this scales the whole UI. */
+html[data-font=sm] { font-size: 14px; }
+html[data-font=md] { font-size: 16px; }
+html[data-font=lg] { font-size: 18px; }
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-hover: var(--hover);
+  --color-line: var(--border);
+  --color-ink: var(--text);
+  --color-muted: var(--muted);
+  --color-chat: var(--chat);
+  --color-bubble-in: var(--bubble-in);
+  --color-bubble-out: var(--bubble-out);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-danger: var(--danger);
+  --color-warn: var(--warn-bg);
+  --color-read: var(--read);
+  --color-overlay: var(--overlay);
+  --shadow-bubble: var(--shadow);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+  --animate-pop: pop 0.5s cubic-bezier(0.2, 1.6, 0.5, 1);
+  --animate-flash: flash 1.4s ease-out;
+  --animate-fade-in: fade-in 0.15s ease-out;
+  --animate-slide-up: slide-up 0.2s cubic-bezier(0.2, 0.9, 0.3, 1);
+  --animate-slide-in: slide-in 0.22s cubic-bezier(0.2, 0.9, 0.3, 1);
+  --animate-shake: shake 0.4s ease-in-out;
+}
+
+@keyframes pop { from { transform: scale(0.3); } to { transform: scale(1); } }
+@keyframes flash { from { background: color-mix(in oklab, var(--accent) 28%, transparent); } to { background: transparent; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+/* 🥺: sinks a little, stretches up pleading, and settles with two smaller bounces. */
+.emoji-plead { animation: emoji-plead 1.9s cubic-bezier(.3, .7, .4, 1) both; transform-origin: 50% 100%; }
+@keyframes emoji-plead {
+  0% { transform: translateY(0) scale(1, 1); }
+  10% { transform: translateY(4%) scale(1.06, .92); }
+  24% { transform: translateY(-16%) scale(.95, 1.07); }
+  38% { transform: translateY(0) scale(1.05, .94); }
+  50% { transform: translateY(-9%) scale(.97, 1.04); }
+  62% { transform: translateY(0) scale(1.03, .97); }
+  72% { transform: translateY(-4%) scale(.99, 1.01); }
+  82%, 100% { transform: translateY(0) scale(1, 1); }
+}
+@keyframes shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-10px); } 40%, 80% { transform: translateX(10px); } }
+@keyframes slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes slide-in { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+
+@layer base {
+  html, body, #root { height: 100%; }
+  body {
+    @apply bg-bg text-ink font-sans antialiased;
+    margin: 0;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button { cursor: pointer; }
+  button:disabled { cursor: default; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+}

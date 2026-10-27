@@ -1,11 +1,11 @@
 // The panel under the message box (where the keyboard is), like WhatsApp: Emoji | GIFs | Stickers.
 import { useEffect, useRef, useState } from 'react';
 import { Delete, Search, Smile, Sticker } from 'lucide-react';
-import { Spinner } from '../../components/ui/button';
+import { Spinner } from '@sanga/ui/button';
 import { EMOJI_PICKER, NOTO_STICKERS } from '../../lib/emoji';
 import { searchGifs } from '../../lib/engine';
 import type { GifItem } from '../../lib/types';
-import { cn } from '../../lib/utils';
+import { cn } from '@sanga/ui/utils';
 import { useApp } from '../../state/app';
 
 export type PanelTab = 'emoji' | 'gifs' | 'stickers';

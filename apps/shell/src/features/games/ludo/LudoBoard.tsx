@@ -3,7 +3,7 @@
 // capture…) which are played back in order before the next update is shown.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Avatar } from '../../../components/Avatar';
-import { cn } from '../../../lib/utils';
+import { cn } from '@sanga/ui/utils';
 import { homeAt } from '@sanga/game-rules/ludo.js';
 import { playSound } from '../sounds';
 import type { Game, GameEvent } from '../store';
