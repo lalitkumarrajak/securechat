@@ -111,7 +111,7 @@ function Composer({ prefill, onClose }: { prefill?: StoryContent; onClose: () =>
         )}
       </header>
 
-      <div className="relative grid min-h-0 flex-1 place-items-center">
+      <div className="relative grid min-h-0 flex-1 place-items-center overflow-hidden">
         {!draft ? (
           <div className="grid w-full max-w-xs gap-3 px-6">
             <h2 className="mb-2 text-center text-xl font-semibold">New story</h2>
@@ -127,7 +127,7 @@ function Composer({ prefill, onClose }: { prefill?: StoryContent; onClose: () =>
             <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-white/60"><Lock className="size-3.5" /> End-to-end encrypted · gone after 24 hours</p>
           </div>
         ) : draft.kind === 'img' ? (
-          <img src={draft.src} alt="Your photo" className="max-h-full max-w-full object-contain" />
+          <img src={draft.src} alt="Your photo" className="absolute inset-0 size-full object-contain" />
         ) : (
           <div className="grid size-full place-items-center p-8" style={{ background: BACKGROUNDS[bg] }}>
             <TextArea value={text} onChange={setText} />

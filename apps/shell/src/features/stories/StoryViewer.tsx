@@ -198,7 +198,7 @@ function Player() {
           <div className="grid h-full place-items-center px-8 text-center text-sm text-white/75">This story can’t be opened on this device.</div>
         ) : content.type === 'img' ? (
           <div className="grid h-full place-items-center">
-            <img src={content.src} alt={content.text || `${name}’s photo`} className="max-h-full max-w-full object-contain" draggable={false} />
+            <img src={content.src} alt={content.text || `${name}’s photo`} className="absolute inset-0 size-full object-contain" draggable={false} />
             {content.text && (
               <p className="absolute inset-x-0 bottom-4 mx-auto w-fit max-w-[90%] rounded-xl bg-black/55 px-3 py-2 text-center text-[15px] whitespace-pre-wrap">{content.text}</p>
             )}

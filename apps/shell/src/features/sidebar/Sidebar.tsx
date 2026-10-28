@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Archive, ArrowLeft, BellOff, CirclePlus, Clock, Eye, EyeOff, Gamepad2, House, Lock, LogOut, MessageSquarePlus, MoreVertical, NotebookPen, Search, Settings, UserPlus, Users, WifiOff, X } from 'lucide-react';
+import { Archive, ArrowLeft, BellOff, CircleDashed, CirclePlus, Clock, Eye, EyeOff, Gamepad2, House, Lock, LogOut, MessageCircle, MessageSquarePlus, MoreVertical, NotebookPen, Search, Settings, UserPlus, Users, WifiOff, X } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
 import { Ticks } from '../../components/Ticks';
 import { IconButton } from '@sanga/ui/button';
@@ -11,8 +11,8 @@ import { displayName, type Chat } from '../../lib/types';
 import { cn } from '@sanga/ui/utils';
 import { setApp, useApp } from '../../state/app';
 import { GamesStrip } from '../games/GamesStrip';
-import { StoriesStrip } from '../stories/StoriesStrip';
-import { openComposer } from '../../lib/stories';
+import { StoriesList } from '../stories/StoriesList';
+import { openComposer, useStories } from '../../lib/stories';
 import { ChatListSkeleton } from '../../components/Skeleton';
 import { useSettings } from '../../state/settings';
 import { lockNow } from '../../lib/applock';
@@ -38,6 +38,8 @@ export function Sidebar() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const archivedView = panel === 'archived';
+  const [tab, setTab] = useState<'chats' | 'stories'>('chats');
+  const storiesTab = tab === 'stories' && !archivedView;
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -111,6 +113,7 @@ export function Sidebar() {
       {/* Only the header stays put: search, stories and games scroll away with the chats, so on a
           phone the list gets nearly the whole screen. */}
       <div className="min-h-0 flex-1 overflow-y-auto">
+        {storiesTab ? <StoriesList /> : <>
         <div className="flex items-center gap-2 px-3 pb-2">
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" />
@@ -129,7 +132,6 @@ export function Sidebar() {
             </button>
           ))}
         </div>
-        {!archivedView && !query && <StoriesStrip />}
         {!archivedView && archivedCount > 0 && !query && (
           <button onClick={() => setApp({ panel: 'archived' })} className="flex w-full items-center gap-4 px-5 py-3 text-left hover:bg-hover">
             <Archive className="size-5 text-accent-ink" />
@@ -141,8 +143,34 @@ export function Sidebar() {
         <ul>{visible.map((c) => <ChatRow key={c.peer} chat={c} />)}</ul>
         {!visible.length && syncing && !waited && conn !== 'offline' && !query && !archivedView ? <ChatListSkeleton rows={6} />
           : !visible.length && <EmptyList archived={archivedView} searching={!!query || filter !== 'all'} />}
+        </>}
       </div>
+      {!archivedView && <Tabs tab={tab} setTab={setTab} />}
     </>
+  );
+}
+
+/** Chats and Stories, at the bottom of the list like on WhatsApp. */
+function Tabs({ tab, setTab }: { tab: 'chats' | 'stories'; setTab: (t: 'chats' | 'stories') => void }) {
+  const me = useApp((s) => s.me!.u);
+  const unread = useApp((s) => s.chats.filter((c) => c.unread && !c.archived).length);
+  const fresh = useStories((s) => s.list.some((x) => x.u !== me && !x.seen));
+  const item = (t: 'chats' | 'stories', label: string, icon: React.ReactNode, badge: React.ReactNode) => (
+    <button role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
+      className={cn('relative flex flex-1 flex-col items-center gap-0.5 pt-2 pb-1.5 text-xs font-medium transition', tab === t ? 'text-accent-ink' : 'text-muted hover:text-ink')}>
+      <span className={cn('relative grid h-7 w-14 place-items-center rounded-full transition [&_svg]:size-5', tab === t && 'bg-accent/15')}>
+        {icon}{badge}
+      </span>
+      {label}
+    </button>
+  );
+  return (
+    <nav role="tablist" aria-label="Chats and stories" className="flex shrink-0 border-t border-line bg-panel pb-[env(safe-area-inset-bottom)]">
+      {item('chats', 'Chats', <MessageCircle />, unread > 0 && (
+        <span className="absolute -top-1 right-1 grid min-w-[18px] place-items-center rounded-full bg-accent px-1 text-[11px] leading-[18px] font-bold text-white">{unread}</span>
+      ))}
+      {item('stories', 'Stories', <CircleDashed />, fresh && <span className="absolute top-0 right-3 size-2.5 rounded-full border-2 border-panel bg-accent" aria-label="New stories" />)}
+    </nav>
   );
 }
 

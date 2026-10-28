@@ -6,7 +6,12 @@ import { makeFriends, phone, signUp, testPng, uname, type Phone } from './helper
 test.describe.configure({ mode: 'serial' });
 
 let P: Phone, Q: Phone, R: Phone;
-const strip = (p: Phone) => p.page.getByRole('list', { name: 'Stories' });
+// The Stories tab of the chat list (opened if it isn't the one showing).
+async function stories(p: Phone) {
+  const tab = p.page.getByRole('tab', { name: /Stories$/ });
+  if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.click();
+  return p.page.getByRole('region', { name: 'Stories' });
+}
 const viewer = (p: Phone) => p.page.getByRole('dialog', { name: 'Stories' });
 const composer = (p: Phone) => p.page.getByRole('dialog', { name: 'New story' });
 
@@ -22,7 +27,7 @@ test('set up: P is friends with Q and R', async () => {
 });
 
 test('a text story, shared only with Q and tagging them', async () => {
-  await strip(P).getByRole('button', { name: 'New story' }).click();
+  await (await stories(P)).getByRole('button', { name: 'New story' }).click();
   const c = composer(P);
   await c.getByRole('button', { name: /Text/ }).click();
   await c.getByLabel('Story text').fill('Guess where I am 🌴');
@@ -42,14 +47,14 @@ test('a text story, shared only with Q and tagging them', async () => {
 
   // Q is told they were tagged; R never sees it.
   await expect(Q.page.getByText(`${P.u} tagged you in their story`)).toBeVisible();
-  await expect(strip(Q).getByRole('button', { name: `${P.u}’s story, new` })).toBeVisible();
+  await expect((await stories(Q)).getByRole('button', { name: `${P.u}’s story, new` })).toBeVisible();
   await R.page.reload();
-  await expect(strip(R).getByRole('button', { name: 'New story' })).toBeVisible();
-  await expect(strip(R).getByRole('button', { name: new RegExp(P.u) })).toHaveCount(0);
+  await expect((await stories(R)).getByRole('button', { name: 'New story' })).toBeVisible();
+  await expect((await stories(R)).getByRole('button', { name: new RegExp(P.u) })).toHaveCount(0);
 });
 
 test('a photo story for all friends', async () => {
-  await strip(P).getByRole('button', { name: 'New story' }).click();
+  await (await stories(P)).getByRole('button', { name: 'New story' }).click();
   const c = composer(P);
   const chooser = P.page.waitForEvent('filechooser');
   await c.getByRole('button', { name: /Photo/ }).click();
@@ -58,11 +63,11 @@ test('a photo story for all friends', async () => {
   await c.getByLabel('Caption').fill('Sunset at the beach');
   await c.getByRole('button', { name: 'Share story' }).click();
   await expect(P.page.getByText('Story shared')).toBeVisible();
-  await expect(strip(R).getByRole('button', { name: `${P.u}’s story, new` })).toBeVisible();
+  await expect((await stories(R)).getByRole('button', { name: `${P.u}’s story, new` })).toBeVisible();
 });
 
 test('Q watches both, likes one and comments', async () => {
-  await strip(Q).getByRole('button', { name: `${P.u}’s story, new` }).click();
+  await (await stories(Q)).getByRole('button', { name: `${P.u}’s story, new` }).click();
   const v = viewer(Q);
   await v.getByRole('button', { name: 'Pause' }).click();
   await expect(v.getByText('Guess where I am 🌴')).toBeVisible();
@@ -81,12 +86,12 @@ test('Q watches both, likes one and comments', async () => {
   await expect(v.getByRole('img', { name: 'Sunset at the beach' })).toBeVisible();
   await expect(v.getByText('Sunset at the beach')).toBeVisible();
   await v.getByRole('button', { name: 'Close stories' }).click();
-  await expect(strip(Q).getByRole('button', { name: `${P.u}’s story` , exact: true })).toBeVisible(); // seen now: no "new"
+  await expect((await stories(Q)).getByRole('button', { name: `${P.u}’s story` , exact: true })).toBeVisible(); // seen now: no "new"
   expect(Q.errors).toEqual([]);
 });
 
 test('P sees who viewed, who liked and the comment', async () => {
-  await strip(P).getByRole('button', { name: 'Your story' }).click();
+  await (await stories(P)).getByRole('button', { name: 'Your story' }).click();
   const v = viewer(P);
   await v.getByRole('button', { name: 'Pause' }).click();
   await expect(v.getByText('Guess where I am 🌴')).toBeVisible();
@@ -106,8 +111,8 @@ test('P deletes a story; it disappears for Q', async () => {
   await expect(P.page.getByText('Story deleted')).toBeVisible();
   await P.page.keyboard.press('Escape');
   // Notices from earlier stay up in a background test window; they now sit over the stories row.
-  for (const b of await Q.page.getByRole('button', { name: 'Close toast' }).all()) await b.click().catch(() => {});
-  await strip(Q).getByRole('button', { name: `${P.u}’s story`, exact: true }).click();
+  for (const b of await Q.page.getByRole('button', { name: 'Close toast' }).all()) await b.click({ timeout: 2000 }).catch(() => {});
+  await (await stories(Q)).getByRole('button', { name: `${P.u}’s story`, exact: true }).click();
   await expect(viewer(Q).getByRole('img', { name: 'Sunset at the beach' })).toBeVisible();
   await expect(viewer(Q).getByTestId('story-progress').locator('> span')).toHaveCount(1); // one story left
   expect([...P.errors, ...Q.errors, ...R.errors]).toEqual([]);
