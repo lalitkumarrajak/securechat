@@ -6,6 +6,7 @@ import { initPrivacy } from './lib/privacy';
 import { toast } from 'sonner';
 import { App } from './App';
 import { useCall } from './lib/calls';
+import './lib/reminders'; // reminders that come due while Sanga is open
 
 initSettings();
 initPrivacy();

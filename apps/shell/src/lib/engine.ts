@@ -1330,9 +1330,11 @@ export async function disablePush() {
   await sub.unsubscribe();
 }
 
-// Clicking a notification opens that chat (sent by the service worker).
+// Clicking a notification opens that chat, or the calendar for a reminder (sent by the service worker).
 navigator.serviceWorker?.addEventListener('message', (e) => {
-  if (e.data?.t === 'open' && e.data.peer && getApp().status === 'app') openChat(e.data.peer);
+  if (e.data?.t !== 'open' || getApp().status !== 'app') return;
+  if (e.data.peer) openChat(e.data.peer);
+  else if (e.data.section === 'calendar') go('calendar');
 });
 
 export const me = () => S.me;

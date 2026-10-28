@@ -93,6 +93,21 @@ async function selfKey(myPriv, myPubB64, purpose) {
     hk, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
 }
 export const notesKey = (myPriv, myPubB64) => selfKey(myPriv, myPubB64, 'notes');
+
+// The other apps' records (calendar events…): the same kind of key, one per app.
+export const appKey = (myPriv, myPubB64, app) => selfKey(myPriv, myPubB64, 'app/' + app);
+export const encryptItem = (key, obj, u, app, id) => seal(key, te.encode(JSON.stringify(obj)), `item|${app}|${u}|${id}`);
+export async function decryptItem(key, body, u, app, id) {
+  return JSON.parse(td.decode(await open(key, body, `item|${app}|${u}|${id}`)));
+}
+
+// Reminders: what to show when one is due. The service worker unseals it when the push arrives
+// (sw.js derives this same key itself, from the identity key kept on the device).
+export const reminderKey = (myPriv, myPubB64) => selfKey(myPriv, myPubB64, 'remind');
+export const sealReminder = (key, obj, u, id) => seal(key, te.encode(JSON.stringify(obj)), `remind|${u}|${id}`);
+export async function openReminder(key, body, u, id) {
+  return JSON.parse(td.decode(await open(key, body, `remind|${u}|${id}`)));
+}
 export const encryptNote = (key, obj, u, id) => seal(key, te.encode(JSON.stringify(obj)), `note|${u}|${id}`);
 export async function decryptNote(key, body, u, id) {
   return JSON.parse(td.decode(await open(key, body, `note|${u}|${id}`)));

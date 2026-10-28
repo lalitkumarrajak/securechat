@@ -1,6 +1,6 @@
 # Sanga
 
-Private, end-to-end encrypted messaging with the people you choose: chats, stories, calls, a diary and games, made of separate apps that load when you open them. Built to work well on slow, flaky connections.
+Private, end-to-end encrypted messaging with the people you choose: chats, stories, calls, a diary, a calendar and games, made of separate apps that load when you open them. Built to work well on slow, flaky connections.
 
 - **Friends only:** search a username, send a friend request; you can chat once they accept. Block or remove friends any time Tap a friend's photo for their profile card (photo, about, Message / Play / Info).
 - **Messages:** text, photos (pick up to 100 at once and review them first: swipe through, remove, add more, a caption on each; they arrive as one album grid; any format the phone takes, including HEIC/HEIF camera photos; swipe through a chat's photos full screen), voice messages (hold the mic), big animated emoji, replies (swipe right), reactions, edit (15 min), forward, copy, pin (up to 3 per chat), select several, delete for me or for everyone (5 min).
@@ -13,6 +13,7 @@ Private, end-to-end encrypted messaging with the people you choose: chats, stori
 - **Invite links:** share a link anywhere; people sign up from it and send you a friend request. Game links let anyone join a game.
 - **Settings:** theme (system / light / dark), 6 accent colours, 5 chat wallpapers, text size, profile photo (choose the part to show: drag and zoom; tap to view it full size), name and about, last-seen and read-receipt privacy, push notifications, sounds, Enter to send, change password, sign out of all devices.
 - **Groups:** up to 50 people, end-to-end encrypted (each member's app has its own group key, handed to the others pairwise and replaced when someone leaves or is removed). Everything a chat has, plus @mentions, admins (add/remove people, make admins, edit name/photo/description, only-admins-can-send), invite links, and games (Ludo, UNO) with the group. New members see messages from when they joined.
+- **Calendar:** events, birthdays, holidays and reminders that repeat by day, week, month, year, or every lunar month on a tithi. The Hindu calendar is worked out on the device from the sun and moon for your place: tithi (and when it ends), nakshatra, yoga, lunar month (Purnimanta or Amanta, with adhik maas), samvat, sunrise, sunset and moonrise; festivals on their days by the common rules (Diwali at pradosh, Karva Chauth at moonrise, Holika Dahan after Bhadra…); and fasts (every Ekadashi by name with its parana time, Pradosh, Sankashti with moonrise, Purnima, Amavasya, Shivratri). A fast tracker logs how each fast went, with yearly stats and an Ekadashi streak. Reminders reach you even when Sanga is closed: your devices tell the server *when*, with the title sealed so only they can read it.
 - **Diary and notes:** write about any day, for yourself or about a chat (from its menu). A calendar marks the days you wrote something; filter by chat, search, add a mood. End-to-end encrypted with a key only your own devices have, synced between them, never deleted after the message retention period.
 - **Stories:** a photo with a caption or a few words on a colour, for 24 hours. Share with all friends or only the ones you pick, tag friends (they're notified and can add it to their own story). Friends like and comment (only you see the comments); you see who viewed, liked and commented. Each story is sealed with its own key, wrapped for each friend it's shared with.
 - **Voice and video calls:** with any friend, from the chat header. Ringing on all their devices (the first to answer takes it), mute, camera off, front/back camera, minimise to keep chatting. Sound and video go directly between the phones (WebRTC); the setup is sealed with your conversation key, so the server can't listen in. Calls show in the chat (missed, declined, how long) with a call-back button.
@@ -133,9 +134,13 @@ Sanga is a **shell** plus separate apps, each built and deployed on its own with
    and `public/app.json` (`id`, `name`, `icon`).
 2. Its `src/App.tsx` default-exports a component taking `{ onClose, params }` (`AppProps`) and uses
    `sdk()` for everything outside the app.
-3. In the shell, open it with `<AppFrame id="<name>" name="…" onClose={…} />` (see
-   `features/notes/NotesPanel.tsx`).
-4. Its server part goes in `server/<name>.js` (routes, plus live messages through `sendTo`).
+3. In the shell, give it a page with `<AppFrame id="<name>" name="…" onClose={…} tab />` (see
+   `features/calendar/CalendarPage.tsx`), a tab in `features/nav/AppTabs.tsx`, and an `@source` line in
+   `apps/shell/src/index.css` (inside Sanga the shell's stylesheet covers every app's classes).
+4. Its records can use the sealed per-app store (`/api/items?app=<name>`, add it to `ITEM_APPS` in
+   `server/items.js`); anything else goes in `server/<name>.js` (routes, plus live messages through `sendTo`).
+5. Work to do when Sanga starts (like the calendar keeping reminders current): expose `./background`
+   and name it in `app.json`; the app registers with `store.put('app/bg/<name>', '<name>')`.
 
 ## Project layout
 
@@ -145,6 +150,7 @@ apps/
     src/lib/         local database, sync engine, message rules, sdk.ts (the shell's side of the SDK), apps.ts (loads apps)
     public/sw.js     offline cache and push notifications
   notes/             the diary, a separate app (loaded when opened, or on its own at /apps/notes/)
+  calendar/          the calendar and panchang, a separate app (/apps/calendar/)
 packages/
   sdk/               the contract between the shell and the apps
   ui/                theme, buttons, dialogs, menus, formatting helpers

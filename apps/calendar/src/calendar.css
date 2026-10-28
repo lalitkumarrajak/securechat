@@ -1,0 +1,5 @@
+/* The calendar's styles on its own page (/apps/calendar/) only. Inside Sanga the shell's stylesheet
+   includes the calendar's classes (see @source in apps/shell/src/index.css). */
+@import "tailwindcss";
+@import "@sanga/ui/theme.css";
+@source "../../../packages/ui/src";

@@ -3,7 +3,8 @@
 import { assertAppFrame, provideSdk, scopedStore, type Sdk } from '@sanga/sdk';
 import { confirm } from '@sanga/ui/confirm';
 import * as db from './db';
-import { api, frameHooks, ownIdentity, readyHooks } from './engine';
+import { api, enablePush, frameHooks, ownIdentity, pushSupported, readyHooks } from './engine';
+import { useSettings } from '../state/settings';
 import { Avatar } from '../components/Avatar';
 import { displayName } from './types';
 import { useApp } from '../state/app';
@@ -46,6 +47,10 @@ export const shellSdk: Sdk = {
   },
   confirm,
   Avatar,
+  usePush: () => {
+    const on = useSettings((s) => s.push);
+    return { on, supported: pushSupported(), enable: () => enablePush() };
+  },
 };
 
 provideSdk(shellSdk);

@@ -17,6 +17,8 @@ import { routes as gifRoutes } from './gifs.js';
 import { routes as previewRoutes } from './preview.js';
 import { routes as groupRoutes } from './groups.js';
 import { routes as noteRoutes } from './notes.js';
+import { routes as itemRoutes } from './items.js';
+import { routes as reminderRoutes, startReminders } from './reminders.js';
 import { purgeStories, routes as storyRoutes } from './stories.js';
 import { handlers as callHandlers, onClose as callClosed, onConnect as callConnected, routes as callRoutes } from './calls.js';
 import { handlers as messageHandlers } from './messages.js';
@@ -43,12 +45,13 @@ const migrated = await migrateFriends();
 if (migrated) console.log(`made ${migrated} existing chat pair(s) friends`);
 await initPush();
 await loadGames();
+startReminders();
 loadStatic();
 
 const handlers = { ...messageHandlers, ...gameHandlers, ...callHandlers };
 
 // ---------- HTTP ----------
-const routes = { ...authRoutes, ...profileRoutes, ...friendRoutes, ...pushRoutes, ...gifRoutes, ...previewRoutes, ...groupRoutes, ...noteRoutes, ...storyRoutes, ...callRoutes };
+const routes = { ...authRoutes, ...profileRoutes, ...friendRoutes, ...pushRoutes, ...gifRoutes, ...previewRoutes, ...groupRoutes, ...noteRoutes, ...itemRoutes, ...reminderRoutes, ...storyRoutes, ...callRoutes };
 
 async function handleHttp(req, res) {
   const url = new URL(req.url, 'http://x');

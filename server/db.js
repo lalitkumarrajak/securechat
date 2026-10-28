@@ -129,6 +129,23 @@ const SCHEMA = (pg) => `
     PRIMARY KEY (username, id)
   );
   CREATE INDEX IF NOT EXISTS notes_updated ON notes(username, updated);
+  CREATE TABLE IF NOT EXISTS items (
+    username TEXT NOT NULL,
+    app      TEXT NOT NULL,
+    id       TEXT NOT NULL,
+    body     TEXT NOT NULL,
+    updated  BIGINT NOT NULL,
+    PRIMARY KEY (username, app, id)
+  );
+  CREATE INDEX IF NOT EXISTS items_updated ON items(username, app, updated);
+  CREATE TABLE IF NOT EXISTS reminders (
+    username TEXT NOT NULL,
+    id       TEXT NOT NULL,
+    at       BIGINT NOT NULL,
+    body     TEXT NOT NULL,
+    PRIMARY KEY (username, id)
+  );
+  CREATE INDEX IF NOT EXISTS reminders_at ON reminders(at);
   CREATE TABLE IF NOT EXISTS stories (
     id      TEXT PRIMARY KEY,
     owner   TEXT NOT NULL,
@@ -286,6 +303,20 @@ const SQL = {
   // octet_length: bytes, from the stored size rather than by reading every body (SQLite 3.43+, Postgres).
   noteStats: 'SELECT COUNT(*) AS n, COALESCE(MAX(updated), 0) AS last, COALESCE(SUM(octet_length(body)), 0) AS bytes FROM notes WHERE username = ?',
 
+  // Other apps' records (the calendar's events…): ciphertext only, like notes. An empty body is a deleted one.
+  itemsSince: 'SELECT id, body, updated FROM items WHERE username = ? AND app = ? AND updated >= ? ORDER BY updated, id LIMIT ?',
+  putItem: `INSERT INTO items (username, app, id, body, updated) VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT (username, app, id) DO UPDATE SET body = excluded.body, updated = excluded.updated`,
+  getItem: 'SELECT updated FROM items WHERE username = ? AND app = ? AND id = ?',
+  itemStats: 'SELECT COUNT(*) AS n, COALESCE(MAX(updated), 0) AS last, COALESCE(SUM(octet_length(body)), 0) AS bytes FROM items WHERE username = ? AND app = ?',
+
+  // Reminders: when to notify, and a title sealed so only the account's devices can read it.
+  clearReminders: 'DELETE FROM reminders WHERE username = ?',
+  putReminder: `INSERT INTO reminders (username, id, at, body) VALUES (?, ?, ?, ?)
+                ON CONFLICT (username, id) DO UPDATE SET at = excluded.at, body = excluded.body`,
+  dueReminders: 'SELECT username, id, at, body FROM reminders WHERE at <= ? ORDER BY at LIMIT ?',
+  deleteReminder: 'DELETE FROM reminders WHERE username = ? AND id = ?',
+
   // Stories: ciphertext, plus the story's key wrapped for each person allowed to see it.
   insertStory: 'INSERT INTO stories (id, owner, body, ts, expires) VALUES (?, ?, ?, ?, ?)',
   insertStoryKey: 'INSERT INTO story_keys (story, viewer, key) VALUES (?, ?, ?) ON CONFLICT (story, viewer) DO NOTHING',
@@ -397,9 +428,9 @@ async function openMongo(uri) {
   const mdb = client.db(client.options.dbName === 'test' ? 'securechat' : undefined);
   const c = (name) => mdb.collection(name);
   const [users, sessions, messages, hidden, avatars, friendships, blocks, profiles, pushSubs, games, config, groups, groupMembers, groupPhotos, notes,
-    stories, storyKeys, storyViews, storyComments] =
+    stories, storyKeys, storyViews, storyComments, items, reminders] =
     ['users', 'sessions', 'messages', 'message_hidden', 'avatars', 'friendships', 'blocks', 'profiles', 'push_subs', 'games', 'config',
-      'groups', 'group_members', 'group_photos', 'notes', 'stories', 'story_keys', 'story_views', 'story_comments'].map(c);
+      'groups', 'group_members', 'group_photos', 'notes', 'stories', 'story_keys', 'story_views', 'story_comments', 'items', 'reminders'].map(c);
   await Promise.all([
     sessions.createIndex({ expires: 1 }),
     sessions.createIndex({ username: 1 }),
@@ -417,6 +448,9 @@ async function openMongo(uri) {
     blocks.createIndex({ blocked: 1 }),
     pushSubs.createIndex({ username: 1 }),
     notes.createIndex({ username: 1, updated: 1 }),
+    items.createIndex({ username: 1, app: 1, updated: 1 }),
+    reminders.createIndex({ at: 1 }),
+    reminders.createIndex({ username: 1 }),
     stories.createIndex({ owner: 1, expires: 1 }),
     stories.createIndex({ expires: 1 }),
     storyKeys.createIndex({ viewer: 1 }),
@@ -610,6 +644,28 @@ async function openMongo(uri) {
       last: (await notes.find({ username: u }).sort({ updated: -1 }).limit(1).next())?.updated ?? 0,
       bytes: await sumBytes(notes, { username: u }),
     }),
+
+    itemsSince: async (u, app, since, limit) => (await items.find({ username: u, app, updated: { $gte: since } })
+      .sort({ updated: 1, id: 1 }).limit(limit).toArray()).map((d) => ({ id: d.id, body: d.body, updated: d.updated })),
+    putItem: async (u, app, id, body, updated) => {
+      await items.replaceOne({ _id: `${u}|${app}|${id}` }, { username: u, app, id, body, updated }, { upsert: true });
+      return changes(1);
+    },
+    getItem: async (u, app, id) => (await items.findOne({ _id: `${u}|${app}|${id}` }, { projection: { updated: 1 } })) ?? undefined,
+    itemStats: async (u, app) => ({
+      n: await items.countDocuments({ username: u, app }),
+      last: (await items.find({ username: u, app }).sort({ updated: -1 }).limit(1).next())?.updated ?? 0,
+      bytes: await sumBytes(items, { username: u, app }),
+    }),
+
+    clearReminders: async (u) => changes((await reminders.deleteMany({ username: u })).deletedCount),
+    putReminder: async (u, id, at, body) => {
+      await reminders.replaceOne({ _id: u + '|' + id }, { username: u, id, at, body }, { upsert: true });
+      return changes(1);
+    },
+    dueReminders: async (now, limit) => (await reminders.find({ at: { $lte: now } }).sort({ at: 1 }).limit(limit).toArray())
+      .map((d) => ({ username: d.username, id: d.id, at: d.at, body: d.body })),
+    deleteReminder: async (u, id) => changes((await reminders.deleteOne({ _id: u + '|' + id })).deletedCount),
 
     insertStory: (id, owner, body, ts, expires) => insertIgnoringDupes(stories, { _id: id, owner, body, ts, expires }),
     insertStoryKey: (story, viewer, key) => insertIgnoringDupes(storyKeys, { _id: story + '|' + viewer, story, viewer, key }),

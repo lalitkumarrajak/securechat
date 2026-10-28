@@ -1,0 +1,14 @@
+{
+  "name": "@sanga/calendar",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Sanga Calendar: events, holidays, reminders, and the Hindu calendar (panchang, festivals and fasts). Loaded by the shell when opened, or on its own at /apps/calendar/",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "TZ=Asia/Kolkata vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": { "@sanga/crypto": "*", "@sanga/sdk": "*", "@sanga/ui": "*" }
+}

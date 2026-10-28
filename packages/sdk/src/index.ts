@@ -31,6 +31,9 @@ export interface Sdk {
   confirm(o: { title: string; description?: string; confirmText?: string; destructive?: boolean }): Promise<boolean>;
   /** A person's or group's photo (or initial). */
   Avatar: ComponentType<{ u: string; name?: string; size?: number; className?: string }>;
+  /** React hook: whether notifications reach this device when Sanga is closed, and a way to turn them
+   *  on. Only inside Sanga (an app on its own page can't). */
+  usePush?(): { on: boolean; supported: boolean; enable(): Promise<void> };
 }
 
 /** What the shell gives an app's main component. */
@@ -46,7 +49,7 @@ export interface AppProps {
 /** The live message types apps may receive. The shell handles every other type itself (messages,
  *  calls, stories, games…); an app neither sees those nor can take them over. Add a type here when
  *  an app's server part (server/<name>.js) sends a new one. */
-export const APP_FRAMES: readonly string[] = ['notes'];
+export const APP_FRAMES: readonly string[] = ['notes', 'calendar'];
 
 export function assertAppFrame(type: string) {
   if (!APP_FRAMES.includes(type)) throw new Error(`Apps can't listen to “${type}” messages`);

@@ -23,6 +23,7 @@ const StoryComposer = lazy(() => import('./stories/StoryComposer').then((m) => (
 const GamesHub = lazy(() => import('./games/GamesHub').then((m) => ({ default: m.GamesHub })));
 import { handleInvite } from '../lib/invite';
 import { DiaryPage } from './notes/DiaryPage';
+import { CalendarPage } from './calendar/CalendarPage';
 
 /** Signed in: Chat (Chats and Stories) or Games, with everything that can open over any of them. */
 export function Main() {
@@ -34,6 +35,7 @@ export function Main() {
     <>
       {(section === 'chat' || section === 'stories') && <Shell />}
       {section === 'diary' && <DiaryPage />}
+      {section === 'calendar' && <CalendarPage />}
       {section === 'games' && <Suspense fallback={null}><GamesHub /></Suspense>}
       <Overlays />
     </>
@@ -85,11 +87,12 @@ function Overlays() {
 // without slowing down the start.
 function usePrefetch() {
   useEffect(() => {
+    const bg = setTimeout(() => void import('../lib/apps').then((m) => m.runBackgrounds()), 6000);
     const t = setTimeout(() => {
       for (const load of [() => import('./settings/SettingsPanel'), () => import('./friends/FriendsPanel'), 
         () => import('./stories/StoryViewer'), () => import('./stories/StoryComposer'), () => import('./groups/GroupInfoPanel'), () => import('./games/GamesHub')]) load().catch(() => {});
     }, 4000);
-    return () => clearTimeout(t);
+    return () => { clearTimeout(t); clearTimeout(bg); };
   }, []);
 }
 

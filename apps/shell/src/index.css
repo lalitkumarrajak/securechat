@@ -5,6 +5,7 @@
    fight, and the later one would win). */
 @source "../../../packages/ui/src";
 @source "../../notes/src";
+@source "../../calendar/src";
 
 /* ---------- chat wallpapers (Settings → Appearance): .wallpaper.wp-<name> ---------- */
 .wallpaper { background-color: var(--chat); }

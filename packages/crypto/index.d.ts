@@ -19,6 +19,12 @@ export function decryptGroup(key: CryptoKey, body: string, from: string, to: str
 export function notesKey(myPriv: CryptoKey, myPub: string): Promise<CryptoKey>;
 export function encryptNote(key: CryptoKey, obj: unknown, u: string, id: string): Promise<string>;
 export function decryptNote(key: CryptoKey, body: string, u: string, id: string): Promise<any>;
+export function appKey(myPriv: CryptoKey, myPub: string, app: string): Promise<CryptoKey>;
+export function encryptItem(key: CryptoKey, obj: unknown, u: string, app: string, id: string): Promise<string>;
+export function decryptItem(key: CryptoKey, body: string, u: string, app: string, id: string): Promise<any>;
+export function reminderKey(myPriv: CryptoKey, myPub: string): Promise<CryptoKey>;
+export function sealReminder(key: CryptoKey, obj: unknown, u: string, id: string): Promise<string>;
+export function openReminder(key: CryptoKey, body: string, u: string, id: string): Promise<any>;
 export function storySelfKey(myPriv: CryptoKey, myPub: string): Promise<CryptoKey>;
 export function newStoryKey(): { raw: Uint8Array; key: Promise<CryptoKey> };
 export function wrapStoryKey(wrapKey: CryptoKey, raw: Uint8Array, owner: string, id: string, viewer: string): Promise<string>;

@@ -5,8 +5,9 @@ import { lazy, type ComponentType, type LazyExoticComponent } from 'react';
 import { loadRemote, registerRemotes } from '@module-federation/runtime';
 import type { AppProps } from '@sanga/sdk';
 import './sdk';
+import * as db from './db';
 
-export interface AppInfo { id: string; name: string; icon: string; entry: string; expose: string }
+export interface AppInfo { id: string; name: string; icon: string; entry: string; expose: string; background?: string }
 
 let list: Promise<AppInfo[]> | null = null;
 function apps() {
@@ -41,4 +42,20 @@ export async function retryApp(id: string) {
   loaded.delete(id);
   const info = (await apps().catch(() => [])).find((a) => a.id === id);
   if (info) registerRemotes([{ name: id, entry: `${info.entry}?retry=${++attempts}`, type: 'module' }], { force: true });
+}
+
+/** Apps you've used that do some work when Sanga starts (the calendar keeps its reminders current)
+ *  register here ('app/bg/<id>'), and their `background` module runs once Sanga has settled. Nothing
+ *  is downloaded for apps that haven't registered. */
+export async function runBackgrounds() {
+  const ids = (await db.kvPrefix('app/bg/').catch(() => [])) as unknown[];
+  if (!ids.length) return;
+  const list = await apps().catch(() => [] as AppInfo[]);
+  for (const a of list) {
+    if (!a.background || !ids.includes(a.id)) continue;
+    try {
+      const mod = await loadRemote<{ default: () => Promise<void> }>(`${a.id}/${a.background.replace(/^\.\//, '')}`);
+      await mod?.default();
+    } catch (e) { console.warn(`${a.id} background`, e); }
+  }
 }

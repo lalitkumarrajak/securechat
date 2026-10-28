@@ -1,7 +1,7 @@
 // The tabs along the bottom once signed in: Chats and Stories, then Sanga's other apps. Chat is the
-// main screen; Games and the Diary are a tap away.
+// main screen; Games, the Diary and the Calendar are a tap away.
 import type { ReactNode } from 'react';
-import { CircleDashed, Gamepad2, MessageCircle, NotebookPen } from 'lucide-react';
+import { CalendarDays, CircleDashed, Gamepad2, MessageCircle, NotebookPen } from 'lucide-react';
 import { cn } from '@sanga/ui/utils';
 import { myName } from '../../lib/engine';
 import { go } from '../../lib/nav';
@@ -39,6 +39,7 @@ export function AppTabs() {
         fresh && <span className="absolute top-0 right-3 size-2.5 rounded-full border-2 border-panel bg-accent" aria-label="New stories" />)}
       {tab('Games', <Gamepad2 />, section === 'games', to('games'), gamesDue > 0 && <Count n={gamesDue} />)}
       {tab('Diary', <NotebookPen />, section === 'diary', () => { setApp({ notesChat: null }); go('diary'); })}
+      {tab('Calendar', <CalendarDays />, section === 'calendar', to('calendar'))}
     </nav>
   );
 }

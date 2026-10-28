@@ -30,6 +30,6 @@ describe('the SDK boundary', () => {
   it('lets apps listen only to their own live messages', () => {
     expect(() => assertAppFrame('notes')).not.toThrow();
     for (const t of ['m', 'call', 'cans', 'story', 'g', 'ok', 'fr']) expect(() => assertAppFrame(t)).toThrow();
-    expect(APP_FRAMES).toEqual(['notes']);
+    expect(APP_FRAMES).toEqual(['notes', 'calendar']);
   });
 });
