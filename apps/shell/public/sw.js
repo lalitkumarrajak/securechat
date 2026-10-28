@@ -1,6 +1,6 @@
 // Service worker: offline app shell and push notifications.
 const CACHE = 'chattrix-v3'; // bumping it empties the saved copy: the next start waits for the network // bump when the shell files change
-const SHELL = ['/', '/theme-boot.js', '/logo-mark.png', '/icon-192.png', '/manifest.webmanifest'];
+const SHELL = ['/', '/theme-boot.js', '/logo.svg', '/logo-mark.png', '/icon-192.png', '/manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

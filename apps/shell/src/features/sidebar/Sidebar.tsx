@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Archive, ArrowLeft, BellOff, CirclePlus, Clock, Eye, EyeOff, Gamepad2, Lock, LogOut, MessageSquarePlus, MoreVertical, NotebookPen, Search, Settings, UserPlus, Users, WifiOff, X } from 'lucide-react';
+import { Archive, ArrowLeft, BellOff, CirclePlus, Clock, Eye, EyeOff, Gamepad2, House, Lock, LogOut, MessageSquarePlus, MoreVertical, NotebookPen, Search, Settings, UserPlus, Users, WifiOff, X } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
 import { Ticks } from '../../components/Ticks';
 import { IconButton } from '@sanga/ui/button';
@@ -21,6 +21,7 @@ import { groupIdOf, isGroup } from '../../lib/types';
 import { openPicker } from '../games/store';
 import { showProfile } from '../friends/ProfileCard';
 import { openNotes } from '../../lib/notes';
+import { goHome } from '../../lib/nav';
 
 export function Sidebar() {
   const me = useApp((s) => s.me)!;
@@ -63,6 +64,7 @@ export function Sidebar() {
           </>
         ) : (
           <>
+            <IconButton label="Home" onClick={goHome} className="-ml-1"><House /></IconButton>
             <button onClick={() => setApp({ panel: 'settings' })} aria-label="Profile and settings" className="rounded-full">
               <Avatar u={me.u} name={me.name} size={40} />
             </button>
@@ -70,7 +72,6 @@ export function Sidebar() {
             <PeekButton />
             {appLock && <IconButton label="Lock Sanga" onClick={lockNow}><Lock /></IconButton>}
             <IconButton label="Diary" onClick={() => openNotes()}><NotebookPen /></IconButton>
-            <IconButton label="Play games" onClick={() => openPicker()}><Gamepad2 /></IconButton>
             <div className="relative">
               <IconButton label="Friends" onClick={() => setApp({ panel: 'friends', friendsTab: incoming ? 'requests' : 'friends' })}>
                 <UserPlus />

@@ -26,24 +26,55 @@ export async function newTab(p: Phone) {
   p.cdp = await p.ctx.newCDPSession(p.page);
 }
 
+/** The landing page's way into the sign-in screen (already open when the page came from an invite link). */
+export async function openAuth(page: Page, tab: 'Sign in' | 'Create account') {
+  const t = page.getByRole('tab', { name: tab });
+  const start = tab === 'Create account' ? page.getByRole('button', { name: /Get started/ }) : page.getByRole('button', { name: 'Sign in', exact: true });
+  await expect(t.or(start).first()).toBeVisible({ timeout: 15_000 });
+  if (!(await t.isVisible())) await start.click();
+  await t.click();
+}
+
+/** Signed out: the landing page (or the sign-in screen) is showing. */
+export const signedOutView = (page: Page) => page.getByRole('button', { name: /Get started/ }).or(page.getByRole('tab', { name: 'Sign in' })).first();
+
+/** From the home screen into Chat. dispatchEvent: a game opened from an invite link may cover the page. */
+export async function openChats(p: Phone) {
+  const tile = p.page.getByRole('button', { name: 'Chat', exact: true });
+  await expect(tile).toBeVisible({ timeout: 20_000 });
+  await tile.dispatchEvent('click');
+  await expect(p.page.getByRole('heading', { name: p.u, level: 1 })).toBeVisible({ timeout: 20_000 });
+}
+
+/** Home → Games → Play <game>: the "new game" dialog. */
+export async function newGame(p: Phone, game = 'Ludo') {
+  const play = p.page.getByRole('button', { name: `Play ${game}` });
+  if (!(await play.isVisible())) {
+    await p.page.getByRole('button', { name: 'Home' }).click();
+    await p.page.getByRole('button', { name: 'Games', exact: true }).click();
+  }
+  await play.click();
+}
+
 export async function signUp(p: Phone) {
   await p.page.goto('/');
-  await p.page.getByRole('tab', { name: 'Create account' }).click();
+  await openAuth(p.page, 'Create account');
   const form = p.page.getByRole('tabpanel');
   await form.getByLabel('Username').fill(p.u);
   await form.getByLabel('Password', { exact: true }).fill(PASSWORD);
   await form.getByLabel('Confirm password').fill(PASSWORD);
   await form.getByRole('button', { name: 'Create account' }).click();
-  await expect(p.page.getByRole('heading', { name: p.u, level: 1 })).toBeVisible({ timeout: 20_000 });
+  await openChats(p);
 }
 
 export async function signIn(p: Phone) {
   await p.page.goto('/');
+  await openAuth(p.page, 'Sign in');
   const form = p.page.getByRole('tabpanel');
   await form.getByLabel('Username').fill(p.u);
   await form.getByLabel('Password', { exact: true }).fill(PASSWORD);
   await form.getByRole('button', { name: 'Sign in' }).click();
-  await expect(p.page.getByRole('heading', { name: p.u, level: 1 })).toBeVisible({ timeout: 20_000 });
+  await openChats(p);
 }
 
 async function center(l: Locator) {

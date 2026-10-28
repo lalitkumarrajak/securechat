@@ -13,15 +13,15 @@ import { closePicker, createGame, useGames } from './store';
 
 export function NewGameDialog() {
   const picker = useGames((s) => s.picker);
-  return picker ? <PickerDialog initial={picker.pre} pool={picker.pool} /> : null;
+  return picker ? <PickerDialog initial={picker.pre} pool={picker.pool} start={picker.type} /> : null;
 }
 
-function PickerDialog({ initial, pool }: { initial: string[]; pool?: { u: string; name?: string }[] }) {
+function PickerDialog({ initial, pool, start }: { initial: string[]; pool?: { u: string; name?: string }[]; start?: string }) {
   const friends = useApp((s) => s.friends);
   const loaded = useApp((s) => s.friendsLoaded);
   const games = Object.values(GAME_UI);
-  const [type, setType] = useState(games[0].type);
-  const [picked, setPicked] = useState<string[]>(() => initial.slice(0, games[0].max - 1));
+  const [type, setType] = useState(start && GAME_UI[start] ? start : games[0].type);
+  const [picked, setPicked] = useState<string[]>(() => initial.slice(0, GAME_UI[type].max - 1));
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
   const ui = GAME_UI[type];

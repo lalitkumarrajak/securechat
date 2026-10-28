@@ -1,12 +1,12 @@
 // End-to-end: "sign out when I close the tab", and "join me on Sanga" invite links.
 import { test, expect } from '@playwright/test';
-import { PASSWORD, newTab, phone, signUp, uname, type Phone } from './helpers';
+import { PASSWORD, newTab, phone, signedOutView, signUp, uname, type Phone } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
 let P: Phone, Q: Phone;
-const signedIn = (p: Phone) => expect(p.page.getByRole('heading', { name: p.u, level: 1 })).toBeVisible({ timeout: 15_000 });
-const signedOut = (p: Phone) => expect(p.page.getByRole('tab', { name: 'Sign in' })).toBeVisible({ timeout: 15_000 });
+const signedIn = (p: Phone) => expect(p.page.getByRole('heading', { name: p.u, level: 1 }).or(p.page.getByRole('button', { name: 'Chat', exact: true })).first()).toBeVisible({ timeout: 15_000 });
+const signedOut = (p: Phone) => expect(signedOutView(p.page)).toBeVisible({ timeout: 15_000 });
 
 test.beforeAll(async ({ browser }) => {
   P = await phone(browser, uname('priv'));

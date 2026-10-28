@@ -70,7 +70,7 @@ export function LockScreen() {
   return (
     <div className="fixed inset-0 z-[45] flex flex-col items-center justify-center gap-7 bg-gradient-to-b from-[#0b1240] to-[#040828] px-6 pb-[env(safe-area-inset-bottom)] text-white"
       role="dialog" aria-label="Sanga is locked">
-      <img src="/logo-mark.png" alt="" className="size-16 rounded-2xl shadow-lg" />
+      <img src="/logo.svg" alt="" className="size-16 rounded-2xl shadow-lg" />
       <div className="text-center">
         <h1 className="text-xl font-semibold">Enter your PIN</h1>
         <p className={cn('mt-1 h-10 max-w-xs text-sm', error ? 'text-red-300' : 'text-white/60')} role="alert">

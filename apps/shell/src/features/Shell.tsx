@@ -21,18 +21,29 @@ const GroupInfoPanel = lazy(() => import('./groups/GroupInfoPanel').then((m) => 
 const NewGroupPanel = lazy(() => import('./groups/NewGroupPanel').then((m) => ({ default: m.NewGroupPanel })));
 const StoryViewer = lazy(() => import('./stories/StoryViewer').then((m) => ({ default: m.StoryViewer })));
 const StoryComposer = lazy(() => import('./stories/StoryComposer').then((m) => ({ default: m.StoryComposer })));
+const GamesHub = lazy(() => import('./home/GamesHub').then((m) => ({ default: m.GamesHub })));
+import { Home } from './home/Home';
 import { handleInvite } from '../lib/invite';
 
-/** Two panes on desktop; on phones, the chat list or the open chat. */
-export function Shell() {
-  const active = useApp((s) => s.active);
-  const gameOpen = useGames((s) => !!s.open);
-  const panel = useApp((s) => s.panel);
-  const storyOpen = useStories((s) => !!s.viewer);
-  const composing = useStories((s) => !!s.composer);
+/** Signed in: the home screen, Chat or Games, with everything that can open over any of them. */
+export function Main() {
+  const section = useApp((s) => s.section);
   useEffect(() => { handleInvite(); }, []); // opened from someone's invite link
   usePrefetch();
   useKeyboardHeight();
+  return (
+    <>
+      {section === 'home' && <Home />}
+      {section === 'chat' && <Shell />}
+      {section === 'games' && <Suspense fallback={null}><GamesHub /></Suspense>}
+      <Overlays />
+    </>
+  );
+}
+
+/** Chat: two panes on desktop; on phones, the chat list or the open chat. */
+function Shell() {
+  const active = useApp((s) => s.active);
   return (
     <div className="mx-auto flex h-[var(--app-h,100dvh)] max-w-[1600px] overflow-hidden bg-panel md:border-x md:border-line">
       <aside className={cn('flex w-full flex-col border-line bg-panel md:w-[360px] md:shrink-0 md:border-r lg:w-[400px]', active && 'hidden md:flex')}>
@@ -41,6 +52,17 @@ export function Shell() {
       <main className={cn('min-w-0 flex-1 flex-col', active ? 'flex' : 'hidden md:flex')}>
         {active ? <ChatPane key={active} peer={active} /> : <EmptyPane />}
       </main>
+    </div>
+  );
+}
+
+function Overlays() {
+  const gameOpen = useGames((s) => !!s.open);
+  const panel = useApp((s) => s.panel);
+  const storyOpen = useStories((s) => !!s.viewer);
+  const composing = useStories((s) => !!s.composer);
+  return (
+    <>
       <ContactPanel />
       <Suspense fallback={null}>
         {panel === 'friends' && <FriendsPanel />}
@@ -57,7 +79,7 @@ export function Shell() {
       <PhotoGallery />
       {gameOpen && <Suspense fallback={null}><GameScreen /></Suspense>}
       <CallScreen />
-    </div>
+    </>
   );
 }
 
@@ -67,7 +89,7 @@ function usePrefetch() {
   useEffect(() => {
     const t = setTimeout(() => {
       for (const load of [() => import('./settings/SettingsPanel'), () => import('./friends/FriendsPanel'), () => import('./notes/NotesPanel'),
-        () => import('./stories/StoryViewer'), () => import('./stories/StoryComposer'), () => import('./groups/GroupInfoPanel')]) load().catch(() => {});
+        () => import('./stories/StoryViewer'), () => import('./stories/StoryComposer'), () => import('./groups/GroupInfoPanel'), () => import('./home/GamesHub')]) load().catch(() => {});
     }, 4000);
     return () => clearTimeout(t);
   }, []);

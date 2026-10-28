@@ -1,7 +1,7 @@
 // End-to-end: Ludo between people who aren't friends, joined from a shared link.
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
-import { phone, signUp, uname, type Phone } from './helpers';
+import { newGame, phone, signUp, uname, type Phone } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -28,7 +28,7 @@ test.afterAll(async () => {
 
 test('host creates a game and shares its link', async () => {
   await signUp(A);
-  await A.page.getByRole('button', { name: 'Play games' }).click();
+  await newGame(A);
   const dlg = A.page.getByRole('dialog', { name: 'Play a game' });
   await expect(dlg.getByRole('button', { name: /Ludo/ })).toBeVisible();
   await dlg.getByRole('button', { name: 'Create game and share link' }).click();
@@ -133,7 +133,7 @@ test('leaving: the last one left wins', async () => {
 test('5 or 6 players use the six-arm board', async ({ browser }) => {
   const more = await Promise.all(['dev', 'eka', 'fay'].map((n) => phone(browser, uname(n))));
   try {
-    await A.page.getByRole('button', { name: 'Play games' }).click();
+    await newGame(A);
     await A.page.getByRole('dialog', { name: 'Play a game' }).getByRole('button', { name: 'Create game and share link' }).click();
     await A.page.getByRole('button', { name: 'Copy link' }).click();
     const l2 = await A.page.evaluate(() => navigator.clipboard.readText());

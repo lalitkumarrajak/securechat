@@ -1,7 +1,7 @@
 // End-to-end: two (sometimes three) phones using Sanga the way people do.
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
-import { bubble, longPress, newTab, phone, signIn, signUp, stubExternalImages, swipeRight, testPdf, testPng, uname, type Phone } from './helpers';
+import { bubble, longPress, newTab, openChats, phone, signIn, signedOutView, signUp, stubExternalImages, swipeRight, testPdf, testPng, uname, type Phone } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -23,10 +23,12 @@ test.afterAll(async () => {
 
 test('landing page offers sign in and sign up', async () => {
   await A.page.goto('/');
-  await expect(A.page.getByRole('heading', { name: /Private chats/ })).toBeVisible();
+  await expect(A.page.getByRole('heading', { name: /Your people/ })).toBeVisible();
+  await expect(A.page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
+  await A.page.screenshot({ path: shots('01-landing-phone'), fullPage: true });
+  await A.page.getByRole('button', { name: /Get started/ }).click();
   await expect(A.page.getByRole('tab', { name: 'Sign in' })).toBeVisible();
-  await expect(A.page.getByRole('tab', { name: 'Create account' })).toBeVisible();
-  await A.page.screenshot({ path: shots('01-landing-phone') });
+  await expect(A.page.getByRole('heading', { name: 'Create your account' })).toBeVisible();
   // Validation shows inline, no browser alert.
   await A.page.getByRole('tab', { name: 'Create account' }).click();
   const form = A.page.getByRole('tabpanel');
@@ -106,6 +108,7 @@ test('presence: online while open, last seen right after closing the tab', async
   await expect(A.page.locator('header').getByText(/last seen today/)).toBeVisible({ timeout: 5_000 });
   await newTab(B); // and comes back later
   await B.page.goto('/');
+  await openChats(B);
   await expect(A.page.locator('header').getByText('online')).toBeVisible({ timeout: 10_000 });
   await B.page.locator('li').filter({ hasText: A.u }).first().click();
 });
@@ -347,7 +350,7 @@ test('dark mode chat screen and desktop layout', async ({ browser }) => {
   await other.getByRole('button', { name: 'Sign out' }).click();
   await B.page.getByRole('alertdialog').getByRole('button', { name: 'Sign out' }).click();
   await expect(B.page.getByText('Device signed out')).toBeVisible();
-  await expect(D.page.getByRole('tab', { name: 'Sign in' })).toBeVisible({ timeout: 10_000 }); // the desktop is back at the landing page
+  await expect(signedOutView(D.page)).toBeVisible({ timeout: 10_000 }); // the desktop is back at the landing page
   await D.ctx.close();
   await B.page.keyboard.press('Escape');
   await B.page.locator('li').filter({ hasText: 'Lalit Rajak' }).first().click();

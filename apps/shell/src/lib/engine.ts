@@ -10,6 +10,7 @@ import { groupIdOf, isGroup } from './types';
 import { prepareFile } from './files';
 import type { LocationContent } from './location';
 import { getApp, setApp } from '../state/app';
+import { go } from './nav';
 import { deviceHints, deviceName, placeName } from './device';
 import { setSettings, useSettings } from '../state/settings';
 
@@ -1187,7 +1188,8 @@ function clearTyping(peer: string) {
 // ---------- open / close chats ----------
 export async function openChat(peer: string) {
   const prev = getApp().active;
-  if (!history.state?.chat) history.pushState({ chat: true }, '');
+  go('chat');
+  if (!history.state?.chat) history.pushState({ ...history.state, chat: true }, '');
   setApp({
     active: peer, panel: null,
     ...(prev !== peer && { messages: [], olderLeft: false, replyTo: null, editing: null, selection: null, searchOpen: false, searchQuery: '', highlight: null }),
@@ -1216,7 +1218,7 @@ export function closeChat() {
 
 // Phones: the back button closes the open chat, like WhatsApp, instead of leaving the app.
 // Opening a chat adds one history entry; going back removes it and closes the chat.
-if (history.state?.chat) history.replaceState(null, ''); // left over from before a reload
+if (history.state?.chat) history.replaceState({ ...history.state, chat: undefined }, ''); // left over from before a reload
 window.addEventListener('popstate', () => { if (getApp().active) setApp(closedChat); });
 
 export async function setArchived(peer: string, archived: boolean) {

@@ -3,11 +3,13 @@ import { create } from 'zustand';
 import type { Chat, Friend, Group, Me, Msg, Presence, Request } from '../lib/types';
 
 export type Status = 'loading' | 'auth' | 'app';
+export type Section = 'home' | 'chat' | 'games';
 export type Conn = 'online' | 'connecting' | 'offline';
 export type Panel = null | 'settings' | 'friends' | 'contact' | 'archived' | 'group' | 'newgroup' | 'notes';
 
 export interface AppState {
   status: Status;
+  section: Section;                      // home screen, Chat or Games (lib/nav.ts)
   signupOpen: boolean;
   gifsEnabled: boolean;                  // server has a KLIPY key
   syncing: boolean;                      // first download of messages since opening the app
@@ -43,6 +45,7 @@ export interface AppState {
 
 export const useApp = create<AppState>(() => ({
   status: 'loading',
+  section: location.hash === '#chat' ? 'chat' : location.hash === '#games' ? 'games' : 'home',
   signupOpen: true,
   gifsEnabled: false,
   syncing: true,

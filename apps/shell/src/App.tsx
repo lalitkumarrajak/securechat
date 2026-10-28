@@ -6,7 +6,7 @@ import { boot, openChat } from './lib/engine';
 import { useApp } from './state/app';
 import { useSettings } from './state/settings';
 import { Landing } from './features/auth/Landing';
-import { Shell } from './features/Shell';
+import { Main } from './features/Shell';
 import { joinFromLink } from './features/games/store';
 import { LockScreen } from './features/lock/LockScreen';
 import { useLock } from './lib/applock';
@@ -45,7 +45,7 @@ export function App() {
     <>
       {status === 'loading' && <ShellSkeleton />}
       {status === 'auth' && <Landing />}
-      {status === 'app' && (locked ? <LockScreen /> : <Shell />)}
+      {status === 'app' && (locked ? <LockScreen /> : <Main />)}
       <ConfirmHost />
       {!(status === 'app' && locked) && <Toaster position="top-center" theme={theme === 'system' ? 'system' : theme} richColors closeButton
         toastOptions={{ className: 'rounded-xl!' }} />}

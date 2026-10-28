@@ -2,7 +2,7 @@
 // keyboard already focused, keeping messages above the keyboard, and the privacy screen.
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
-import { bubble, longPress, phone, signUp, swipeRight, testPng, uname, type Phone } from './helpers';
+import { bubble, longPress, phone, signedOutView, signUp, swipeRight, testPng, uname, type Phone } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -338,7 +338,7 @@ test('phones with the old on-device storage upgrade without losing messages', as
     db.close();
   });
   await R.page.reload();
-  await expect(R.page.getByRole('tab', { name: 'Sign in' })).toBeVisible();
+  await expect(signedOutView(R.page)).toBeVisible();
   const after = await R.page.evaluate(async () => {
     const db = await new Promise<IDBDatabase>((res, rej) => { const r = indexedDB.open('chattrix'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
     const store = db.transaction('msgs').objectStore('msgs');

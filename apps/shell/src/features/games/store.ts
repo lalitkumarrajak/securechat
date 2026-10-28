@@ -19,7 +19,7 @@ export interface Game<S = any> {
 export interface ChatLine { f: string; x: string; ts: number }
 
 /** The "new game" dialog: who's ticked, and who can be picked (default: my friends; from a group: its members). */
-export interface Picker { pre: string[]; pool?: { u: string; name?: string }[] }
+export interface Picker { pre: string[]; pool?: { u: string; name?: string }[]; type?: string }
 
 interface GamesState {
   games: Record<string, Game>;
@@ -155,7 +155,7 @@ export const dropBot = (id: string, u: string) => sendOrWarn({ t: 'gbot', id, dr
 export const linkShared = (g: Game) => { if (!g.open) sendOrWarn({ t: 'glink', id: g.id }); };
 
 export const openGame = (id: string | null) => set({ open: id, chatOpen: false });
-export const openPicker = (pre: string[] = [], pool?: Picker['pool']) => set({ picker: { pre, ...(pool && { pool }) } });
+export const openPicker = (pre: string[] = [], pool?: Picker['pool'], type?: string) => set({ picker: { pre, ...(pool && { pool }), ...(type && { type }) } });
 export const closePicker = () => set({ picker: null });
 export const setChatOpen = (chatOpen: boolean) =>
   set((s) => ({ chatOpen, unread: chatOpen && s.open ? { ...s.unread, [s.open]: 0 } : s.unread }));

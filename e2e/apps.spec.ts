@@ -49,7 +49,7 @@ test('the diary also runs on its own page, with the same sign-in and notes', asy
   await P.page.getByRole('button', { name: 'Back to diary' }).click();
 
   await P.page.getByRole('button', { name: 'Back', exact: true }).click(); // back to Sanga
-  await expect(P.page.getByRole('heading', { name: P.u, level: 1 })).toBeVisible();
+  await expect(P.page.getByRole('button', { name: 'Chat', exact: true })).toBeVisible(); // the home screen
   await P.page.getByRole('button', { name: 'Diary' }).click();
   await expect(P.page.getByRole('dialog', { name: 'Diary and notes' }).getByRole('button', { name: /Written on its own/ })).toBeVisible();
   await P.page.keyboard.press('Escape');

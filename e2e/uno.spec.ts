@@ -1,7 +1,7 @@
 // End-to-end: UNO against two computer players.
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
-import { phone, signUp, uname, type Phone } from './helpers';
+import { newGame, phone, signUp, uname, type Phone } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 let P: Phone;
@@ -15,7 +15,7 @@ test.afterAll(async () => { await P?.ctx.close(); });
 
 test('start UNO and fill seats with computer players', async () => {
   await signUp(P);
-  await P.page.getByRole('button', { name: 'Play games' }).click();
+  await newGame(P, 'UNO');
   const dlg = P.page.getByRole('dialog', { name: 'Play a game' });
   await dlg.getByRole('button', { name: /UNO/ }).click();
   await dlg.getByRole('button', { name: 'Create game and share link' }).click();
