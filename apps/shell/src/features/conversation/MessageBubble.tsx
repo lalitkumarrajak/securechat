@@ -54,8 +54,8 @@ export const MessageBubble = memo(function MessageBubble({ m, me, peerName, firs
   const peekTimer = useRef(0);
   useEffect(() => () => clearTimeout(peekTimer.current), []);
   const press = useRef<{ timer: number; x: number; y: number; dx: number; horizontal: boolean | null; long: boolean } | null>(null);
-  const emoji = m.type === 'text' && !m.re ? emojiOnly(m.text || '') : null;
-  const bare = !!emoji || m.type === 'sticker'; // big emoji and stickers: no bubble, like WhatsApp
+  const emoji = m.type === 'text' ? emojiOnly(m.text || '') : null; // big and animated, replies too
+  const bare = (!!emoji && !m.re) || m.type === 'sticker'; // big emoji and stickers: no bubble, like WhatsApp (a reply keeps it, for the quote)
   const deleted = m.type === 'deleted';
 
   // ---- touch: long-press opens the action sheet, swipe right replies ----
@@ -209,7 +209,7 @@ function Body({ m, emoji, me, members }: { m: Msg; emoji: string[] | null; me: s
       </span>
     );
   }
-  if (emoji) return <BigEmoji parts={emoji} />;
+  if (emoji) return <BigEmoji parts={emoji} className={m.re ? 'px-0.5 pt-1 pb-0.5' : undefined} />;
   if (m.type === 'img') {
     return (
       <>

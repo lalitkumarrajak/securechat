@@ -1,5 +1,5 @@
 // Service worker: offline app shell and push notifications.
-const CACHE = 'chattrix-v3'; // bumping it empties the saved copy: the next start waits for the network // bump when the shell files change
+const CACHE = 'chattrix-v4'; // bumping it empties the saved copy: the next start waits for the network // bump when the shell files change
 const SHELL = ['/', '/theme-boot.js', '/logo.svg', '/logo-mark.png', '/icon-192.png', '/manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
@@ -44,11 +44,29 @@ self.addEventListener('fetch', (e) => {
       return res;
     });
     if (hit) {
-      e.waitUntil(fresh.then(() => {}, () => {}));
+      const saved = page ? hit.clone() : null;
+      e.waitUntil(fresh.then((res) => saved && res.ok && newer(saved, res.clone()), () => {}));
       return hit;
     }
     try { return await fresh; } catch { return Response.error(); }
   }));
+});
+
+// The page just opened from the saved copy, and the server has a newer Sanga: tell the open windows,
+// which switch to it (main.tsx). The page names its build's script, so comparing that is enough.
+// A page that opened just now may not be listening yet, so each page also says which build it is
+// when it starts, and hears back if a newer one has come in.
+const build = (html) => html.match(/\/assets\/index-[\w-]+\.js/)?.[0] || '';
+let latest = '';
+async function newer(saved, res) {
+  const [a, b] = await Promise.all([saved.text(), res.text()]);
+  if (!build(b)) return;
+  latest = build(b);
+  if (build(a) === latest) return;
+  for (const w of await self.clients.matchAll({ type: 'window' })) w.postMessage({ t: 'update', build: latest });
+}
+self.addEventListener('message', (e) => {
+  if (e.data?.t === 'build' && latest && e.data.build && e.data.build !== latest) e.source?.postMessage({ t: 'update', build: latest });
 });
 
 // Push payloads carry only who it's from, never message content (that stays end-to-end encrypted).

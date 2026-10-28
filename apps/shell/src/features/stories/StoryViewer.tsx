@@ -18,6 +18,8 @@ import { displayName } from '../../lib/types';
 import { cn } from '@sanga/ui/utils';
 import { useApp } from '../../state/app';
 import { showProfile } from '../friends/ProfileCard';
+import { Emoji } from '../conversation/BigEmoji';
+import { emojiOnly } from '../../lib/emoji';
 
 const PHOTO_MS = 6000;
 const textMs = (t: string) => Math.min(12000, 4000 + t.length * 40);
@@ -324,7 +326,7 @@ function ActivitySheet({ s, onClose }: { s: StoryMeta; onClose: () => void }) {
                     <Avatar u={c.u} name={nameOf(c.u)} size={36} />
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm"><b className="font-semibold">{nameOf(c.u)}</b> <span className="text-xs text-muted">{fmtAgo(c.ts)}</span></span>
-                      <span className="block text-sm break-words whitespace-pre-wrap">{c.text}</span>
+                      <CommentText text={c.text} />
                     </span>
                     <button onClick={() => remove(c.id)} aria-label="Delete comment" className="rounded-full p-1.5 text-muted hover:bg-hover hover:text-danger">
                       <Trash2 className="size-4" />
@@ -338,4 +340,11 @@ function ActivitySheet({ s, onClose }: { s: StoryMeta; onClose: () => void }) {
       )}
     </Dialog>
   );
+}
+
+/** A comment; one that's only emoji is shown big and animated, as in a chat. */
+function CommentText({ text }: { text: string }) {
+  const emoji = emojiOnly(text);
+  if (emoji) return <span className="mt-0.5 flex gap-0.5">{emoji.map((e, i) => <Emoji key={i + e} e={e} size={36} />)}</span>;
+  return <span className="block text-sm break-words whitespace-pre-wrap">{text}</span>;
 }

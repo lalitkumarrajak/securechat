@@ -63,10 +63,13 @@ export function Sidebar() {
           </>
         ) : (
           <>
-            <button onClick={() => setApp({ panel: 'settings' })} aria-label="Profile and settings" className="rounded-full">
-              <Avatar u={me.u} name={me.name} size={40} />
-            </button>
-            <h1 className="min-w-0 flex-1 truncate pl-1 text-xl font-bold tracking-tight">{headerTitle.trim() || me.u}</h1>
+            {/* On Stories your photo is on "My story" just below: once is enough. */}
+            {!storiesTab && (
+              <button onClick={() => setApp({ panel: 'settings' })} aria-label="Profile and settings" className="rounded-full">
+                <Avatar u={me.u} name={me.name} size={40} />
+              </button>
+            )}
+            <h1 className={cn('min-w-0 flex-1 truncate text-xl font-bold tracking-tight', storiesTab ? 'pl-2' : 'pl-1')}>{storiesTab ? 'Stories' : headerTitle.trim() || me.u}</h1>
             <PeekButton />
             {appLock && <IconButton label="Lock Sanga" onClick={lockNow}><Lock /></IconButton>}
             <div className="relative">

@@ -11,7 +11,11 @@ export function AppFrame({ id, name, onClose, params = {}, tab }: { id: string; 
   const App = appComponent(id);
   return (
     <Boundary key={attempt} name={name} onRetry={() => { void retryApp(id).then(() => setAttempt(attempt + 1)); }} onClose={onClose}>
-      <Suspense fallback={<div className="grid flex-1 place-items-center" role="status" aria-label={`Opening ${name}`}><Spinner /></div>}>
+      <Suspense fallback={
+        <div className="grid flex-1 place-items-center" role="status" aria-label={`Opening ${name}`}>
+          <span className="flex items-center gap-2 text-sm text-muted"><Spinner className="size-5 text-accent" />Opening {name}…</span>
+        </div>
+      }>
         <App onClose={onClose} params={params} tab={tab} />
       </Suspense>
     </Boundary>
