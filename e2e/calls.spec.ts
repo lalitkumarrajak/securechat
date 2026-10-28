@@ -71,6 +71,45 @@ test('a video call: both see each other', async () => {
   await expect(P.page.locator('[data-k]').filter({ hasText: 'Outgoing video call' })).toBeVisible();
 });
 
+// The browser's screen picker can't be clicked in a test: the "screen" is a moving drawing instead.
+// Everything after picking it is real: the voice call gains a video track, agreed between the phones.
+async function fakeScreen(p: Phone) {
+  await p.page.evaluate(() => {
+    navigator.mediaDevices.getDisplayMedia = async () => {
+      const c = Object.assign(document.createElement('canvas'), { width: 640, height: 360 });
+      const g = c.getContext('2d')!;
+      let i = 0;
+      setInterval(() => { g.fillStyle = `hsl(${i++ % 360} 70% 50%)`; g.fillRect(0, 0, 640, 360); }, 50);
+      return c.captureStream(15);
+    };
+  });
+}
+
+test('share my screen in a voice call; the other side sees it', async () => {
+  await expect(callScreen(P)).toHaveCount(0, { timeout: 5000 });
+  await fakeScreen(P);
+  await P.page.getByRole('button', { name: 'Voice call' }).click();
+  await callScreen(Q).getByRole('button', { name: 'Accept' }).click();
+  await expect(callScreen(P).getByText(/^0:0\d$/)).toBeVisible({ timeout: 20_000 });
+
+  await callScreen(P).getByRole('button', { name: 'Share screen' }).click();
+  await expect(callScreen(P).getByText('You’re sharing your screen')).toBeVisible();
+  await expect(callScreen(Q).getByText(`${P.u} is sharing their screen`)).toBeVisible();
+  // Q's screen plays P's picture
+  await expect.poll(() => Q.page.evaluate(() => [...document.querySelectorAll('video')].some((v) => v.videoWidth > 0)), { timeout: 15_000 }).toBe(true);
+  await P.page.screenshot({ path: 'e2e/.artifacts/screens/16-sharing.png' });
+  await Q.page.screenshot({ path: 'e2e/.artifacts/screens/17-sharing-seen.png' });
+
+  await callScreen(P).getByRole('button', { name: 'Stop sharing screen' }).click();
+  await expect(callScreen(Q).getByText(`${P.u} is sharing their screen`)).toHaveCount(0);
+  // and again, on the same video track (no new agreement needed)
+  await callScreen(P).getByRole('button', { name: 'Share screen' }).click();
+  await expect(callScreen(Q).getByText(`${P.u} is sharing their screen`)).toBeVisible();
+  await callScreen(P).getByRole('button', { name: 'End call' }).click();
+  await expect(callScreen(Q)).toContainText('Call ended');
+  expect(P.errors).toEqual([]);
+});
+
 test('declined and cancelled calls show in the chat', async () => {
   await expect(callScreen(P)).toHaveCount(0, { timeout: 5000 });
   await P.page.getByRole('button', { name: 'Video call' }).click();
@@ -94,4 +133,46 @@ test('declined and cancelled calls show in the chat', async () => {
   await expect(callScreen(P)).toContainText('Incoming voice call');
   await callScreen(P).getByRole('button', { name: 'Decline' }).click();
   expect([...P.errors, ...Q.errors]).toEqual([]);
+});
+
+test('a group call: add a friend, everyone hears everyone, one leaves and the others carry on', async ({ browser }) => {
+  const R = await phone(browser, uname('third'));
+  await signUp(R);
+  await expect(callScreen(P)).toHaveCount(0, { timeout: 5000 });
+  for (const p of [P, Q]) await p.page.getByRole('button', { name: 'Back' }).first().click(); // to the chat list
+  await makeFriends(P, R);
+  await makeFriends(Q, R); // everyone on a call must be friends with everyone else
+  await openChat(P, Q);
+  await P.page.getByRole('button', { name: 'Voice call' }).click();
+  await callScreen(Q).getByRole('button', { name: 'Accept' }).click();
+  await expect(callScreen(P).getByText(/^0:0\d$/)).toBeVisible({ timeout: 20_000 });
+
+  await callScreen(P).getByRole('button', { name: 'Add people' }).click();
+  const add = P.page.getByRole('dialog', { name: 'Add people' });
+  await expect(add.getByRole('button', { name: new RegExp(Q.u) })).toBeDisabled(); // already on it
+  await add.getByRole('button', { name: new RegExp(R.u) }).click();
+  await expect(callScreen(Q).getByRole('listitem', { name: R.u })).toContainText('Ringing…'); // Q sees R being rung
+  await expect(callScreen(R)).toContainText('Incoming group voice call');
+  await callScreen(R).getByRole('button', { name: 'Accept' }).click();
+
+  // All three connected, each hearing the other two
+  for (const p of [P, Q, R]) {
+    await expect(callScreen(p).getByRole('heading', { name: 'Group call · 3 people' })).toBeVisible({ timeout: 20_000 });
+    await expect.poll(() => p.page.evaluate(() => [...document.querySelectorAll('audio')]
+      .filter((a) => (a.srcObject as MediaStream | null)?.getAudioTracks().some((t) => t.readyState === 'live')).length), { timeout: 20_000 }).toBe(2);
+  }
+  for (const p of [P, Q, R]) await expect(callScreen(p).getByRole('listitem').filter({ hasText: 'Connecting…' })).toHaveCount(0, { timeout: 20_000 });
+  await R.page.screenshot({ path: 'e2e/.artifacts/screens/18-group-call.png' });
+
+  await callScreen(R).getByRole('button', { name: 'Mute' }).click();
+  await expect(callScreen(P).getByRole('listitem', { name: R.u }).getByLabel('Muted')).toBeVisible();
+
+  await callScreen(R).getByRole('button', { name: 'Leave call' }).click();
+  await expect(P.page.getByText(`${R.u} left the call`).first()).toBeVisible();
+  await expect(callScreen(P).getByRole('heading', { name: 'Group call · 3 people' })).toHaveCount(0);
+  await expect(callScreen(P)).toContainText(Q.u); // back to the two of them
+  await callScreen(Q).getByRole('button', { name: 'End call' }).click();
+  await expect(callScreen(P)).toContainText('Call ended');
+  expect([...P.errors, ...Q.errors, ...R.errors]).toEqual([]);
+  await R.ctx.close();
 });

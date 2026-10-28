@@ -6,7 +6,7 @@ import { phone, signIn, signUp, uname, type Phone } from './helpers';
 test.describe.configure({ mode: 'serial' });
 
 let P: Phone, Q: Phone, P2: Phone;
-const diary = (p: Phone) => p.page.getByRole('dialog', { name: 'Diary and notes' });
+const diary = (p: Phone) => p.page.getByRole('region', { name: 'Diary and notes' });
 const card = (p: Phone, text: string) => diary(p).locator('li').filter({ hasText: text });
 
 test.beforeAll(async ({ browser }) => {
@@ -27,7 +27,7 @@ test('set up: two friends', async () => {
 });
 
 test('write a diary entry for today, with a mood', async () => {
-  await P.page.getByRole('button', { name: 'Diary' }).click();
+  await P.page.getByRole('tab', { name: 'Diary' }).click();
   const d = diary(P);
   await expect(d.getByText(/Only you can read them/)).toBeVisible();
   await d.getByRole('button', { name: 'New note' }).click();
@@ -36,7 +36,7 @@ test('write a diary entry for today, with a mood', async () => {
   await d.getByLabel('Note', { exact: true }).fill('5 km by the lake.\nFelt great.');
   await expect(d.getByRole('status')).toHaveText('Saved');
   await d.getByRole('button', { name: 'Back to diary' }).click();
-  await expect(d.getByRole('heading', { name: 'Today' })).toBeVisible();
+  await expect(d.getByRole('heading', { name: /Today$/ })).toBeVisible(); // the day's heading in the list
   await expect(card(P, 'Morning run')).toContainText('5 km by the lake.');
   await expect(d.getByRole('group', { name: 'Calendar' }).getByRole('button', { name: /, 1 note$/ })).toHaveCount(1);
 });
@@ -48,7 +48,7 @@ test('pick another day: see just that day, and write for it', async () => {
   await cal.getByRole('button', { name: /\b15\b/ }).click();
   await expect(d.getByText('Nothing written on this day yet.')).toBeVisible();
   await d.getByRole('button', { name: 'New note' }).click();
-  await expect(d.getByLabel('Day')).toHaveValue(/-15$/);
+  await expect(d.getByLabel('Day', { exact: true })).toHaveValue(/-15$/);
   await d.getByLabel('Note', { exact: true }).fill('Paid the electricity bill');
   await expect(d.getByRole('status')).toHaveText('Saved');
   await d.getByRole('button', { name: 'Back to diary' }).click();
@@ -57,7 +57,7 @@ test('pick another day: see just that day, and write for it', async () => {
   await d.getByRole('button', { name: 'Show all days' }).click();
   await expect(card(P, 'Morning run')).toBeVisible();
   await expect(card(P, 'Paid the electricity bill')).toBeVisible();
-  await d.getByRole('button', { name: 'Back', exact: true }).click();
+  await P.page.getByRole('tab', { name: /Chats$/ }).click();
 });
 
 test("notes about a chat, from the chat's menu; filters and search", async () => {
@@ -92,7 +92,7 @@ test("notes about a chat, from the chat's menu; filters and search", async () =>
 test('they reach my other phone (decrypted there), and changes go both ways', async ({ browser }) => {
   P2 = await phone(browser, P.u);
   await signIn(P2);
-  await P2.page.getByRole('button', { name: 'Diary' }).click();
+  await P2.page.getByRole('tab', { name: 'Diary' }).click();
   for (const t of ['Morning run', 'Paid the electricity bill', 'Owes me 200']) await expect(card(P2, t)).toBeVisible({ timeout: 15_000 });
 
   // Edited on the second phone: shows on the first without reopening

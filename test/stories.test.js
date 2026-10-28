@@ -186,6 +186,53 @@ describe('calls', () => {
     for (const ws of [aws, b1, b2, b3]) ws.close();
   });
 
+  it('group calls: ring a friend in, the others connect to them, setup goes to one member, leaving tells the rest', async () => {
+    const [a, b, c, d, e] = await Promise.all(['gia', 'gus', 'gil', 'gwen', 'gray'].map((n) => register(srv, name(n))));
+    for (const [x, y] of [[a, b], [a, c], [b, c], [a, d], [a, e], [b, e], [c, e]]) await befriend(srv, x, y); // d knows only a
+    const [aws, bws, cws, dws, ews] = await Promise.all([a, b, c, d, e].map((x) => connect(srv, x.token)));
+    const id = C.randomId(18);
+    aws.sendJson({ t: 'call', id, to: b.u, v: 0, b: 'eA==' });
+    await bws.next('call');
+    bws.sendJson({ t: 'cans', id, b: 'eQ==' });
+    assert.equal((await aws.next('cans')).f, b.u);
+
+    // b rings c in; a sees c ringing; c's ring says who's on it
+    bws.sendJson({ t: 'cadd', id, to: c.u, b: 'b2Zm' });
+    const ring = await cws.next('call', (m) => m.id === id);
+    assert.deepEqual([ring.f, ring.b, ring.m], [b.u, 'b2Zm', [a.u]]);
+    assert.equal((await bws.next('cring', (m) => m.id === id)).u, c.u);
+    assert.deepEqual(await aws.next('cinv'), { t: 'cinv', id, u: c.u, by: b.u });
+    cws.sendJson({ t: 'cans', id, b: 'YW5z' });
+    assert.deepEqual([(await bws.next('cans', (m) => m.f === c.u)).b], ['YW5z']); // the answer goes to who rang them
+    assert.equal((await aws.next('cjoin')).u, c.u);                              // a connects to c itself
+    assert.equal(await bws.gets('cjoin'), false);
+
+    // setup between a and c, addressed
+    aws.sendJson({ t: 'csig', id, k: 'offer', b: 'bzE=', to: c.u });
+    assert.deepEqual(await cws.next('csig'), { t: 'csig', id, k: 'offer', b: 'bzE=', f: a.u });
+    assert.equal(await bws.gets('csig'), false);
+    aws.sendJson({ t: 'csig', id, k: 'ice', b: 'aQ==' }); // no `to` with two others: nobody
+    assert.equal(await cws.gets('csig'), false);
+
+    // d isn't friends with b and c: can't be added; strangers and a full call neither
+    aws.sendJson({ t: 'cadd', id, to: d.u, b: 'eA==' });
+    assert.equal((await aws.next('cnot')).r, 'notfriends');
+    assert.equal(await dws.gets('call'), false);
+    aws.sendJson({ t: 'cadd', id, to: e.u, b: 'eA==' });
+    await ews.next('call', (m) => m.id === id);
+    aws.sendJson({ t: 'cadd', id, to: d.u, b: 'eA==' });
+    assert.equal((await aws.next('cnot', (m) => m.u === d.u)).r, 'full');      // four already (one ringing)
+    ews.sendJson({ t: 'cend', id, r: 'declined' });
+    assert.deepEqual(await cws.next('cleft'), { t: 'cleft', id, u: e.u, r: 'declined' });
+
+    // c leaves: the others are told and carry on; then b leaves and the call is over
+    cws.sendJson({ t: 'cend', id, r: 'ended' });
+    assert.equal((await aws.next('cleft', (m) => m.u === c.u)).r, 'ended');
+    bws.sendJson({ t: 'cend', id, r: 'ended' });
+    assert.equal((await aws.next('cend', (m) => m.id === id)).r, 'ended');
+    for (const ws of [aws, bws, cws, dws, ews]) ws.close();
+  });
+
   it('declined, cancelled and unanswered calls; strangers can’t call', async () => {
     const [a, b, s] = await Promise.all(['wes', 'wil', 'wyn'].map((n) => register(srv, name(n))));
     await befriend(srv, a, b);

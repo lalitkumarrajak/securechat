@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Archive, ArrowLeft, BellOff, CircleDashed, CirclePlus, Clock, Eye, EyeOff, Gamepad2, House, Lock, LogOut, MessageCircle, MessageSquarePlus, MoreVertical, NotebookPen, Search, Settings, UserPlus, Users, WifiOff, X } from 'lucide-react';
+import { Archive, ArrowLeft, BellOff, CirclePlus, Clock, Eye, EyeOff, Lock, LogOut, MessageSquarePlus, MoreVertical, Search, Settings, UserPlus, Users, WifiOff, X } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
 import { Ticks } from '../../components/Ticks';
 import { IconButton } from '@sanga/ui/button';
@@ -12,16 +12,14 @@ import { cn } from '@sanga/ui/utils';
 import { setApp, useApp } from '../../state/app';
 import { GamesStrip } from '../games/GamesStrip';
 import { StoriesList } from '../stories/StoriesList';
-import { openComposer, useStories } from '../../lib/stories';
+import { openComposer } from '../../lib/stories';
 import { ChatListSkeleton } from '../../components/Skeleton';
 import { useSettings } from '../../state/settings';
 import { lockNow } from '../../lib/applock';
 import { togglePeek, usePeek } from '../../lib/privacy';
 import { groupIdOf, isGroup } from '../../lib/types';
-import { openPicker } from '../games/store';
 import { showProfile } from '../friends/ProfileCard';
-import { openNotes } from '../../lib/notes';
-import { goHome } from '../../lib/nav';
+import { AppTabs } from '../nav/AppTabs';
 
 export function Sidebar() {
   const me = useApp((s) => s.me)!;
@@ -38,8 +36,7 @@ export function Sidebar() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const archivedView = panel === 'archived';
-  const [tab, setTab] = useState<'chats' | 'stories'>('chats');
-  const storiesTab = tab === 'stories' && !archivedView;
+  const storiesTab = useApp((s) => s.section === 'stories') && !archivedView;
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -66,14 +63,12 @@ export function Sidebar() {
           </>
         ) : (
           <>
-            <IconButton label="Home" onClick={goHome} className="-ml-1"><House /></IconButton>
             <button onClick={() => setApp({ panel: 'settings' })} aria-label="Profile and settings" className="rounded-full">
               <Avatar u={me.u} name={me.name} size={40} />
             </button>
             <h1 className="min-w-0 flex-1 truncate pl-1 text-xl font-bold tracking-tight">{headerTitle.trim() || me.u}</h1>
             <PeekButton />
             {appLock && <IconButton label="Lock Sanga" onClick={lockNow}><Lock /></IconButton>}
-            <IconButton label="Diary" onClick={() => openNotes()}><NotebookPen /></IconButton>
             <div className="relative">
               <IconButton label="Friends" onClick={() => setApp({ panel: 'friends', friendsTab: incoming ? 'requests' : 'friends' })}>
                 <UserPlus />
@@ -89,8 +84,6 @@ export function Sidebar() {
                 <MenuItem icon={<Users />} onSelect={() => setApp({ panel: 'newgroup' })}>New group</MenuItem>
                 <MenuItem icon={<CirclePlus />} onSelect={() => openComposer()}>New story</MenuItem>
                 <MenuItem icon={<UserPlus />} onSelect={() => setApp({ panel: 'friends', friendsTab: 'add' })}>Add friend</MenuItem>
-                <MenuItem icon={<Gamepad2 />} onSelect={() => openPicker()}>Play games</MenuItem>
-                <MenuItem icon={<NotebookPen />} onSelect={() => openNotes()}>Diary and notes</MenuItem>
                 <MenuItem icon={<Archive />} onSelect={() => setApp({ panel: 'archived' })}>Archived chats</MenuItem>
                 <MenuItem icon={<Settings />} onSelect={() => setApp({ panel: 'settings' })}>Settings</MenuItem>
                 <MenuSeparator />
@@ -110,27 +103,31 @@ export function Sidebar() {
         </div>
       )}
 
-      {/* Only the header stays put: search, stories and games scroll away with the chats, so on a
+      {/* Only the header stays put: search and games scroll away with the chats, so on a
           phone the list gets nearly the whole screen. */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {storiesTab ? <StoriesList /> : <>
-        <div className="flex items-center gap-2 px-3 pb-2">
-          <div className="relative min-w-0 flex-1">
+        <div className="px-3 pb-2">
+          <div className="relative">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" />
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search chats"
-              className="h-9 w-full rounded-xl bg-panel-2 pr-8 pl-9 text-sm outline-none placeholder:text-muted focus:ring-2 focus:ring-accent/30" />
+              className="h-10 w-full rounded-xl bg-panel-2 pr-8 pl-9 text-sm outline-none placeholder:text-muted focus:ring-2 focus:ring-accent/30" />
             {query && (
               <button onClick={() => setQuery('')} aria-label="Clear search" className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded-full p-1 text-muted hover:text-ink">
                 <X className="size-4" />
               </button>
             )}
           </div>
-          {!archivedView && (['all', 'unread'] as const).map((f) => (
-            <button key={f} onClick={() => setFilter(f)} aria-pressed={filter === f}
-              className={cn('h-9 shrink-0 rounded-full px-3 text-sm font-medium transition', filter === f ? 'bg-accent/15 text-accent-ink' : 'bg-panel-2 text-muted hover:text-ink')}>
-              {f === 'all' ? 'All' : 'Unread'}
-            </button>
-          ))}
+          {!archivedView && (
+            <div className="mt-2 flex gap-2">
+              {(['all', 'unread'] as const).map((f) => (
+                <button key={f} onClick={() => setFilter(f)} aria-pressed={filter === f}
+                  className={cn('h-8 shrink-0 rounded-full px-3.5 text-sm font-medium transition', filter === f ? 'bg-accent/15 text-accent-ink' : 'bg-panel-2 text-muted hover:text-ink')}>
+                  {f === 'all' ? 'All' : 'Unread'}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         {!archivedView && archivedCount > 0 && !query && (
           <button onClick={() => setApp({ panel: 'archived' })} className="flex w-full items-center gap-4 px-5 py-3 text-left hover:bg-hover">
@@ -145,32 +142,8 @@ export function Sidebar() {
           : !visible.length && <EmptyList archived={archivedView} searching={!!query || filter !== 'all'} />}
         </>}
       </div>
-      {!archivedView && <Tabs tab={tab} setTab={setTab} />}
+      {!archivedView && <AppTabs />}
     </>
-  );
-}
-
-/** Chats and Stories, at the bottom of the list like on WhatsApp. */
-function Tabs({ tab, setTab }: { tab: 'chats' | 'stories'; setTab: (t: 'chats' | 'stories') => void }) {
-  const me = useApp((s) => s.me!.u);
-  const unread = useApp((s) => s.chats.filter((c) => c.unread && !c.archived).length);
-  const fresh = useStories((s) => s.list.some((x) => x.u !== me && !x.seen));
-  const item = (t: 'chats' | 'stories', label: string, icon: React.ReactNode, badge: React.ReactNode) => (
-    <button role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
-      className={cn('relative flex flex-1 flex-col items-center gap-0.5 pt-2 pb-1.5 text-xs font-medium transition', tab === t ? 'text-accent-ink' : 'text-muted hover:text-ink')}>
-      <span className={cn('relative grid h-7 w-14 place-items-center rounded-full transition [&_svg]:size-5', tab === t && 'bg-accent/15')}>
-        {icon}{badge}
-      </span>
-      {label}
-    </button>
-  );
-  return (
-    <nav role="tablist" aria-label="Chats and stories" className="flex shrink-0 border-t border-line bg-panel pb-[env(safe-area-inset-bottom)]">
-      {item('chats', 'Chats', <MessageCircle />, unread > 0 && (
-        <span className="absolute -top-1 right-1 grid min-w-[18px] place-items-center rounded-full bg-accent px-1 text-[11px] leading-[18px] font-bold text-white">{unread}</span>
-      ))}
-      {item('stories', 'Stories', <CircleDashed />, fresh && <span className="absolute top-0 right-3 size-2.5 rounded-full border-2 border-panel bg-accent" aria-label="New stories" />)}
-    </nav>
   );
 }
 

@@ -6,13 +6,13 @@ import { RotateCcw } from 'lucide-react';
 import { Spinner } from '@sanga/ui/button';
 import { appComponent, retryApp } from '../../lib/apps';
 
-export function AppFrame({ id, name, onClose, params = {} }: { id: string; name: string; onClose: () => void; params?: Record<string, string> }) {
+export function AppFrame({ id, name, onClose, params = {}, tab }: { id: string; name: string; onClose: () => void; params?: Record<string, string>; tab?: boolean }) {
   const [attempt, setAttempt] = useState(0);
   const App = appComponent(id);
   return (
     <Boundary key={attempt} name={name} onRetry={() => { void retryApp(id).then(() => setAttempt(attempt + 1)); }} onClose={onClose}>
       <Suspense fallback={<div className="grid flex-1 place-items-center" role="status" aria-label={`Opening ${name}`}><Spinner /></div>}>
-        <App onClose={onClose} params={params} />
+        <App onClose={onClose} params={params} tab={tab} />
       </Suspense>
     </Boundary>
   );

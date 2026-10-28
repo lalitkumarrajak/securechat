@@ -16,16 +16,15 @@ import { useStories } from '../lib/stories';
 const GameScreen = lazy(() => import('./games/GameScreen').then((m) => ({ default: m.GameScreen })));
 const FriendsPanel = lazy(() => import('./friends/FriendsPanel').then((m) => ({ default: m.FriendsPanel })));
 const SettingsPanel = lazy(() => import('./settings/SettingsPanel').then((m) => ({ default: m.SettingsPanel })));
-const NotesPanel = lazy(() => import('./notes/NotesPanel').then((m) => ({ default: m.NotesPanel })));
 const GroupInfoPanel = lazy(() => import('./groups/GroupInfoPanel').then((m) => ({ default: m.GroupInfoPanel })));
 const NewGroupPanel = lazy(() => import('./groups/NewGroupPanel').then((m) => ({ default: m.NewGroupPanel })));
 const StoryViewer = lazy(() => import('./stories/StoryViewer').then((m) => ({ default: m.StoryViewer })));
 const StoryComposer = lazy(() => import('./stories/StoryComposer').then((m) => ({ default: m.StoryComposer })));
-const GamesHub = lazy(() => import('./home/GamesHub').then((m) => ({ default: m.GamesHub })));
-import { Home } from './home/Home';
+const GamesHub = lazy(() => import('./games/GamesHub').then((m) => ({ default: m.GamesHub })));
 import { handleInvite } from '../lib/invite';
+import { DiaryPage } from './notes/DiaryPage';
 
-/** Signed in: the home screen, Chat or Games, with everything that can open over any of them. */
+/** Signed in: Chat (Chats and Stories) or Games, with everything that can open over any of them. */
 export function Main() {
   const section = useApp((s) => s.section);
   useEffect(() => { handleInvite(); }, []); // opened from someone's invite link
@@ -33,8 +32,8 @@ export function Main() {
   useKeyboardHeight();
   return (
     <>
-      {section === 'home' && <Home />}
-      {section === 'chat' && <Shell />}
+      {(section === 'chat' || section === 'stories') && <Shell />}
+      {section === 'diary' && <DiaryPage />}
       {section === 'games' && <Suspense fallback={null}><GamesHub /></Suspense>}
       <Overlays />
     </>
@@ -67,7 +66,6 @@ function Overlays() {
       <Suspense fallback={null}>
         {panel === 'friends' && <FriendsPanel />}
         {panel === 'settings' && <SettingsPanel />}
-        {panel === 'notes' && <NotesPanel />}
         {panel === 'group' && <GroupInfoPanel />}
         {panel === 'newgroup' && <NewGroupPanel />}
         {storyOpen && <StoryViewer />}
@@ -88,8 +86,8 @@ function Overlays() {
 function usePrefetch() {
   useEffect(() => {
     const t = setTimeout(() => {
-      for (const load of [() => import('./settings/SettingsPanel'), () => import('./friends/FriendsPanel'), () => import('./notes/NotesPanel'),
-        () => import('./stories/StoryViewer'), () => import('./stories/StoryComposer'), () => import('./groups/GroupInfoPanel'), () => import('./home/GamesHub')]) load().catch(() => {});
+      for (const load of [() => import('./settings/SettingsPanel'), () => import('./friends/FriendsPanel'), 
+        () => import('./stories/StoryViewer'), () => import('./stories/StoryComposer'), () => import('./groups/GroupInfoPanel'), () => import('./games/GamesHub')]) load().catch(() => {});
     }, 4000);
     return () => clearTimeout(t);
   }, []);

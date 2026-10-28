@@ -34,7 +34,7 @@ test('placeholders show while chats are loading, not a spinner', async () => {
   await P.page.close();
   await newTab(P);
   await P.page.routeWebSocket(/\/ws$/, () => { /* never answers: chats stay "loading" */ });
-  await P.page.goto('/#chat');
+  await P.page.goto('/');
   await expect(P.page.getByRole('status', { name: 'Loading chats' })).toBeVisible();
   await P.page.screenshot({ path: shots('31-loading-skeleton') });
 });

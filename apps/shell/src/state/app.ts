@@ -3,9 +3,9 @@ import { create } from 'zustand';
 import type { Chat, Friend, Group, Me, Msg, Presence, Request } from '../lib/types';
 
 export type Status = 'loading' | 'auth' | 'app';
-export type Section = 'home' | 'chat' | 'games';
+export type Section = 'chat' | 'stories' | 'games' | 'diary';
 export type Conn = 'online' | 'connecting' | 'offline';
-export type Panel = null | 'settings' | 'friends' | 'contact' | 'archived' | 'group' | 'newgroup' | 'notes';
+export type Panel = null | 'settings' | 'friends' | 'contact' | 'archived' | 'group' | 'newgroup';
 
 export interface AppState {
   status: Status;
@@ -45,7 +45,7 @@ export interface AppState {
 
 export const useApp = create<AppState>(() => ({
   status: 'loading',
-  section: location.hash === '#chat' ? 'chat' : location.hash === '#games' ? 'games' : 'home',
+  section: location.hash === '#stories' ? 'stories' : location.hash === '#games' ? 'games' : location.hash === '#diary' ? 'diary' : 'chat',
   signupOpen: true,
   gifsEnabled: false,
   syncing: true,

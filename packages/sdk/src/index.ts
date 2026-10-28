@@ -39,6 +39,8 @@ export interface AppProps {
   onClose(): void;
   /** Where to open it, e.g. { chat: 'ravi' } for "Notes about this chat". */
   params: Record<string, string>;
+  /** Shown as one of Sanga's bottom tabs: there's nothing to go back to, so no back button. */
+  tab?: boolean;
 }
 
 /** The live message types apps may receive. The shell handles every other type itself (messages,

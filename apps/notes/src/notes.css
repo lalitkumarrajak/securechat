@@ -1,5 +1,5 @@
-/* The diary's own styles, loaded with it. Inside the shell most of this is already there and the
-   duplicates are harmless; on its own page (/apps/notes/) it's everything the diary needs. */
+/* The diary's styles on its own page (/apps/notes/) only. Inside Sanga the shell's stylesheet
+   includes the diary's classes (see @source in apps/shell/src/index.css). */
 @import "tailwindcss";
 @import "@sanga/ui/theme.css";
 @source "../../../packages/ui/src";

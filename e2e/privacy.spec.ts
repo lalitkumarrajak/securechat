@@ -5,7 +5,7 @@ import { PASSWORD, newTab, phone, signedOutView, signUp, uname, type Phone } fro
 test.describe.configure({ mode: 'serial' });
 
 let P: Phone, Q: Phone;
-const signedIn = (p: Phone) => expect(p.page.getByRole('heading', { name: p.u, level: 1 }).or(p.page.getByRole('button', { name: 'Chat', exact: true })).first()).toBeVisible({ timeout: 15_000 });
+const signedIn = (p: Phone) => expect(p.page.getByRole('heading', { name: p.u, level: 1 }).first()).toBeVisible({ timeout: 15_000 });
 const signedOut = (p: Phone) => expect(signedOutView(p.page)).toBeVisible({ timeout: 15_000 });
 
 test.beforeAll(async ({ browser }) => {

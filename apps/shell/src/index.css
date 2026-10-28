@@ -1,7 +1,10 @@
 @import "tailwindcss";
 @import "@sanga/ui/theme.css";
-/* Classes used by the shared components, which live outside this app. */
+/* Classes used by the shared components, which live outside this app, and by the other Sanga apps
+   shown inside it (they bring no stylesheet of their own here: two copies of the utilities would
+   fight, and the later one would win). */
 @source "../../../packages/ui/src";
+@source "../../notes/src";
 
 /* ---------- chat wallpapers (Settings → Appearance): .wallpaper.wp-<name> ---------- */
 .wallpaper { background-color: var(--chat); }

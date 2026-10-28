@@ -1,18 +1,17 @@
 // Games: pick a game to start (with friends, a link, or computer players), and the games you're in.
-import { ArrowLeft, Bot, Link2, Users } from 'lucide-react';
-import { IconButton } from '@sanga/ui/button';
-import { goHome } from '../../lib/nav';
-import { GAME_UI } from '../games/registry';
-import { GamesStrip } from '../games/GamesStrip';
-import { listed, openPicker, useGames } from '../games/store';
+import { Bot, Link2, Users } from 'lucide-react';
+import { AppTabs } from '../nav/AppTabs';
+import { GAME_UI } from './registry';
+import { GamesStrip } from './GamesStrip';
+import { listed, openPicker, useGames } from './store';
 
 export function GamesHub() {
   const any = useGames((s) => listed(s.games).length > 0);
   return (
-    <div className="h-[var(--app-h,100dvh)] overflow-y-auto bg-bg">
+    <div className="flex h-[var(--app-h,100dvh)] flex-col bg-bg">
+    <div className="min-h-0 flex-1 overflow-y-auto">
       <header className="sticky top-0 z-10 border-b border-line bg-bg/85 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-5xl items-center gap-2 px-3 md:h-16 md:px-8">
-          <IconButton label="Home" onClick={goHome}><ArrowLeft /></IconButton>
+        <div className="mx-auto flex h-14 max-w-5xl items-center gap-2 px-4 md:h-16 md:px-8">
           <h1 className="flex-1 text-xl font-bold tracking-tight">Games</h1>
         </div>
       </header>
@@ -56,6 +55,8 @@ export function GamesHub() {
         </div>
         <p className="mt-3 text-center text-xs text-muted">Tip: in the waiting room, tap “Add computer player” to play even when your friends are busy.</p>
       </div>
+    </div>
+    <AppTabs />
     </div>
   );
 }

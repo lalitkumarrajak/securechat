@@ -38,21 +38,22 @@ export async function openAuth(page: Page, tab: 'Sign in' | 'Create account') {
 /** Signed out: the landing page (or the sign-in screen) is showing. */
 export const signedOutView = (page: Page) => page.getByRole('button', { name: /Get started/ }).or(page.getByRole('tab', { name: 'Sign in' })).first();
 
-/** From the home screen into Chat. dispatchEvent: a game opened from an invite link may cover the page. */
+/** One of the tabs along the bottom: Chats, Stories, Games or Diary. */
+export const tab = (p: Phone, name: string) => p.page.getByRole('tab', { name: new RegExp(`${name}$`) });
+
+/** Signed in, Chat opens; the Chats tab if another one is showing. dispatchEvent: a game opened
+ *  from an invite link may cover the page. */
 export async function openChats(p: Phone) {
-  const tile = p.page.getByRole('button', { name: 'Chat', exact: true });
-  await expect(tile).toBeVisible({ timeout: 20_000 });
-  await tile.dispatchEvent('click');
+  const chats = tab(p, 'Chats');
+  await expect(chats).toBeVisible({ timeout: 20_000 });
+  if ((await chats.getAttribute('aria-selected')) !== 'true') await chats.dispatchEvent('click');
   await expect(p.page.getByRole('heading', { name: p.u, level: 1 })).toBeVisible({ timeout: 20_000 });
 }
 
-/** Home → Games → Play <game>: the "new game" dialog. */
+/** Games tab → Play <game>: the "new game" dialog. */
 export async function newGame(p: Phone, game = 'Ludo') {
   const play = p.page.getByRole('button', { name: `Play ${game}` });
-  if (!(await play.isVisible())) {
-    await p.page.getByRole('button', { name: 'Home' }).click();
-    await p.page.getByRole('button', { name: 'Games', exact: true }).click();
-  }
+  if (!(await play.isVisible())) await tab(p, 'Games').click();
   await play.click();
 }
 
