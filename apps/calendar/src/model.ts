@@ -125,7 +125,7 @@ export function newEvent(day: string, kind: Kind = 'event'): CalEvent {
   };
 }
 export function newFast(day: string, name: string, ref?: string): FastLog {
-  return { id: C.randomId(12), type: 'fast', day, name, ref, status: day > today() ? 'planned' : 'kept', fastType: 'phalahar', notes: '', created: Date.now(), edited: Date.now() };
+  return { id: C.randomId(12), type: 'fast', day, name, ref, status: day >= today() ? 'planned' : 'kept', fastType: 'phalahar', notes: '', created: Date.now(), edited: Date.now() };
 }
 
 // ---------- repeating ----------

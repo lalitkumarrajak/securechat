@@ -5,7 +5,7 @@ import * as C from '@sanga/crypto';
 import * as db from './db';
 import { applyEdit, applyPin, applyReact, senderOf } from './controls';
 import { compressImage, squarePhoto, type Crop } from './image';
-import type { CallLog, Chat, Content, Friend, GifItem, Group, LinkPreview, Me, Msg, Request, SearchHit, Session, SysEvent } from './types';
+import type { CallLog, Chat, Content, Friend, Topic, GifItem, Group, LinkPreview, Me, Msg, Request, SearchHit, Session, SysEvent } from './types';
 import { groupIdOf, isGroup } from './types';
 import { prepareFile } from './files';
 import type { LocationContent } from './location';
@@ -40,7 +40,7 @@ const S = {
 };
 
 const visible = () => document.visibilityState === 'visible';
-const CONTROL = new Set(['react', 'edit', 'pin', 'gkey']);
+const CONTROL = new Set(['react', 'edit', 'pin', 'gkey', 'topic']);
 // Cid prefix of group key handovers; the server keeps it out of ordinary messages.
 const GKEY_CID = 'gk.';
 
@@ -508,15 +508,19 @@ async function loadMessages(peer: string) {
   // up to, instead of going back to the newest page and making the list jump.
   if (s.active === peer && s.messages[0]?.peer === peer) {
     const from = s.messages[0].ts;
-    const msgs = await db.olderMessages(peer, Infinity, Infinity, from);
+    const msgs = await db.olderMessages(peer, Infinity, Infinity, from, inTab(s.topic));
     if (getApp().active === peer) setApp((st) => ({ messages: [...st.messages.filter((m) => m.ts < from), ...msgs] }));
     return;
   }
   const unread = getApp().chats.find((c) => c.peer === peer)?.unread || 0;
   const limit = Math.max(PAGE, unread + 30); // always include the first unread message
-  const msgs = await db.recentMessages(peer, limit);
-  if (getApp().active === peer) setApp({ messages: msgs, olderLeft: msgs.length >= limit });
+  const topic = getApp().topic;
+  const msgs = await db.recentMessages(peer, limit, inTab(topic));
+  if (getApp().active === peer && getApp().topic === topic) setApp({ messages: msgs, olderLeft: msgs.length >= limit });
 }
+
+/** Messages of one tab of a chat ('' = the main chat). */
+const inTab = (topic: string) => (m: Msg) => (m.tp || '') === topic;
 
 let loadingOlder: Promise<number> | null = null;
 /** Loads the next older page of the open chat (or back to `from`, for jumps). Returns how many were added. */
@@ -529,10 +533,10 @@ export function loadOlder(from?: number): Promise<number> {
     const oldest = s.messages[0].ts;
     const same = s.messages.filter((m) => m.ts === oldest).length;
     const limit = from !== undefined ? Infinity : PAGE + same;
-    const got = await db.olderMessages(peer, oldest, limit, from);
+    const got = await db.olderMessages(peer, oldest, limit, from, inTab(s.topic));
     const have = new Set(s.messages.map((m) => m.k));
     const add = got.filter((m) => !have.has(m.k));
-    if (getApp().active !== peer) return 0;
+    if (getApp().active !== peer || getApp().topic !== s.topic) return 0;
     setApp((st) => ({ messages: [...add, ...st.messages], olderLeft: from !== undefined || got.length >= limit }));
     return add.length;
   })().finally(() => { loadingOlder = null; }));
@@ -543,6 +547,7 @@ export async function loadUntil(k: string) {
   if (getApp().messages.some((m) => m.k === k)) return true;
   const target = await db.getMsg(k);
   if (!target || target.peer !== getApp().active) return false;
+  if ((target.tp || '') !== getApp().topic) await openTopic(target.peer, target.tp || ''); // it's in another tab
   for (let i = 0; i < 2 && !getApp().messages.some((m) => m.k === k); i++) await loadOlder(target.ts); // twice: a page may be loading already
   return getApp().messages.some((m) => m.k === k);
 }
@@ -562,6 +567,7 @@ function showMessage(m: Msg) {
     if (s.active !== m.peer) return {};
     const i = s.messages.findIndex((x) => x.k === m.k);
     if (i >= 0) { const messages = s.messages.slice(); messages[i] = m; return { messages }; }
+    if ((m.tp || '') !== s.topic) return {}; // sent in another tab of this chat
     // An edit or reaction to a message further up than what's loaded: it shows when you scroll there.
     if (s.olderLeft && s.messages.length && m.ts < s.messages[0].ts) return {};
     const messages = [...s.messages, m];
@@ -615,11 +621,12 @@ const replyOf = (r: any) =>
 
 const PHOTO_SRC = /^data:image\/(webp|jpeg|png|gif|avif);base64,/;
 const ALBUM_ID = /^[A-Za-z0-9_-]{6,32}$/; // photos sent together share one
+const TOPIC_ID = /^[A-Za-z0-9_-]{6,32}$/; // a chat tab
 const MAX_PHOTO_SRC = 3_000_000; // the app sends photos of at most ~1.4 MB; anything far bigger is refused
 
 /** Validate decrypted content into the fields a Msg may carry. */
 function pick(c: any): Partial<Msg> {
-  const extra = { ...(replyOf(c.re) && { re: replyOf(c.re) }), ...(c.fwd === true && { fwd: true }) };
+  const extra = { ...(replyOf(c.re) && { re: replyOf(c.re) }), ...(c.fwd === true && { fwd: true }), ...(typeof c.tp === 'string' && TOPIC_ID.test(c.tp) && { tp: c.tp }) };
   if (c.type === 'text' && typeof c.text === 'string') {
     const lp = linkPreviewOf(c.lp);
     return { type: 'text', text: c.text.slice(0, 8000), ...extra, ...(lp && { lp }) };
@@ -650,7 +657,7 @@ function pick(c: any): Partial<Msg> {
     return { type: 'sticker', src: c.src, w: c.w | 0, h: c.h | 0, ...extra };
   }
   if (c.type === 'call' && ['ok', 'missed', 'cancelled', 'declined', 'busy', 'failed'].includes(c.st)) {
-    return { type: 'call', call: { v: !!c.v, dur: Math.max(0, Math.min(86400, +c.dur || 0)), st: c.st } };
+    return { type: 'call', ...(extra.tp && { tp: extra.tp }), call: { v: !!c.v, dur: Math.max(0, Math.min(86400, +c.dur || 0)), st: c.st } };
   }
   if (c.type === 'voice' && typeof c.src === 'string' && c.src.startsWith('data:audio/') && Array.isArray(c.peaks)) {
     return { type: 'voice', src: c.src, dur: +c.dur || 0, peaks: c.peaks.slice(0, 64).map((v: unknown) => Math.min(1, Math.max(0, +(v as number) || 0))), ...extra };
@@ -726,7 +733,7 @@ async function ingest(row: any, fromSync: boolean): Promise<void> {
   const mn = group && Array.isArray(content?.mn) ? content.mn.filter((u: unknown) => typeof u === 'string').slice(0, 50) : undefined;
   const msg: Msg = { k, cid: row.cid, id: row.id, peer, out, ts: row.ts, s: !out && viewing ? 2 : row.s, ...pick(content), ...(mn?.length && { mn }) } as Msg;
   await db.putMsg(msg);
-  await bumpChat(peer, msg, !out && row.s < 2 && !viewing, fromSync);
+  await bumpChat(peer, msg, !out && row.s < 2 && !viewing, fromSync, !out && row.s < 2 && !(viewing && (msg.tp || '') === getApp().topic));
   if (!out && row.s < 2 && !group) queueReceipt(row.id, viewing ? 2 : 1); // no read receipts in groups (yet)
   if (!out) clearTyping(peer);
   if (fromSync) return;
@@ -886,18 +893,22 @@ async function groupSendingKey(gid: string) {
   return { kid: cur.kid, key: (await groupKey(S.me, cur.kid))!.key };
 }
 
-async function bumpChat(peer: string, msg: Msg, unread: boolean, fromSync: boolean) {
+async function bumpChat(peer: string, msg: Msg, unread: boolean, fromSync: boolean, tabUnread = unread) {
   const chat = (await db.getChat(peer)) || newChat(peer);
-  // In groups the list shows who said it: "Rakhi: see you".
+  // In groups the list shows who said it: "Rakhi: see you". Messages in a tab say which: "🏠 House · Rent paid".
   const who = isGroup(peer) && !msg.out && msg.type !== 'sys' ? nameOf(senderOf(msg), getApp().groups[groupIdOf(peer)]) + ': ' : '';
-  if (msg.ts >= chat.ts) Object.assign(chat, { ts: msg.ts, last: who + preview(msg), lastOut: msg.out, lastK: msg.k, lastS: msg.s });
+  const topic = msg.tp && chat.topics?.find((t) => t.id === msg.tp);
+  const tab = topic ? `${topic.emoji} ${topic.name} · ` : '';
+  if (msg.ts >= chat.ts) Object.assign(chat, { ts: msg.ts, last: tab + who + preview(msg), lastOut: msg.out, lastK: msg.k, lastS: msg.s });
   if (unread) chat.unread++;
+  if (tabUnread && chat.topics?.length) chat.tunread = { ...chat.tunread, [msg.tp || '']: (chat.tunread?.[msg.tp || ''] || 0) + 1 };
   if (!msg.out && chat.archived && !isMuted(peer)) chat.archived = false; // new message un-archives, like WhatsApp
   if (fromSync) await db.putChat(chat); else await saveChat(chat);
 }
 
 async function applyControl(c: any, from: string, ts: number, peer: string) {
   if (c.type === 'gkey') return storeGroupKey(c, from);
+  if (c.type === 'topic') return applyTopic(c, from, ts, peer);
   if (typeof c.k !== 'string') return;
   if (c.type === 'pin') {
     const target = await db.getMsg(c.k);
@@ -918,6 +929,58 @@ async function applyControl(c: any, from: string, ts: number, peer: string) {
     if (chat?.lastK === next.k) await saveChat({ ...chat, last: preview(next) });
   }
 }
+
+// ---------- tabs inside a chat ----------
+const MAX_TOPICS = 12;
+
+/** A tab added, renamed or removed, by anyone in the chat. The newest change to a tab wins. */
+async function applyTopic(c: any, from: string, ts: number, peer: string) {
+  if (typeof c.id !== 'string' || !TOPIC_ID.test(c.id)) return;
+  const chat = (await db.getChat(peer)) || newChat(peer);
+  const topics = chat.topics || [];
+  const old = topics.find((t) => t.id === c.id);
+  if (old && old.ts > ts) return;
+  if (!c.on) {
+    if (!old) return;
+    // A tab's messages belong to it alone: they go with it, never into the main chat.
+    const gone = await db.recentMessages(peer, Infinity, (m) => m.tp === c.id);
+    for (const m of gone) await db.del('msgs', m.k);
+    const keys = new Set(gone.map((m) => m.k));
+    const tunread = { ...chat.tunread };
+    delete tunread[c.id];
+    await saveChat({ ...chat, topics: topics.filter((t) => t.id !== c.id), tunread, pins: (chat.pins || []).filter((p) => !keys.has(p.k)) });
+    if (getApp().active === peer) await openTopic(peer, getApp().topic === c.id ? '' : getApp().topic, true);
+    return;
+  }
+  const name = typeof c.name === 'string' ? c.name.trim().slice(0, 30) : '';
+  const emoji = typeof c.emoji === 'string' ? [...c.emoji].slice(0, 4).join('') : '';
+  if (!name || (!old && topics.length >= MAX_TOPICS)) return;
+  const t: Topic = { id: c.id, name, emoji, by: old?.by || from, ts };
+  await saveChat({ ...chat, topics: old ? topics.map((x) => (x.id === c.id ? t : x)) : [...topics, t] });
+}
+
+/** Show one tab of the open chat ('' = the main chat). */
+export async function openTopic(peer: string, topic: string, reload = false) {
+  if (getApp().active !== peer) return;
+  if (getApp().topic !== topic || reload) {
+    setApp({ topic, messages: [], olderLeft: false, replyTo: null, editing: null, selection: null, highlight: null });
+    await loadMessages(peer);
+  }
+  const chat = await db.getChat(peer);
+  if (chat?.tunread?.[topic]) await saveChat({ ...chat, tunread: { ...chat.tunread, [topic]: 0 } });
+}
+
+/** Add a tab to a chat (or rename one): everyone in the chat gets it. Returns its id. */
+export async function saveTopic(peer: string, name: string, emoji: string, id?: string) {
+  const chat = await db.getChat(peer);
+  if (!id && (chat?.topics?.length || 0) >= MAX_TOPICS) throw new Error(`A chat can have up to ${MAX_TOPICS} tabs`);
+  id ||= C.randomId(9);
+  await sendControl(peer, { type: 'topic', id, name: name.trim().slice(0, 30), emoji, on: true });
+  return id;
+}
+
+/** Remove a tab and its messages, for everyone in the chat. */
+export const deleteTopic = (peer: string, id: string) => sendControl(peer, { type: 'topic', id, name: '', emoji: '', on: false });
 
 async function markDeleted(m: Msg) {
   const gone: Msg = { k: m.k, cid: m.cid, id: m.id, peer: m.peer, out: m.out, ts: m.ts, s: m.s, type: 'deleted' };
@@ -973,7 +1036,10 @@ export async function markRead(peer: string) {
     }
   }
   const chat = await db.getChat(peer);
-  if (chat?.unread) await saveChat({ ...chat, unread: 0 });
+  const tab = getApp().active === peer ? getApp().topic : null; // the tab on screen is read too
+  if (chat?.unread || (tab !== null && chat?.tunread?.[tab])) {
+    await saveChat({ ...chat!, unread: 0, ...(tab !== null && chat!.tunread && { tunread: { ...chat!.tunread, [tab]: 0 } }) });
+  }
 }
 
 // ---------- sending ----------
@@ -1007,6 +1073,9 @@ export async function sendContent(peer: string, content: Extract<Content, { type
     toast.warning('Sending is paused', { description: 'This contact’s security code changed. Verify it first.' });
     return;
   }
+  // Sent from a tab: it goes in that tab. Call logs always go in the main chat.
+  const { active, topic } = getApp();
+  if (peer === active && topic && content.type !== 'call' && !(content as any).tp) (content as any).tp = topic;
   const { cid, ts } = await encryptAndQueue(peer, content, quiet, mn);
   const msg = { k: S.me + '/' + cid, cid, peer, out: true, ts, s: -1, ...pick(content), ...(mn?.length && { mn }) } as Msg;
   await db.putMsg(msg);
@@ -1016,7 +1085,7 @@ export async function sendContent(peer: string, content: Extract<Content, { type
 }
 
 /** Reactions, edits and pins: encrypted like messages, applied locally right away. */
-async function sendControl(peer: string, content: Extract<Content, { type: 'react' | 'edit' | 'pin' }>) {
+async function sendControl(peer: string, content: Extract<Content, { type: 'react' | 'edit' | 'pin' | 'topic' }>) {
   const { cid, ts } = await encryptAndQueue(peer, content, true);
   await db.put('kv', 1, 'ctl/' + S.me + '/' + cid);
   await applyControl(content, S.me, ts, peer);
@@ -1039,7 +1108,7 @@ export async function retry(m: Msg) {
   // A failed message is re-sent as a new one (the old ciphertext was refused).
   await removeLocal(m);
   const c = contentOf(m);
-  if (c) await sendContent(m.peer, c);
+  if (c) await sendContent(m.peer, { ...c, ...(m.tp && { tp: m.tp }) } as typeof c);
 }
 
 function contentOf(m: Msg): Extract<Content, { type: 'text' | 'img' | 'voice' | 'gif' | 'sticker' | 'file' | 'location' }> | null {
@@ -1192,7 +1261,7 @@ export async function openChat(peer: string) {
   if (!history.state?.chat) history.pushState({ ...history.state, chat: true }, '');
   setApp({
     active: peer, panel: null,
-    ...(prev !== peer && { messages: [], olderLeft: false, replyTo: null, editing: null, selection: null, searchOpen: false, searchQuery: '', highlight: null }),
+    ...(prev !== peer && { topic: '', messages: [], olderLeft: false, replyTo: null, editing: null, selection: null, searchOpen: false, searchQuery: '', highlight: null }),
   });
   if (!(await db.getChat(peer))) await saveChat(newChat(peer));
   await loadMessages(peer);
@@ -1201,7 +1270,7 @@ export async function openChat(peer: string) {
   askNotifyPermissionOnce();
 }
 
-const closedChat = { active: null, messages: [], olderLeft: false, replyTo: null, editing: null, selection: null, searchOpen: false, searchQuery: '', highlight: null };
+const closedChat = { active: null, topic: '', messages: [], olderLeft: false, replyTo: null, editing: null, selection: null, searchOpen: false, searchQuery: '', highlight: null };
 
 /** Remove a chat and its messages from this device (e.g. a group you left). */
 export async function deleteChatHere(peer: string) {

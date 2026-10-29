@@ -50,7 +50,7 @@ test('an event with a reminder: the server sends it at the time and the open app
   const start = new Date(Date.now() + 60e3);
   start.setSeconds(0, 0);
   if (start.getTime() - Date.now() < 25e3) start.setMinutes(start.getMinutes() + 1); // time to save it
-  await cal(P).getByRole('button', { name: 'Today' }).click().catch(() => {});
+  await cal(P).getByRole('button', { name: 'Today', exact: true }).click().catch(() => {});
   await cal(P).getByRole('button', { name: 'Add', exact: true }).click();
   const ed = P.page.getByRole('dialog', { name: 'New event' });
   await ed.getByLabel('Title').fill('Call Maa');

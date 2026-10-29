@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  Archive, ArchiveRestore, ArrowLeft, Bell, BellOff, ChevronDown, ChevronUp, Copy, Forward, Gamepad2, Info, Lock, LogOut,
+  Archive, ArchiveRestore, ArrowLeft, Bell, BellOff, ChevronDown, ChevronUp, Copy, FolderPlus, Forward, Gamepad2, Info, Lock, LogOut,
   MoreVertical, NotebookPen, Pencil, Phone, Pin, Reply, Search, ShieldAlert, ShieldCheck, SquareCheck, Trash2, UserMinus, UserX, Video, X,
 } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
@@ -20,6 +20,7 @@ import { useSettings } from '../../state/settings';
 import { Composer } from './Composer';
 import { MessageList } from './MessageList';
 import { ChatDialogs } from './ChatDialogs';
+import { addChatTab, ChatTabDialog, ChatTabs } from './ChatTabs';
 import { deleteFlow, setChatUi, startEdit, startReply } from './chatUi';
 import { openPicker } from '../games/store';
 import { useGames } from '../games/store';
@@ -67,12 +68,17 @@ export function ChatPane({ peer }: { peer: string }) {
   const friend = useApp((s) => s.friends[peer]);
   const selection = useApp((s) => s.selection);
   const searchOpen = useApp((s) => s.searchOpen);
+  const topic = useApp((s) => s.topic);
   const keyChanged = useApp((s) => s.keyChanged[peer]);
   const blocked = useApp((s) => s.blocked.includes(peer));
   const requestOut = useApp((s) => s.outgoing.some((r) => r.u === peer));
   const requestIn = useApp((s) => s.incoming.some((r) => r.u === peer));
   // The unread count when the chat was opened places the "N unread" divider.
-  const [unreadAtOpen] = useState(() => useApp.getState().chats.find((c) => c.peer === peer)?.unread || 0);
+  // With tabs, only the main chat's own unread count (each tab keeps its own).
+  const [unreadAtOpen] = useState(() => {
+    const c = useApp.getState().chats.find((x) => x.peer === peer);
+    return (c?.topics?.length ? c.tunread?.[''] : c?.unread) || 0;
+  });
   const group = useApp((s) => (isGroup(peer) ? s.groups[groupIdOf(peer)] : undefined));
   const groupsLoaded = useApp((s) => s.groupsLoaded);
   const name = isGroup(peer) ? group?.name || 'Group' : displayName(friend, peer);
@@ -81,6 +87,7 @@ export function ChatPane({ peer }: { peer: string }) {
   return (
     <div className="flex h-full min-h-0 flex-col bg-chat">
       {selection ? <SelectionBar /> : <Header peer={peer} name={name} />}
+      <ChatTabs peer={peer} />
       {searchOpen && !selection && <SearchBar />}
       <PinnedBar peer={peer} />
       {keyChanged && !isGroup(peer) && (
@@ -88,7 +95,7 @@ export function ChatPane({ peer }: { peer: string }) {
           {name}’s security code changed. Sending is paused until you verify it.
         </Banner>
       )}
-      <MessageList peer={peer} peerName={name} unreadAtOpen={unreadAtOpen} />
+      <MessageList key={topic} peer={peer} peerName={name} unreadAtOpen={topic ? 0 : unreadAtOpen} />
       {canSend ? <Composer key={peer} peer={peer} peerName={name} /> : (
         <div className="shrink-0 border-t border-line bg-panel px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-center text-sm">
           {isGroup(peer) ? (
@@ -109,6 +116,7 @@ export function ChatPane({ peer }: { peer: string }) {
         </div>
       )}
       <ChatDialogs peer={peer} name={name} />
+      <ChatTabDialog peer={peer} />
     </div>
   );
 }
@@ -188,6 +196,7 @@ function GroupHeader({ peer, name }: { peer: string; name: string }) {
           <MenuItem icon={<Search />} onSelect={() => setApp({ searchOpen: true })}>Search</MenuItem>
           <MenuItem icon={<SquareCheck />} onSelect={() => setApp({ selection: [] })}>Select messages</MenuItem>
           <MenuItem icon={<NotebookPen />} onSelect={() => openNotes(peer)}>Notes about this group</MenuItem>
+          {group && <MenuItem icon={<FolderPlus />} onSelect={addChatTab}>Add a tab</MenuItem>}
           {group && others.length > 0 && <MenuItem icon={<Gamepad2 />} onSelect={play}>Play a game with the group</MenuItem>}
           <MuteItems peer={peer} />
           <MenuItem icon={archived ? <ArchiveRestore /> : <Archive />} onSelect={() => setArchived(peer, !archived)}>{archived ? 'Unarchive' : 'Archive'}</MenuItem>
@@ -241,6 +250,7 @@ function PersonHeader({ peer, name }: { peer: string; name: string }) {
           <MenuItem icon={<SquareCheck />} onSelect={() => setApp({ selection: [] })}>Select messages</MenuItem>
           <MenuItem icon={<Gamepad2 />} onSelect={() => openPicker([peer])}>Play a game</MenuItem>
           <MenuItem icon={<NotebookPen />} onSelect={() => openNotes(peer)}>Notes about this chat</MenuItem>
+          {friend && !blocked && <MenuItem icon={<FolderPlus />} onSelect={addChatTab}>Add a tab</MenuItem>}
           {muted ? (
             <MenuItem icon={<Bell />} onSelect={() => doMute(0, 'Notifications on')}>Unmute</MenuItem>
           ) : (

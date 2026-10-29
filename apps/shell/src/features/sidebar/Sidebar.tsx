@@ -62,13 +62,12 @@ export function Sidebar() {
           <h1 className="flex-1 text-lg font-semibold">Archived</h1>
         </header>
       ) : (
-        // Photo on the left, the title in the middle, the buttons on the right.
-        <header className="grid h-14 shrink-0 grid-cols-[1fr_minmax(0,auto)_1fr] items-center gap-2 px-3 md:h-16">
-          <button onClick={() => setApp({ panel: 'settings' })} aria-label="Profile and settings" className="justify-self-start rounded-full">
+        <header className="flex h-14 shrink-0 items-center gap-2 px-3 md:h-16">
+          <button onClick={() => setApp({ panel: 'settings' })} aria-label="Profile and settings" className="rounded-full">
             <Avatar u={me.u} name={me.name} size={40} />
           </button>
-          <h1 className="min-w-0 truncate text-center text-xl font-bold tracking-tight">{headerTitle.trim() || me.u}</h1>
-          <div className="flex items-center justify-self-end">
+          <h1 className="min-w-0 flex-1 truncate pl-1 text-xl font-bold tracking-tight">{headerTitle.trim() || me.u}</h1>
+          <div className="flex items-center">
             <PeekButton />
             {appLock && <IconButton label="Lock Sanga" onClick={lockNow}><Lock /></IconButton>}
             <div className="relative">

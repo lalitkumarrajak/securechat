@@ -18,7 +18,7 @@ export function StoriesList() {
   const seen = all.filter((r) => r.u !== me.u && !r.unseen);
 
   return (
-    <div role="region" aria-label="Stories" className="pt-2 pb-6">
+    <div role="region" aria-label="Stories" className="flex min-h-full flex-col pt-2 pb-6">
       <h1 className="sr-only">Stories</h1>
       {/* Centred: your photo (tap to see your story), its + to add one, and how many you have. */}
       <div className="flex flex-col items-center px-4 pt-4 pb-2 text-center">
@@ -39,10 +39,13 @@ export function StoriesList() {
 
       {fresh.length > 0 && <Section title="Recent" rows={fresh} />}
       {seen.length > 0 && <Section title="Viewed" rows={seen} />}
-      {fresh.length + seen.length === 0 && (
-        <p className="px-6 py-10 text-center text-sm text-muted">No stories from friends right now. When they share one, it shows up here for 24 hours.</p>
-      )}
-      <p className="mt-2 flex items-center justify-center gap-1.5 px-4 text-xs text-muted"><Lock className="size-3.5" /> Stories are end-to-end encrypted</p>
+      {/* With nothing from friends, the note sits in the middle of the space below "My story". */}
+      <div className={cn('flex flex-col items-center justify-center gap-3 px-6 text-center', fresh.length + seen.length === 0 ? 'flex-1 pb-16' : 'mt-4')}>
+        {fresh.length + seen.length === 0 && (
+          <p className="max-w-xs text-sm text-muted">No stories from friends right now. When they share one, it shows up here for 24 hours.</p>
+        )}
+        <p className="flex items-center gap-1.5 text-xs text-muted"><Lock className="size-3.5" /> Stories are end-to-end encrypted</p>
+      </div>
     </div>
   );
 }

@@ -38,9 +38,13 @@ export interface Msg {
   mn?: string[];          // usernames @mentioned (groups)
   al?: string;            // album: photos sent together share this id and show as one grid
   call?: CallLog;
+  tp?: string;            // the chat tab it was sent in (none: the main chat)
 }
 
 export interface Pin { k: string; ts: number }
+
+/** A tab inside a chat ("🏠 House", "💰 Expenses"): its own thread of messages, shared by everyone in the chat. */
+export interface Topic { id: string; name: string; emoji: string; by: string; ts: number }
 
 export interface GroupMember { u: string; n: string; pub: string; admin: boolean; joined: number }
 export interface Group {
@@ -62,6 +66,8 @@ export interface Chat {
   pins: Pin[];
   archived?: boolean;
   draft?: string;
+  topics?: Topic[];       // the chat's tabs, besides the main chat
+  tunread?: Record<string, number>; // unread messages per tab ('' = the main chat)
 }
 
 export interface Person { u: string; name: string; about: string; av: number }
@@ -87,7 +93,8 @@ export type Content =
   | { type: 'call'; v: boolean; dur: number; st: CallStatus }
   | { type: 'react'; k: string; e: string }
   | { type: 'edit'; k: string; text: string }
-  | { type: 'pin'; k: string; on: boolean };
+  | { type: 'pin'; k: string; on: boolean }
+  | { type: 'topic'; id: string; name: string; emoji: string; on: boolean };
 
 /** A device signed in to your account (Settings → Account → Active sessions). */
 export interface DeviceHints { model?: string; pv?: string; platform?: string }

@@ -56,7 +56,7 @@ export const getChat = (peer: string) => get<Chat>('chats', peer);
 export const putChat = (c: Chat) => put('chats', c);
 
 /** Newest `limit` messages of a chat, oldest first. */
-export async function recentMessages(peer: string, limit = 500): Promise<Msg[]> {
+export async function recentMessages(peer: string, limit = 500, keep?: (m: Msg) => boolean): Promise<Msg[]> {
   const idx = (await store('msgs')).index('peer_ts');
   const range = IDBKeyRange.bound([peer, -Infinity], [peer, Infinity]);
   return new Promise((resolve, reject) => {
@@ -64,15 +64,16 @@ export async function recentMessages(peer: string, limit = 500): Promise<Msg[]> 
     const req = idx.openCursor(range, 'prev');
     req.onsuccess = () => {
       const cur = req.result;
-      if (cur && out.length < limit) { out.push(cur.value); cur.continue(); }
+      if (cur && out.length < limit) { if (!keep || keep(cur.value)) out.push(cur.value); cur.continue(); }
       else resolve(out.reverse());
     };
     req.onerror = () => reject(req.error);
   });
 }
 
-/** Up to `limit` messages of a chat sent at or before `ts` (and not before `from`), oldest first. */
-export async function olderMessages(peer: string, ts: number, limit: number, from = -Infinity): Promise<Msg[]> {
+/** Up to `limit` messages of a chat sent at or before `ts` (and not before `from`), oldest first.
+ *  `keep` picks one tab's messages (the rest are skipped, not counted). */
+export async function olderMessages(peer: string, ts: number, limit: number, from = -Infinity, keep?: (m: Msg) => boolean): Promise<Msg[]> {
   const idx = (await store('msgs')).index('peer_ts');
   const range = IDBKeyRange.bound([peer, from], [peer, ts]);
   return new Promise((resolve, reject) => {
@@ -80,7 +81,7 @@ export async function olderMessages(peer: string, ts: number, limit: number, fro
     const req = idx.openCursor(range, 'prev');
     req.onsuccess = () => {
       const cur = req.result;
-      if (cur && out.length < limit) { out.push(cur.value); cur.continue(); }
+      if (cur && out.length < limit) { if (!keep || keep(cur.value)) out.push(cur.value); cur.continue(); }
       else resolve(out.reverse());
     };
     req.onerror = () => reject(req.error);

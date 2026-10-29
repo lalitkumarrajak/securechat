@@ -23,7 +23,8 @@ export interface AppState {
   blocked: string[];
   chats: Chat[];                         // newest first
   active: string | null;                 // open chat
-  messages: Msg[];                       // messages of the open chat, oldest first
+  topic: string;                         // the open chat's tab ('' = the main chat)
+  messages: Msg[];                       // messages of the open chat's tab, oldest first
   olderLeft: boolean;                    // the open chat has older messages on this device, not loaded yet
   presence: Record<string, Presence>;
   typing: Record<string, 'typing' | 'recording'>;
@@ -59,6 +60,7 @@ export const useApp = create<AppState>(() => ({
   blocked: [],
   chats: [],
   active: null,
+  topic: '',
   messages: [],
   olderLeft: false,
   presence: {},
