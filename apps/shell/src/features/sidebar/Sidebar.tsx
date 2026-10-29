@@ -55,23 +55,20 @@ export function Sidebar() {
 
   return (
     <>
-      <header className="flex h-14 shrink-0 items-center gap-2 px-3 md:h-16">
-        {archivedView ? (
-          <>
-            <IconButton label="Back" onClick={() => setApp({ panel: null })}><ArrowLeft /></IconButton>
-            <h1 className="flex-1 text-lg font-semibold">Archived</h1>
-          </>
-        ) : (
-          <>
-            {/* On Stories your photo is on "My story" just below: once is enough. */}
-            {!storiesTab && (
-              <button onClick={() => setApp({ panel: 'settings' })} aria-label="Profile and settings" className="rounded-full">
-                <Avatar u={me.u} name={me.name} size={40} />
-              </button>
-            )}
-            <h1 className={cn('min-w-0 flex-1 truncate text-xl font-bold tracking-tight', storiesTab ? 'pl-2' : 'pl-1')}>{storiesTab ? 'Stories' : headerTitle.trim() || me.u}</h1>
-            {/* Stories is just its title: the chat's buttons and menu belong to Chats. */}
-            {!storiesTab && <>
+      {/* Stories has no top bar: "My story" is the first thing on it. */}
+      {!storiesTab && (archivedView ? (
+        <header className="flex h-14 shrink-0 items-center gap-2 px-3 md:h-16">
+          <IconButton label="Back" onClick={() => setApp({ panel: null })}><ArrowLeft /></IconButton>
+          <h1 className="flex-1 text-lg font-semibold">Archived</h1>
+        </header>
+      ) : (
+        // Photo on the left, the title in the middle, the buttons on the right.
+        <header className="grid h-14 shrink-0 grid-cols-[1fr_minmax(0,auto)_1fr] items-center gap-2 px-3 md:h-16">
+          <button onClick={() => setApp({ panel: 'settings' })} aria-label="Profile and settings" className="justify-self-start rounded-full">
+            <Avatar u={me.u} name={me.name} size={40} />
+          </button>
+          <h1 className="min-w-0 truncate text-center text-xl font-bold tracking-tight">{headerTitle.trim() || me.u}</h1>
+          <div className="flex items-center justify-self-end">
             <PeekButton />
             {appLock && <IconButton label="Lock Sanga" onClick={lockNow}><Lock /></IconButton>}
             <div className="relative">
@@ -97,10 +94,9 @@ export function Sidebar() {
                 }}>Sign out</MenuItem>
               </MenuContent>
             </Menu>
-            </>}
-          </>
-        )}
-      </header>
+          </div>
+        </header>
+      ))}
 
       {conn !== 'online' && (
         <div className="mx-3 mb-2 flex items-center gap-2 rounded-xl bg-warn px-3 py-2 text-sm" role="status">

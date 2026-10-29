@@ -99,9 +99,9 @@ test('an emoji-only reply is big and animated, with the message it answers', asy
   await Q.page.screenshot({ path: shots('62-emoji-reply') });
 });
 
-test('Stories has just its title on top: no photo, Friends or menu', async () => {
+test('Stories has no top bar: no title, photo, Friends or menu', async () => {
   await tab(P, 'Stories').click();
-  await expect(P.page.getByRole('heading', { level: 1, name: 'Stories' })).toBeVisible();
+  await expect(P.page.locator('aside header')).toHaveCount(0);
   for (const name of ['Profile and settings', 'Friends', 'Menu']) await expect(P.page.getByRole('button', { name })).toHaveCount(0);
   await expect(P.page.getByRole('region', { name: 'Stories' }).getByText('My story')).toBeVisible();
   await P.page.screenshot({ path: shots('63-stories-header') });
