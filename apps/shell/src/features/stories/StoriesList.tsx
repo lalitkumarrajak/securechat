@@ -1,6 +1,6 @@
 // The Stories tab in Chat: your story, then friends' stories, new ones first.
 import { useMemo } from 'react';
-import { Camera, Lock, Plus } from 'lucide-react';
+import { Lock, Plus } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
 import { fmtAgo } from '@sanga/ui/format';
 import { displayName } from '../../lib/types';
@@ -20,24 +20,21 @@ export function StoriesList() {
   return (
     <div role="region" aria-label="Stories" className="pt-2 pb-6">
       <h1 className="sr-only">Stories</h1>
-      <div className="flex items-center gap-3 px-3 py-2">
-        <button onClick={() => (mine ? openStories(me.u) : openComposer())} aria-label={mine ? 'Your story' : 'Add to your story'}
-          className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left">
-          <span className="relative">
-            <StoryRing state={mine ? 'seen' : 'none'}><Avatar u={me.u} name={me.name} size={50} /></StoryRing>
-            {!mine && <span className="absolute right-0 bottom-0 grid size-5 place-items-center rounded-full border-2 border-panel bg-accent text-white"><Plus className="size-3" strokeWidth={3} /></span>}
-          </span>
-          <span className="min-w-0">
-            <span className="block font-semibold">My story</span>
-            <span className="block truncate text-sm text-muted">
-              {mine ? `${mine.stories.length} stor${mine.stories.length === 1 ? 'y' : 'ies'} · ${fmtAgo(mine.last)}` : 'Tap to share a photo or a few words'}
-            </span>
-          </span>
-        </button>
-        <button onClick={() => openComposer()} aria-label="New story"
-          className="grid size-10 shrink-0 place-items-center rounded-full bg-accent/12 text-accent-ink hover:bg-accent/20">
-          <Camera className="size-5" />
-        </button>
+      {/* Centred: your photo (tap to see your story), its + to add one, and how many you have. */}
+      <div className="flex flex-col items-center px-4 pt-4 pb-2 text-center">
+        <span className="relative">
+          <button onClick={() => (mine ? openStories(me.u) : openComposer())} aria-label={mine ? 'Your story' : 'Add to your story'} className="rounded-full">
+            <StoryRing state={mine ? 'seen' : 'none'}><Avatar u={me.u} name={me.name} size={72} /></StoryRing>
+          </button>
+          <button onClick={() => openComposer()} aria-label="New story"
+            className="absolute right-0 bottom-0 grid size-7 place-items-center rounded-full border-2 border-panel bg-accent text-white hover:brightness-110">
+            <Plus className="size-4" strokeWidth={3} />
+          </button>
+        </span>
+        <span className="mt-2 font-semibold">My story</span>
+        <span className="text-sm text-muted">
+          {mine ? `${mine.stories.length} stor${mine.stories.length === 1 ? 'y' : 'ies'} · ${fmtAgo(mine.last)}` : 'Tap to share a photo or a few words'}
+        </span>
       </div>
 
       {fresh.length > 0 && <Section title="Recent" rows={fresh} />}
