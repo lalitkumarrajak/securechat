@@ -20,21 +20,23 @@ export function StoriesList() {
   return (
     <div role="region" aria-label="Stories" className="flex min-h-full flex-col pt-2 pb-6">
       <h1 className="sr-only">Stories</h1>
-      {/* Centred: your photo (tap to see your story), its + to add one, and how many you have. */}
-      <div className="flex flex-col items-center px-4 pt-4 pb-2 text-center">
-        <span className="relative">
+      {/* Your photo (tap to see your story; its + adds one), then how many you have. */}
+      <div className="flex items-center gap-3 px-3 py-2">
+        <span className="relative shrink-0">
           <button onClick={() => (mine ? openStories(me.u) : openComposer())} aria-label={mine ? 'Your story' : 'Add to your story'} className="rounded-full">
-            <StoryRing state={mine ? 'seen' : 'none'}><Avatar u={me.u} name={me.name} size={72} /></StoryRing>
+            <StoryRing state={mine ? 'seen' : 'none'}><Avatar u={me.u} name={me.name} size={50} /></StoryRing>
           </button>
           <button onClick={() => openComposer()} aria-label="New story"
-            className="absolute right-0 bottom-0 grid size-7 place-items-center rounded-full border-2 border-panel bg-accent text-white hover:brightness-110">
-            <Plus className="size-4" strokeWidth={3} />
+            className="absolute right-0 bottom-0 grid size-5 place-items-center rounded-full border-2 border-panel bg-accent text-white hover:brightness-110">
+            <Plus className="size-3" strokeWidth={3} />
           </button>
         </span>
-        <span className="mt-2 font-semibold">My story</span>
-        <span className="text-sm text-muted">
-          {mine ? `${mine.stories.length} stor${mine.stories.length === 1 ? 'y' : 'ies'} · ${fmtAgo(mine.last)}` : 'Tap to share a photo or a few words'}
-        </span>
+        <button onClick={() => (mine ? openStories(me.u) : openComposer())} className="min-w-0 flex-1 text-left">
+          <span className="block font-semibold">My story</span>
+          <span className="block truncate text-sm text-muted">
+            {mine ? `${mine.stories.length} stor${mine.stories.length === 1 ? 'y' : 'ies'} · ${fmtAgo(mine.last)}` : 'Tap to share a photo or a few words'}
+          </span>
+        </button>
       </div>
 
       {fresh.length > 0 && <Section title="Recent" rows={fresh} />}
