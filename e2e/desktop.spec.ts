@@ -64,7 +64,7 @@ test('a friend from Friends opens their chat beside the list', async () => {
 test('from the Stories and Games tabs, a friend still opens their chat', async () => {
   for (const t of ['Stories', 'Games', 'Diary']) {
     await tab(P, t).click();
-    if (t !== 'Stories') await tab(P, 'Chats').click(); // Friends is above the chat list
+    await tab(P, 'Chats').click(); // Friends is above the chat list
     await P.page.getByRole('button', { name: 'Friends' }).click();
     await P.page.getByRole('dialog').locator('li').filter({ hasText: Q.u }).first().click();
     await expect(P.page.locator('#composer-input')).toBeVisible();
@@ -99,10 +99,10 @@ test('an emoji-only reply is big and animated, with the message it answers', asy
   await Q.page.screenshot({ path: shots('62-emoji-reply') });
 });
 
-test('Stories shows my photo once: on "My story", not in the top bar too', async () => {
+test('Stories has just its title on top: no photo, Friends or menu', async () => {
   await tab(P, 'Stories').click();
   await expect(P.page.getByRole('heading', { level: 1, name: 'Stories' })).toBeVisible();
-  await expect(P.page.getByRole('button', { name: 'Profile and settings' })).toHaveCount(0);
+  for (const name of ['Profile and settings', 'Friends', 'Menu']) await expect(P.page.getByRole('button', { name })).toHaveCount(0);
   await expect(P.page.getByRole('region', { name: 'Stories' }).getByText('My story')).toBeVisible();
   await P.page.screenshot({ path: shots('63-stories-header') });
   await tab(P, 'Chats').click();

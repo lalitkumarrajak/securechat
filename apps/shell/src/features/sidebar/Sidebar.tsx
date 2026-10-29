@@ -70,6 +70,8 @@ export function Sidebar() {
               </button>
             )}
             <h1 className={cn('min-w-0 flex-1 truncate text-xl font-bold tracking-tight', storiesTab ? 'pl-2' : 'pl-1')}>{storiesTab ? 'Stories' : headerTitle.trim() || me.u}</h1>
+            {/* Stories is just its title: the chat's buttons and menu belong to Chats. */}
+            {!storiesTab && <>
             <PeekButton />
             {appLock && <IconButton label="Lock Sanga" onClick={lockNow}><Lock /></IconButton>}
             <div className="relative">
@@ -95,6 +97,7 @@ export function Sidebar() {
                 }}>Sign out</MenuItem>
               </MenuContent>
             </Menu>
+            </>}
           </>
         )}
       </header>
