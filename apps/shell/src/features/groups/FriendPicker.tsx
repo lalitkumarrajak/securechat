@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import { Check, Search } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
-import { ChatRowSkeleton } from '../../components/Skeleton';
+import { ChatRowSkeleton } from '../../components/skeleton/ChatRowSkeleton';
 import { displayName } from '../../lib/types';
 import { cn } from '@sanga/ui/utils';
 import { useApp } from '../../state/app';

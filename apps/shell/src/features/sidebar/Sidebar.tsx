@@ -1,25 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Archive, ArrowLeft, BellOff, CirclePlus, Clock, Eye, EyeOff, Lock, LogOut, MessageSquarePlus, MoreVertical, Search, Settings, UserPlus, Users, WifiOff, X } from 'lucide-react';
+import { Archive, ArrowLeft, CirclePlus, Clock, Lock, LogOut, MessageSquarePlus, MoreVertical, Search, Settings, UserPlus, Users, WifiOff, X } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
-import { Ticks } from '../../components/Ticks';
 import { IconButton } from '@sanga/ui/button';
 import { confirm } from '@sanga/ui/confirm';
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '@sanga/ui/menu';
-import { isMuted, logout, openChat } from '../../lib/engine';
-import { fmtListTime } from '@sanga/ui/format';
-import { displayName, type Chat } from '../../lib/types';
+import { logout } from '../../lib/engine';
 import { cn } from '@sanga/ui/utils';
 import { setApp, useApp } from '../../state/app';
 import { GamesStrip } from '../games/GamesStrip';
 import { StoriesList } from '../stories/StoriesList';
 import { openComposer } from '../../lib/stories';
-import { ChatListSkeleton } from '../../components/Skeleton';
+import { ChatListSkeleton } from '../../components/skeleton/ChatListSkeleton';
 import { useSettings } from '../../state/settings';
 import { lockNow } from '../../lib/applock';
-import { togglePeek, usePeek } from '../../lib/privacy';
-import { groupIdOf, isGroup } from '../../lib/types';
-import { showProfile } from '../friends/ProfileCard';
 import { AppTabs } from '../nav/AppTabs';
+import { ChatRow } from './ChatRow';
+import { EmptyList } from './EmptyList';
+import { PeekButton } from './PeekButton';
 
 export function Sidebar() {
   const me = useApp((s) => s.me)!;
@@ -145,101 +142,5 @@ export function Sidebar() {
       </div>
       {!archivedView && <AppTabs />}
     </>
-  );
-}
-
-/** With the privacy screen on: show everything for a moment, or blur it again. */
-export function PeekButton() {
-  const on = useSettings((s) => s.privacyScreen);
-  const peek = usePeek();
-  if (!on) return null;
-  return <IconButton label={peek ? 'Blur chats' : 'Show chats for 30 seconds'} onClick={() => togglePeek()}>{peek ? <EyeOff /> : <Eye />}</IconButton>;
-}
-
-function EmptyList({ archived, searching }: { archived: boolean; searching: boolean }) {
-  const friends = useApp((s) => s.friends);
-  const loaded = useApp((s) => s.friendsLoaded);
-  if (searching) return <p className="px-6 py-10 text-center text-sm text-muted">No chats found.</p>;
-  if (archived) return <p className="px-6 py-10 text-center text-sm text-muted">No archived chats.</p>;
-  const list = Object.values(friends).sort((a, b) => displayName(a, a.u).localeCompare(displayName(b, b.u)));
-  if (!list.length && !loaded) return <ChatListSkeleton rows={4} />;
-  if (list.length) {
-    return (
-      <div className="py-4">
-        <p className="px-5 pb-2 text-sm text-muted">No chats yet. Say hi to {list.length === 1 ? 'your friend' : `your ${list.length} friends`}:</p>
-        <ul>
-          {list.slice(0, 8).map((f) => (
-            <li key={f.u}>
-              <button onClick={() => openChat(f.u)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-hover">
-                <Avatar u={f.u} name={f.name} size={48} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">{displayName(f, f.u)}</span>
-                  <span className="block truncate text-sm text-muted">@{f.u}</span>
-                </span>
-                <MessageSquarePlus className="size-5 text-accent-ink" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
-    );
-  }
-  return (
-    <div className="px-8 py-12 text-center">
-      <div className="mx-auto grid size-16 place-items-center rounded-2xl bg-accent/12 text-accent-ink"><MessageSquarePlus className="size-8" /></div>
-      <h2 className="mt-4 font-semibold">No chats yet</h2>
-      <p className="mt-1 text-sm text-muted">Add friends by their username. Once they accept, you can start chatting.</p>
-      <button onClick={() => setApp({ panel: 'friends', friendsTab: 'add' })}
-        className="mt-5 inline-flex h-10 items-center gap-2 rounded-xl bg-accent px-4 text-sm font-medium text-white hover:brightness-110">
-        <UserPlus className="size-4" /> Add a friend
-      </button>
-    </div>
-  );
-}
-
-function ChatRow({ chat }: { chat: Chat }) {
-  const friend = useApp((s) => s.friends[chat.peer]);
-  const active = useApp((s) => s.active === chat.peer);
-  const online = useApp((s) => s.presence[chat.peer]?.on);
-  const typing = useApp((s) => s.typing[chat.peer]);
-  const group = useApp((s) => (isGroup(chat.peer) ? s.groups[groupIdOf(chat.peer)] : undefined));
-  const typingWho = useApp((s) => s.typingWho[chat.peer]);
-  const friendsMap = useApp((s) => s.friends);
-  useApp((s) => s.me?.mutes); // re-render when mutes change
-  const muted = isMuted(chat.peer);
-  const name = isGroup(chat.peer) ? group?.name || 'Group' : displayName(friend, chat.peer);
-  const whoName = typingWho && (friendsMap[typingWho]?.name || group?.members.find((m) => m.u === typingWho)?.n || typingWho);
-
-  let line: React.ReactNode = chat.last;
-  if (typing) line = <span className="text-accent-ink">{whoName && isGroup(chat.peer) ? `${whoName} is ` : ''}{typing === 'recording' ? 'recording audio…' : 'typing…'}</span>;
-  else if (chat.draft && !active) line = <><span className="text-danger">Draft: </span>{chat.draft}</>;
-  else if (chat.lastOut && chat.last) line = <><Ticks s={chat.lastS ?? 0} className="mr-0.5 inline align-[-3px]" />{chat.last}</>;
-
-  return (
-    <li className={cn('priv-scope relative flex items-center transition hover:bg-hover', active && 'bg-hover')}>
-      {/* the photo opens their profile card; the rest of the row opens the chat */}
-      <button onClick={() => showProfile(chat.peer)} aria-label={`${name}’s profile`} className="absolute top-1/2 left-3 z-10 -translate-y-1/2 rounded-full">
-        <Avatar u={chat.peer} name={name} size={50} online={online} className="priv" />
-      </button>
-      <button onClick={() => openChat(chat.peer)} className="flex w-full items-center gap-3 py-2.5 pr-3 pl-[74px] text-left">
-        <span className="priv min-w-0 flex-1 border-b border-line/0 py-0.5">
-          <span className="flex items-center gap-2">
-            <span className="flex-1 truncate font-medium">{name}</span>
-            <span className={cn('shrink-0 text-xs', chat.unread && !muted ? 'font-semibold text-accent-ink' : 'text-muted')}>
-              {chat.ts ? fmtListTime(chat.ts) : ''}
-            </span>
-          </span>
-          <span className="mt-0.5 flex items-center gap-2">
-            <span className="flex-1 truncate text-sm text-muted">{line}</span>
-            {muted && <BellOff className="size-4 shrink-0 text-muted" aria-label="Muted" />}
-            {chat.unread > 0 && (
-              <span className={cn('grid min-w-5 place-items-center rounded-full px-1.5 text-xs leading-5 font-semibold text-white', muted ? 'bg-muted' : 'bg-accent')}>
-                {chat.unread}
-              </span>
-            )}
-          </span>
-        </span>
-      </button>
-    </li>
   );
 }

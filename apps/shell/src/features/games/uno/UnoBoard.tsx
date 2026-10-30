@@ -1,19 +1,21 @@
 // The UNO table: opponents along the top, the draw pile and discard pile in the middle, your hand
 // fanned at the bottom. The server only ever sends your own cards (and how many others hold).
 import { useEffect, useRef, useState } from 'react';
-import { Ban, Hand, Repeat2, RotateCcw, RotateCw } from 'lucide-react';
+import { Hand, RotateCcw, RotateCw } from 'lucide-react';
 import { Avatar } from '../../../components/Avatar';
 import { cn } from '@sanga/ui/utils';
 import { card, COLORS, fits } from '@sanga/game-rules/uno.js';
 import { playSound } from '../sounds';
 import type { Game, GameEvent } from '../store';
 import type { GameBoardProps } from '../registry';
-import { Chances, TurnRing } from '../TurnRing';
-
-interface UnoView { hand: number[]; counts: number[]; pile: number[]; deck: number; color: string; dir: number; drawn: number | null; uno: number | null; said: number | null }
-
-export const HEX: Record<string, string> = { r: '#e5322d', y: '#f7c300', g: '#2fa84f', b: '#1e74d6', w: '#1c1c1c' };
-const NAME: Record<string, string> = { r: 'Red', y: 'Yellow', g: 'Green', b: 'Blue' };
+import { TurnRing } from '../TurnRing';
+import { Chances } from '../Chances';
+import { UnoView } from './uno-board/types';
+import { HEX, NAME, nameOf, describe } from './uno-board/helpers';
+import { Opponent } from './uno-board/Opponent';
+import { CardsInHand } from './uno-board/CardsInHand';
+import { UnoCard } from './uno-board/UnoCard';
+import { CardBack } from './uno-board/CardBack';
 
 export default function UnoBoard({ g: game, me, act, bubble }: GameBoardProps) {
   const g = game as Game<UnoView>;
@@ -123,14 +125,6 @@ export default function UnoBoard({ g: game, me, act, bubble }: GameBoardProps) {
   );
 }
 
-const nameOf = (g: Game<UnoView>, j: number) => g.players[j]?.n || g.players[j]?.u || '';
-
-function describe(id: number, color: string) {
-  const k = card(id);
-  const v = { skip: 'Skip', rev: 'Reverse', d2: 'Draw Two', wild: 'Wild', w4: 'Wild Draw Four' }[k.v] || k.v;
-  return k.c === 'w' ? `${v}, ${NAME[color]}` : `${NAME[k.c]} ${v}`;
-}
-
 // Big announcements for what just happened, one after another, with sounds.
 function useBanner(g: Game<UnoView>, me: number) {
   const [banner, setBanner] = useState<{ key: number; text: string; color: string } | null>(null);
@@ -167,93 +161,4 @@ function useBanner(g: Game<UnoView>, me: number) {
     }
   }, [g, me]);
   return banner;
-}
-
-function Opponent({ g, j, me, bubble, onCatch }: { g: Game<UnoView>; j: number; me: number; bubble: string | null; onCatch: () => void }) {
-  const pl = g.players[j];
-  const s = g.s;
-  const count = s.counts[j] ?? 0;
-  const active = g.status === 'play' && g.turn === j;
-  const gone = pl.state === 'left' || pl.state === 'out';
-  return (
-    <div className={cn('relative flex w-[76px] shrink-0 flex-col items-center gap-1 rounded-2xl border-2 bg-black/25 px-1 py-1.5', active ? 'border-white' : 'border-transparent', gone && 'opacity-40')}
-      data-player={pl.u}>
-      <TurnRing active={active} deadline={g.deadline} color="#fff">
-        <div className="rounded-xl bg-white p-0.5"><Avatar u={pl.u} name={pl.n} size={34} className="[&>*]:rounded-lg" /></div>
-      </TurnRing>
-      <div className="w-full truncate text-center text-[11px] font-semibold text-white">{pl.n || pl.u}</div>
-      <div className="relative h-7 w-full">
-        {Array.from({ length: Math.min(count, 7) }, (_, k) => (
-          <span key={k} className="absolute top-0" style={{ left: `calc(50% - 9px + ${(k - Math.min(count, 7) / 2 + 0.5) * 6}px)`, rotate: `${(k - 3) * 5}deg` }}>
-            <CardBack size="xs" />
-          </span>
-        ))}
-        <span className="absolute -right-1 -bottom-1 grid min-w-5 place-items-center rounded-full bg-white px-1 text-[11px] font-bold text-slate-900 shadow" aria-label={`${count} cards`}>{count}</span>
-      </div>
-      {pl.rank ? <span className="text-[10px] font-semibold text-amber-300">{pl.rank === 1 ? 'Winner!' : `#${pl.rank}`}</span>
-        : s.uno === j && j !== me ? (
-          <button type="button" onClick={onCatch} className="uno-pulse rounded-full bg-yellow-300 px-2 py-0.5 text-[11px] font-black text-red-700 shadow" aria-label={`Catch ${pl.n}: they didn't say UNO`}>Catch!</button>
-        ) : count === 1 ? <span className="rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-black text-yellow-300 italic">UNO</span>
-        : pl.state === 'playing' && !pl.bot ? <Chances missed={pl.missed || 0} /> : null}
-      {bubble && (
-        <div className="ludo-bubble absolute top-full z-20 mt-1 max-w-[150px] rounded-2xl bg-white px-3 py-1.5 text-sm font-medium text-slate-900 shadow-lg">{bubble}</div>
-      )}
-    </div>
-  );
-}
-
-// My cards, fanned; the ones I can play now are lifted.
-function CardsInHand({ cards, playable, drawn, onPlay }: { cards: number[]; playable: (id: number) => boolean; drawn: number | null; onPlay: (id: number) => void }) {
-  const sorted = [...cards].sort((a, b) => order(a) - order(b));
-  const overlap = sorted.length > 7 ? Math.min(40, 64 - 300 / sorted.length) : 18;
-  return (
-    <div className="flex justify-center overflow-x-auto px-4 pt-4 pb-1" role="list" aria-label="Your cards">
-      {sorted.map((id, k) => {
-        const ok = playable(id);
-        return (
-          <button key={id} type="button" role="listitem" onClick={() => onPlay(id)} disabled={!ok}
-            aria-label={`${describe(id, card(id).c)}${ok ? ', playable' : ''}`}
-            className={cn('shrink-0 transition-transform duration-200 disabled:cursor-default', ok ? '-translate-y-3 hover:-translate-y-5' : 'brightness-75', id === drawn && 'ring-4 ring-yellow-300 rounded-xl')}
-            style={{ marginLeft: k ? -overlap : 0, zIndex: k }}>
-            <UnoCard id={id} size="md" />
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-const order = (id: number) => { const k = card(id); return 'rygbw'.indexOf(k.c) * 100 + (/\d/.test(k.v) ? +k.v : { skip: 10, rev: 11, d2: 12, wild: 13, w4: 14 }[k.v as 'skip']); };
-
-const SIZES = { xs: 'h-[26px] w-[18px] rounded-[3px] border', md: 'h-24 w-16 rounded-xl border-[3px]', lg: 'h-[126px] w-[84px] rounded-2xl border-4' };
-
-/** A card face, drawn with plain HTML so it's crisp at any size. */
-export function UnoCard({ id, size }: { id: number; size: 'md' | 'lg' }) {
-  const k = card(id);
-  const big = size === 'lg' ? 'text-5xl' : 'text-4xl';
-  const sym = (cls: string) => k.v === 'skip' ? <Ban className={cls} strokeWidth={3} />
-    : k.v === 'rev' ? <Repeat2 className={cls} strokeWidth={3} />
-    : k.v === 'd2' ? '+2' : k.v === 'w4' ? '+4' : k.v === 'wild' ? '' : k.v;
-  return (
-    <span className={cn('relative block overflow-hidden border-white shadow-[0_4px_10px_rgba(0,0,0,0.45)]', SIZES[size])} style={{ background: HEX[k.c] }}>
-      <span className="absolute inset-[12%_6%] -rotate-[28deg] rounded-[50%] bg-white"
-        style={k.c === 'w' ? { background: `conic-gradient(${HEX.r} 0 90deg, ${HEX.y} 0 180deg, ${HEX.g} 0 270deg, ${HEX.b} 0)` } : undefined} />
-      <span className={cn('absolute inset-0 grid place-items-center font-black italic', big, k.c === 'w' ? 'text-white [text-shadow:0_2px_0_#000]' : '')}
-        style={k.c === 'w' ? undefined : { color: HEX[k.c], WebkitTextStroke: '1px rgba(0,0,0,0.25)' }}>
-        {typeof sym('') === 'string' ? sym('') : sym(size === 'lg' ? 'size-12' : 'size-9')}
-      </span>
-      <span className="absolute top-0.5 left-1 text-xs font-black text-white italic [text-shadow:0_1px_0_#0006]">{typeof sym('') === 'string' ? sym('') : sym('size-3')}</span>
-    </span>
-  );
-}
-
-export function CardBack({ size }: { size: 'xs' | 'md' | 'lg' }) {
-  return (
-    <span className={cn('relative block overflow-hidden border-white bg-[#1c1c1c] shadow-[0_3px_8px_rgba(0,0,0,0.45)]', SIZES[size])} aria-hidden>
-      <span className="absolute inset-[14%_8%] -rotate-[28deg] rounded-[50%] bg-[#e5322d]" />
-      {size !== 'xs' && (
-        <span className={cn('absolute inset-0 grid -rotate-[20deg] place-items-center font-black text-[#f7c300] italic [text-shadow:2px_2px_0_#000]', size === 'lg' ? 'text-2xl' : 'text-lg')}>UNO</span>
-      )}
-    </span>
-  );
 }

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { Toaster } from 'sonner';
 import { ConfirmHost } from '@sanga/ui/confirm';
-import { ShellSkeleton } from './components/Skeleton';
+import { ShellSkeleton } from './components/skeleton/ShellSkeleton';
 import { boot, openChat } from './lib/engine';
 import { useApp } from './state/app';
 import { useSettings } from './state/settings';

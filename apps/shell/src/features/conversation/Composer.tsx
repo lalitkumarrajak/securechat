@@ -1,25 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import * as M from '@radix-ui/react-dropdown-menu';
 import { toast } from 'sonner';
-import { Camera, Check, FileText, Image as ImageIcon, Keyboard, Link2, MapPin, Mic, Paperclip, Pencil, Reply, SendHorizontal, Smile, Trash2, X } from 'lucide-react';
+import { Camera, Check, Keyboard, SendHorizontal, Smile } from 'lucide-react';
 import { confirm } from '@sanga/ui/confirm';
 import { currentLocation } from '../../lib/location';
 import { isPhoto } from '../../lib/image';
 import { IconButton } from '@sanga/ui/button';
-import { senderOf } from '../../lib/controls';
-import { editMessage, fetchLinkPreview, me, preview, saveDraft, sendFile, sendGif, sendLocation, sendPhoto, sendSticker, sendText, sendTyping, sendVoice } from '../../lib/engine';
-import { fmtDuration } from '@sanga/ui/format';
-import type { GifItem, LinkPreview, Msg } from '../../lib/types';
+import { editMessage, fetchLinkPreview, me, saveDraft, sendFile, sendGif, sendLocation, sendPhoto, sendSticker, sendText, sendTyping } from '../../lib/engine';
+import type { GifItem, LinkPreview } from '../../lib/types';
 import { ExpressionPanel, type PanelTab } from './ExpressionPanel';
+import { ContextBar } from './ContextBar';
+import { AttachButton } from './AttachButton';
+import { MicButton } from './MicButton';
+import { RecordingBar } from './RecordingBar';
+import { LinkCard } from './LinkCard';
 import { MAX_PHOTOS, SendPhotos, toItems, type PhotoItem } from './SendPhotos';
 import { cn, isTouch } from '@sanga/ui/utils';
-import { VoiceRecorder } from '../../lib/voice';
 import { getApp, setApp, useApp } from '../../state/app';
 import { insertMention, mentionQuery, mentioned } from '../../lib/mentions';
 import { groupIdOf, isGroup } from '../../lib/types';
 import { Avatar } from '../../components/Avatar';
-import { useMemberName } from './MessageBubble';
+import { useMemberName } from './useMemberName';
 import { useSettings } from '../../state/settings';
 
 export function Composer({ peer, peerName }: { peer: string; peerName: string }) {
@@ -267,172 +268,6 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
   );
 }
 
-function ContextBar({ m, editing, peerName, onClose }: { m: Msg; editing: boolean; peerName: string; onClose: () => void }) {
-  const group = useApp((s) => (isGroup(m.peer) ? s.groups[groupIdOf(m.peer)] : undefined));
-  const memberName = useMemberName();
-  const who = senderOf(m) === me() ? 'You' : group ? memberName(senderOf(m), group) : peerName;
-  return (
-    <div className="flex items-center gap-2 px-3 pt-2">
-      <div className="priv-scope min-w-0 flex-1 rounded-xl border-l-4 border-accent bg-panel-2 px-3 py-1.5">
-        <span className="flex items-center gap-1.5 text-xs font-semibold text-accent-ink">
-          {editing ? <><Pencil className="size-3" /> Editing message</> : <><Reply className="size-3" /> Replying to {who}</>}
-        </span>
-        <span className="priv block truncate text-sm text-muted">{preview(m)}</span>
-      </div>
-      <IconButton label={editing ? 'Cancel edit' : 'Cancel reply'} size="icon-sm" onClick={onClose}><X /></IconButton>
-    </div>
-  );
-}
-
-const ITEM = 'flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm outline-none data-[highlighted]:bg-hover';
-
-function AttachButton({ onPhotos, onDocuments, onLocation }: {
-  onPhotos: (f: File[]) => void; onDocuments: (f: File[]) => void; onLocation: () => void;
-}) {
-  const gallery = useRef<HTMLInputElement>(null);
-  const camera = useRef<HTMLInputElement>(null);
-  const doc = useRef<HTMLInputElement>(null);
-  const pick = (el: HTMLInputElement | null) => el?.click();
-  const icon = (bg: string, node: React.ReactNode) => <span className={`grid size-9 place-items-center rounded-full text-white ${bg}`}>{node}</span>;
-  return (
-    <>
-      <M.Root modal={false}>
-        <M.Trigger asChild><IconButton label="Attach" className="shrink-0"><Paperclip /></IconButton></M.Trigger>
-        <M.Portal>
-          <M.Content side="top" align="end" sideOffset={8} className="z-50 w-52 rounded-xl border border-line bg-panel p-1 shadow-xl animate-fade-in">
-            <M.Item onSelect={() => pick(doc.current)} className={ITEM}>{icon('bg-indigo-500', <FileText className="size-4" />)} Document</M.Item>
-            <M.Item onSelect={() => pick(gallery.current)} className={ITEM}>{icon('bg-violet-500', <ImageIcon className="size-4" />)} Photos</M.Item>
-            <M.Item onSelect={() => pick(camera.current)} className={ITEM}>{icon('bg-pink-500', <Camera className="size-4" />)} Camera</M.Item>
-            <M.Item onSelect={onLocation} className={ITEM}>{icon('bg-emerald-500', <MapPin className="size-4" />)} Location</M.Item>
-          </M.Content>
-        </M.Portal>
-      </M.Root>
-      <input ref={gallery} type="file" data-kind="gallery" accept="image/*" multiple hidden onChange={(e) => { onPhotos([...(e.target.files || [])]); e.target.value = ''; }} />
-      <input ref={camera} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { onPhotos([...(e.target.files || [])]); e.target.value = ''; }} />
-      <input ref={doc} type="file" data-kind="document" multiple hidden onChange={(e) => { onDocuments([...(e.target.files || [])]); e.target.value = ''; }} />
-    </>
-  );
-}
-
-// ---------- voice messages ----------
-// Hold the mic to record and release to send; slide left to cancel. A quick tap instead
-// "locks" recording on, with Delete and Send buttons (easier on desktop).
-let recorder: VoiceRecorder | null = null;
-let pressStart = 0;
-let pressX = 0;
-const hold = { active: false, cancelled: false, released: false };
-
-function MicButton({ peer, onStart }: { peer: string; onStart: () => void }) {
-  async function down(e: React.PointerEvent) {
-    e.preventDefault();
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-    pressStart = performance.now();
-    pressX = e.clientX;
-    hold.active = true;
-    hold.cancelled = false;
-    hold.released = false;
-    // Released while the browser was still asking for the microphone: switch to "locked" mode.
-    window.addEventListener('pointerup', () => { hold.released = true; }, { once: true });
-    recorder = new VoiceRecorder();
-    try {
-      await recorder.start();
-    } catch {
-      recorder = null;
-      hold.active = false;
-      toast.error('Microphone not available', { description: 'Allow microphone access for this site in your browser settings.' });
-      return;
-    }
-    sendTyping(peer, true);
-    onStart();
-  }
-  return (
-    <button type="button" aria-label="Hold to record a voice message" onPointerDown={down}
-      onContextMenu={(e) => e.preventDefault()}
-      className="grid size-11 shrink-0 touch-none place-items-center rounded-full bg-accent text-white shadow-sm transition select-none active:scale-110">
-      <Mic className="size-5" />
-    </button>
-  );
-}
-
-function RecordingBar({ peer, onDone }: { peer: string; onDone: () => void }) {
-  const [elapsed, setElapsed] = useState(0);
-  const [levels, setLevels] = useState<number[]>([]);
-  const [locked, setLocked] = useState(false);
-  const [slide, setSlide] = useState(0);
-
-  useEffect(() => {
-    const r = recorder;
-    if (!r) { onDone(); return; }
-    if (hold.released) { hold.active = false; setLocked(true); }
-    r.onLevel = (level, t) => {
-      setElapsed(t);
-      setLevels((l) => [...l.slice(-39), level]);
-      sendTyping(peer, true);
-    };
-    r.onLimit = () => finish(true);
-    const move = (e: PointerEvent) => {
-      if (!hold.active) return;
-      const dx = pressX - e.clientX;
-      setSlide(Math.max(0, dx));
-      if (dx > 110) { hold.cancelled = true; hold.active = false; finish(false); }
-    };
-    const up = () => {
-      if (!hold.active) return;
-      hold.active = false;
-      if (performance.now() - pressStart < 400) setLocked(true); // quick tap: keep recording
-      else finish(true);
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-    window.addEventListener('pointercancel', up);
-    return () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-      window.removeEventListener('pointercancel', up);
-    };
-  }, []); // set up once when recording starts
-
-  async function finish(send: boolean) {
-    const r = recorder;
-    recorder = null;
-    onDone();
-    if (!r) return;
-    if (!send) { r.cancel(); toast('Recording cancelled'); return; }
-    const rec = await r.stop();
-    if (!rec) { toast('Hold the mic button to record'); return; }
-    const re = getApp().replyTo;
-    setApp({ replyTo: null });
-    sendVoice(peer, rec, re).catch((e) => toast.error(e.message));
-  }
-
-  return (
-    <div className="flex shrink-0 items-center gap-3 border-t border-line bg-panel px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-      {locked ? (
-        <IconButton label="Delete recording" onClick={() => finish(false)} className="text-danger hover:text-danger"><Trash2 /></IconButton>
-      ) : (
-        <span className="size-3 animate-pulse rounded-full bg-danger" aria-hidden />
-      )}
-      <span className="w-12 font-mono text-sm tabular-nums">{fmtDuration(elapsed)}</span>
-      <div className="flex h-9 flex-1 items-center gap-[2px] overflow-hidden" aria-hidden>
-        {locked || !slide ? levels.map((l, i) => (
-          <span key={i} className="w-[3px] flex-1 rounded-full bg-accent/70" style={{ height: `${Math.max(10, Math.min(100, l * 400))}%` }} />
-        )) : null}
-        {!locked && (
-          <span className={cn('ml-auto text-sm text-muted transition', slide > 0 && 'mr-auto ml-0')} style={{ transform: `translateX(-${slide}px)` }}>
-            ‹ Slide to cancel
-          </span>
-        )}
-      </div>
-      {locked ? (
-        <button onClick={() => finish(true)} aria-label="Send voice message"
-          className="grid size-11 place-items-center rounded-full bg-accent text-white shadow-sm"><SendHorizontal className="size-5" /></button>
-      ) : (
-        <span className="grid size-14 -m-1.5 place-items-center rounded-full bg-accent text-white shadow-lg"><Mic className="size-6" /></span>
-      )}
-    </div>
-  );
-}
-
 // ---------- link previews while typing ----------
 const URL_RE = /https?:\/\/[^\s<]+[^\s<.,;:!?)"'\]]/;
 
@@ -451,20 +286,4 @@ function useLinkPreview(text: string) {
     dismiss: () => setDismissed(url),
     clear: () => { setState({ url: '', preview: null }); setDismissed(''); },
   };
-}
-
-function LinkCard({ lp, onClose }: { lp: LinkPreview; onClose: () => void }) {
-  return (
-    <div className="flex items-center gap-2 px-3 pt-2">
-      <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-xl bg-panel-2">
-        {lp.img ? <img src={lp.img} alt="" className="size-16 shrink-0 object-cover" /> : <span className="grid size-16 shrink-0 place-items-center text-muted"><Link2 className="size-6" /></span>}
-        <span className="min-w-0 py-1.5 pr-2">
-          <span className="block truncate text-sm font-semibold">{lp.title}</span>
-          {lp.desc && <span className="line-clamp-1 text-xs text-muted">{lp.desc}</span>}
-          <span className="block truncate text-xs text-accent-ink">{lp.site}</span>
-        </span>
-      </div>
-      <IconButton label="Remove link preview" size="icon-sm" onClick={onClose}><X /></IconButton>
-    </div>
-  );
 }

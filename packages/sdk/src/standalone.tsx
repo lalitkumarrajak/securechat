@@ -5,6 +5,7 @@
 import { createElement, useEffect, useState, type ComponentType } from 'react';
 import { createRoot } from 'react-dom/client';
 import { confirm, ConfirmHost } from '@sanga/ui/confirm';
+import { Initial } from './Initial';
 import { assertAppFrame, provideSdk, scopedStore, type AppProps, type Sdk } from '@sanga/sdk'; // by name: the same shared copy the app uses
 
 const DB_NAME = 'chattrix'; // the main app's on-device database (named before the app became Sanga)
@@ -114,15 +115,6 @@ function createSdk(s: Session): Sdk {
     confirm,
     Avatar: Initial,
   };
-}
-
-// Photos come from the main app's cache there; on its own an app shows the coloured initial.
-const hue = (name: string) => { let h = 0; for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h % 360; };
-function Initial({ u, name, size = 40, className }: { u: string; name?: string; size?: number; className?: string }) {
-  return createElement('span', {
-    className: 'grid shrink-0 place-items-center rounded-full font-semibold text-white ' + (className || ''),
-    style: { width: size, height: size, fontSize: size * 0.42, background: `hsl(${hue(u)} 45% 48%)` }, 'aria-hidden': true,
-  }, (name || u).replace(/^g:/, '')[0]?.toUpperCase() || '?');
 }
 
 // The main app's settings (apps/shell/src/state/settings.ts, zustand persist). This page has no PIN
