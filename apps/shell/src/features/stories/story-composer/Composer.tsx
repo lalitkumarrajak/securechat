@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { ArrowLeft, ImagePlus, Lock, Palette, Send, Type, UserPlus, Users, X } from 'lucide-react';
+import { ArrowLeft, ImagePlus, Lock, Music2, Palette, Send, Type, UserPlus, Users, X } from 'lucide-react';
 import { Spinner } from '@sanga/ui/button';
 import { compressImage } from '../../../lib/image';
+import type { Song } from '../../../lib/songs';
 import { BACKGROUNDS, MAX_CAPTION, MAX_TEXT, postStory, type StoryContent } from '../../../lib/stories';
 import { displayName } from '../../../lib/types';
 import { useApp } from '../../../state/app';
@@ -11,6 +12,8 @@ import { Draft } from './types';
 import { TextArea } from './TextArea';
 import { Pill } from './Pill';
 import { Choice } from './Choice';
+import { ChosenSong } from './ChosenSong';
+import { SongPicker } from './SongPicker';
 
 export function Composer({ prefill, onClose }: { prefill?: StoryContent; onClose: () => void }) {
   const friends = useApp((s) => s.friends);
@@ -20,6 +23,8 @@ export function Composer({ prefill, onClose }: { prefill?: StoryContent; onClose
   const [tags, setTags] = useState<string[]>([]);
   const [only, setOnly] = useState<string[] | null>(null); // null: all friends
   const [page, setPage] = useState<'edit' | 'tags' | 'audience'>('edit');
+  const [song, setSong] = useState<Song | undefined>(prefill?.song);
+  const [songs, setSongs] = useState(false); // the song picker is open
   const [busy, setBusy] = useState(false);
   const file = useRef<HTMLInputElement>(null);
   const allFriends = Object.keys(friends);
@@ -43,6 +48,7 @@ export function Composer({ prefill, onClose }: { prefill?: StoryContent; onClose
       : { type: 'text', text: text.trim().slice(0, MAX_TEXT), bg };
     if (content.type === 'text' && !content.text) return toast.error('Write something first');
     if (tags.length) content.tags = tags;
+    if (song) content.song = song;
     if (prefill?.via) content.via = prefill.via;
     setBusy(true);
     try {
@@ -123,11 +129,13 @@ export function Composer({ prefill, onClose }: { prefill?: StoryContent; onClose
             <input value={text} onChange={(e) => setText(e.target.value)} maxLength={MAX_CAPTION} placeholder="Add a caption…" aria-label="Caption"
               className="h-11 w-full rounded-full bg-white/12 px-4 text-[15px] text-white outline-none placeholder:text-white/60 focus:bg-white/18" />
           )}
+          {song && <ChosenSong song={song} onChange={() => setSongs(true)} onRemove={() => setSong(undefined)} />}
           {tags.length > 0 && (
             <p className="truncate px-1 text-sm text-white/80">with {tags.map((t) => displayName(friends[t], t)).join(', ')}</p>
           )}
           <div className="flex items-center gap-2">
             <Pill onClick={() => setPage('tags')} icon={<UserPlus className="size-4" />}>{tags.length ? `Tagged ${tags.length}` : 'Tag friends'}</Pill>
+            {!song && <Pill onClick={() => setSongs(true)} icon={<Music2 className="size-4" />}>Add song</Pill>}
             <Pill onClick={() => setPage('audience')} icon={only ? <Lock className="size-4" /> : <Users className="size-4" />}>
               {only ? `${only.length} friend${only.length === 1 ? '' : 's'}` : 'All friends'}
             </Pill>
@@ -139,6 +147,7 @@ export function Composer({ prefill, onClose }: { prefill?: StoryContent; onClose
           </div>
         </footer>
       )}
+      {songs && <SongPicker onPick={(s) => { setSong(s); setSongs(false); }} onClose={() => setSongs(false)} />}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 // End-to-end: stories. A text story shared with one friend and tagging them, a photo story for all
 // friends; friends see, like and comment; the owner sees who viewed, liked and what they said.
 import { test, expect } from '@playwright/test';
-import { makeFriends, phone, signUp, testPng, uname, type Phone } from './helpers';
+import { makeFriends, phone, signUp, testPng, testWav, uname, type Phone } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -116,4 +116,54 @@ test('P deletes a story; it disappears for Q', async () => {
   await expect(viewer(Q).getByRole('img', { name: 'Sunset at the beach' })).toBeVisible();
   await expect(viewer(Q).getByTestId('story-progress').locator('> span')).toHaveCount(1); // one story left
   expect([...P.errors, ...Q.errors, ...R.errors]).toEqual([]);
+});
+
+test('a story with a song: from a file, and from search; Q hears it and can mute it', async () => {
+  await Q.page.keyboard.press('Escape'); // Q's viewer from the last test is still open: it would move on to the new story by itself
+  await expect(viewer(Q)).toHaveCount(0);
+  // A text story with a song from P's phone.
+  await (await stories(P)).getByRole('button', { name: 'New story' }).click();
+  const c = composer(P);
+  await c.getByRole('button', { name: /Text/ }).click();
+  await c.getByLabel('Story text').fill('Road trip playlist');
+  await c.getByRole('button', { name: 'Add song' }).click();
+  const picker = P.page.getByRole('dialog', { name: 'Add a song' });
+  await picker.getByLabel('Choose an audio file').setInputFiles({ name: 'Monsoon_drive.wav', mimeType: 'audio/wav', buffer: testWav(4) });
+  await expect(c.getByRole('button', { name: /Song: Monsoon drive/ })).toBeVisible();
+  await P.page.screenshot({ path: 'e2e/.artifacts/screens/74-story-song-composer.png' });
+  await c.getByRole('button', { name: 'Share story' }).click();
+  await expect(P.page.getByText('Story shared')).toBeVisible();
+
+  // Q opens it: the title shows and the song plays; muting stops it.
+  for (const b of await Q.page.getByRole('button', { name: 'Close toast' }).all()) await b.click({ timeout: 2000 }).catch(() => {});
+  await (await stories(Q)).getByRole('button', { name: `${P.u}’s story, new` }).click();
+  const v = viewer(Q);
+  await expect(v.getByText('Road trip playlist')).toBeVisible();
+  const audio = v.locator('audio');
+  await expect.poll(() => audio.evaluate((a: HTMLAudioElement) => !a.paused && a.currentTime > 0), { timeout: 10_000 }).toBe(true);
+  await Q.page.screenshot({ path: 'e2e/.artifacts/screens/75-story-song.png' });
+  await v.getByRole('button', { name: /Mute song Monsoon drive/ }).click();
+  await expect.poll(() => audio.evaluate((a: HTMLAudioElement) => a.paused)).toBe(true);
+  await v.getByRole('button', { name: /Play song Monsoon drive/ }).click();
+  await expect.poll(() => audio.evaluate((a: HTMLAudioElement) => a.paused)).toBe(false);
+  await Q.page.keyboard.press('Escape');
+
+  // A second story with a song found by search.
+  await (await stories(P)).getByRole('button', { name: 'New story' }).click();
+  await c.getByRole('button', { name: /Text/ }).click();
+  await c.getByLabel('Story text').fill('Found one');
+  await c.getByRole('button', { name: 'Add song' }).click();
+  await picker.getByLabel('Search songs').fill('test');
+  await expect(picker.getByRole('button', { name: 'Use Test Song 2' })).toBeVisible();
+  await P.page.screenshot({ path: 'e2e/.artifacts/screens/76-song-search.png' });
+  await picker.getByRole('button', { name: 'Use Test Song 2' }).click();
+  await expect(c.getByRole('button', { name: /Song: Test Song 2/ })).toBeVisible();
+  await c.getByRole('button', { name: 'Remove song' }).click();
+  await expect(c.getByRole('button', { name: /Song:/ })).toHaveCount(0); // taken off again
+  await c.getByRole('button', { name: 'Add song' }).click();
+  await picker.getByLabel('Search songs').fill('test');
+  await picker.getByRole('button', { name: 'Use Test Song 2' }).click();
+  await c.getByRole('button', { name: 'Share story' }).click();
+  await expect(P.page.getByText('Story shared')).toBeVisible();
+  expect([...P.errors, ...Q.errors]).toEqual([]);
 });

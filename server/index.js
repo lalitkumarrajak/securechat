@@ -14,6 +14,7 @@ import { routes as profileRoutes, avatarVersion } from './profiles.js';
 import { routes as friendRoutes, migrateFriends } from './friends.js';
 import { routes as pushRoutes, initPush } from './push.js';
 import { routes as gifRoutes } from './gifs.js';
+import { routes as songRoutes } from './songs.js';
 import { routes as previewRoutes } from './preview.js';
 import { routes as groupRoutes } from './groups.js';
 import { routes as noteRoutes } from './notes.js';
@@ -51,7 +52,7 @@ loadStatic();
 const handlers = { ...messageHandlers, ...gameHandlers, ...callHandlers };
 
 // ---------- HTTP ----------
-const routes = { ...authRoutes, ...profileRoutes, ...friendRoutes, ...pushRoutes, ...gifRoutes, ...previewRoutes, ...groupRoutes, ...noteRoutes, ...itemRoutes, ...reminderRoutes, ...storyRoutes, ...callRoutes };
+const routes = { ...authRoutes, ...profileRoutes, ...friendRoutes, ...pushRoutes, ...gifRoutes, ...songRoutes, ...previewRoutes, ...groupRoutes, ...noteRoutes, ...itemRoutes, ...reminderRoutes, ...storyRoutes, ...callRoutes };
 
 async function handleHttp(req, res) {
   const url = new URL(req.url, 'http://x');

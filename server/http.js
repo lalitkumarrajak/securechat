@@ -13,7 +13,7 @@ export const SECURITY_HEADERS = {
   // inject small <style> tags; worker-src blob: is for the animated-emoji player. 'wasm-unsafe-eval'
   // (WebAssembly only, not JS eval) lets HEIC/HEIF camera photos be converted on the device.
   'Content-Security-Policy': "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; " +
-    "img-src 'self' data: blob: https://static.klipy.com https://tile.openstreetmap.org; media-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; " +
+    "img-src 'self' data: blob: https://static.klipy.com https://tile.openstreetmap.org https://*.mzstatic.com; media-src 'self' data: blob: https://audio-ssl.itunes.apple.com https://*.mzstatic.com; connect-src 'self'; worker-src 'self' blob:; " +
     "manifest-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',

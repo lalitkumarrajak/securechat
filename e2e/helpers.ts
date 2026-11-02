@@ -125,6 +125,16 @@ export function testPng(w = 400, h = 300) {
   return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
 }
 
+/** A real mono WAV: a quiet 440 Hz tone, to use as a song file. */
+export function testWav(seconds = 3, rate = 22050) {
+  const n = Math.floor(seconds * rate);
+  const b = Buffer.alloc(44 + n * 2);
+  b.write('RIFF', 0); b.writeUInt32LE(36 + n * 2, 4); b.write('WAVEfmt ', 8); b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22);
+  b.writeUInt32LE(rate, 24); b.writeUInt32LE(rate * 2, 28); b.writeUInt16LE(2, 32); b.writeUInt16LE(16, 34); b.write('data', 36); b.writeUInt32LE(n * 2, 40);
+  for (let i = 0; i < n; i++) b.writeInt16LE(Math.round(Math.sin((2 * Math.PI * 440 * i) / rate) * 6000), 44 + i * 2);
+  return b;
+}
+
 /** A tiny but valid one-page PDF with a heading, for file-preview tests. */
 export function testPdf(text = 'Chattrix test document') {
   const objs = [

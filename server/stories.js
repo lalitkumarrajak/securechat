@@ -14,7 +14,7 @@ import { notify } from './push.js';
 
 export const STORY_MS = 24 * 3600e3;
 const ID_RE = /^[A-Za-z0-9_-]{16,32}$/;
-const MAX_BODY = 2_200_000;   // base64 of a sealed photo story (the app sends photos of at most ~1.4 MB)
+const MAX_BODY = 3_800_000;   // base64 of a sealed photo story (photos of at most ~1.4 MB) with a song clip of its own (~1.2 MB)
 const MAX_KEY = 200;          // a wrapped 32-byte key
 const MAX_COMMENT = 4000;
 const MAX_AUDIENCE = 1000;

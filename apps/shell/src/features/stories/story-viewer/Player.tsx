@@ -15,6 +15,7 @@ import { useApp } from '../../../state/app';
 import { showProfile } from '../../friends/ProfileCard';
 import { ReplyBar } from './ReplyBar';
 import { ActivitySheet } from './ActivitySheet';
+import { SongChip } from './SongChip';
 
 const PHOTO_MS = 6000;
 
@@ -175,6 +176,7 @@ export function Player() {
       {/* the story; tapping it moves through them */}
       <div className="relative min-h-0 flex-1 touch-none" onPointerDown={onDown} onPointerUp={onUp} onPointerCancel={onCancel} onPointerLeave={onCancel}
         onContextMenu={(e) => e.preventDefault()} data-testid="story">
+        {c?.song && <SongChip key={s.id} song={c.song} paused={paused} />}
         {!content ? (
           <div className="grid h-full place-items-center">{failed ? <p className="text-sm text-white/75">No connection. Tap to try the next one.</p> : <Spinner />}</div>
         ) : content === 'err' ? (

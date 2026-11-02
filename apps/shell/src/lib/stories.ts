@@ -1,4 +1,4 @@
-// Stories: a photo or a few words for your friends, gone after 24 hours. Friends can like them,
+// Stories: a photo or a few words (and a song, if you like) for your friends, gone after 24 hours. Friends can like them,
 // comment (only you and the commenter can read a comment) and you can tag friends in them.
 // Each story is sealed with its own key (crypto.encryptStory), wrapped for every friend it's shared
 // with, so only they can open it; the server just stores and hands out the ciphertext.
@@ -10,13 +10,14 @@ import * as db from './db';
 import { api, frameHooks, ownIdentity, peerKey, peerKeyChanged, readyHooks } from './engine';
 import { getApp } from '../state/app';
 import { displayName } from './types';
+import { validSong, type Song } from './songs';
 
 export interface StoryMeta {
   id: string; u: string; ts: number; exp: number; key: string; seen: boolean; liked: boolean;
   views?: number; likes?: number; // my own stories
 }
 export type StoryContent = ({ type: 'img'; src: string; w: number; h: number; text: string } | { type: 'text'; text: string; bg: number })
-  & { tags?: string[]; via?: string };
+  & { tags?: string[]; via?: string; song?: Song };
 export interface StoryComment { id: string; u: string; text: string; ts: number }
 export interface StoryActivity { views?: { u: string; ts: number; liked: boolean }[]; comments: StoryComment[] }
 
@@ -122,7 +123,8 @@ const USER = /^[a-z0-9_.]{3,24}$/;
 function valid(o: any): StoryContent | null {
   if (!o || typeof o !== 'object') return null;
   const tags = Array.isArray(o.tags) ? o.tags.filter((t: unknown) => typeof t === 'string' && USER.test(t)).slice(0, 20) : [];
-  const extra = { ...(tags.length && { tags }), ...(typeof o.via === 'string' && USER.test(o.via) && { via: o.via }) };
+  const song = validSong(o.song);
+  const extra = { ...(tags.length && { tags }), ...(typeof o.via === 'string' && USER.test(o.via) && { via: o.via }), ...(song && { song }) };
   if (o.type === 'img' && typeof o.src === 'string' && o.src.length < 3_000_000 && PHOTO_SRC.test(o.src)) {
     return { type: 'img', src: o.src, w: o.w | 0, h: o.h | 0, text: typeof o.text === 'string' ? o.text.slice(0, MAX_CAPTION) : '', ...extra };
   }

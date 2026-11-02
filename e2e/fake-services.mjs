@@ -16,6 +16,12 @@ http.createServer((req, res) => {
   if (url.pathname.startsWith('/api/v1/')) {
     const items = [1, 2, 3, 4, 5, 6].map((i) => gif((url.pathname.includes('stickers') ? 100 : 0) + i, 300, 200 + i * 10));
     res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ result: true, data: { data: items, current_page: 1, has_next: false } }));
+  } else if (url.pathname === '/search') { // iTunes Search-style song search
+    const results = [1, 2, 3].map((i) => ({
+      trackId: i, trackName: `Test Song ${i}`, artistName: 'The Testers',
+      previewUrl: `https://audio-ssl.itunes.apple.com/test/${i}.m4a`, artworkUrl100: `https://is1-ssl.mzstatic.com/image/test/${i}/100x100bb.jpg`,
+    }));
+    res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ resultCount: results.length, results }));
   } else if (url.pathname.startsWith('/geo/')) { // ipwho.is-style location lookup
     res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({
       success: true, city: 'Mumbai', region: 'Maharashtra', country: 'India', country_code: 'IN', connection: { isp: 'Reliance Jio' },

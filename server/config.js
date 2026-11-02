@@ -37,6 +37,7 @@ export const config = {
   publicUrl: process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || '',
   klipyKey: process.env.KLIPY_API_KEY || '',
   klipyBase: process.env.KLIPY_BASE_URL || 'https://api.klipy.com', // overridable for tests
+  itunesBase: process.env.ITUNES_BASE_URL || 'https://itunes.apple.com', // song search for stories; overridable for tests
   vapid: { publicKey: process.env.VAPID_PUBLIC_KEY, privateKey: process.env.VAPID_PRIVATE_KEY },
 };
 
