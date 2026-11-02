@@ -14,12 +14,17 @@ import { GroupList } from './GroupList';
 import { GroupView } from './GroupView';
 import { InsightsTab } from './InsightsTab';
 import { NewGroupDialog } from './NewGroupDialog';
+import { DraftDialog } from './DraftDialog';
+import { expenseFromDraft, parseDraft, type Draft } from './draft';
+import type { Expense } from './model';
 
-type Pane = { kind: 'none' } | { kind: 'group'; gid: string } | { kind: 'insights' };
+type Pane = { kind: 'none' } | { kind: 'group'; gid: string; start?: Expense } | { kind: 'insights' };
 
-export default function SplitApp({ onClose, tab }: AppProps) {
+export default function SplitApp({ onClose, tab, params }: AppProps) {
   const [pane, setPane] = useState<Pane>({ kind: 'none' });
   const [creating, setCreating] = useState(false);
+  const me = sdk().identity().me;
+  const [draft, setDraft] = useState<Draft | null>(() => parseDraft(params.draft)); // a bill sent from the Calendar
   const online = sdk().useOnline();
   const error = useSplit((s) => s.error);
   useEffect(() => { startSplit(); }, []);
@@ -44,7 +49,7 @@ export default function SplitApp({ onClose, tab }: AppProps) {
       </aside>
 
       <main className={cn('min-h-0 min-w-0 flex-1 flex-col', open ? 'flex' : 'hidden md:flex')}>
-        {pane.kind === 'group' && <GroupView key={pane.gid} gid={pane.gid} onBack={back} onGone={back} />}
+        {pane.kind === 'group' && <GroupView key={pane.gid} gid={pane.gid} start={pane.start} onBack={back} onGone={back} />}
         {pane.kind === 'insights' && (
           <>
             <header className="flex h-16 shrink-0 items-center gap-1 px-2">
@@ -58,7 +63,10 @@ export default function SplitApp({ onClose, tab }: AppProps) {
         {pane.kind === 'none' && <Empty emoji="🧾" title="Pick a group">Or tap <b>My spending</b> to see where your money goes across all of them.</Empty>}
       </main>
 
-      <NewGroupDialog open={creating} onClose={() => setCreating(false)} onCreated={(gid) => { setCreating(false); setPane({ kind: 'group', gid }); }} />
+      <DraftDialog draft={creating ? null : draft} onClose={() => setDraft(null)} onNew={() => setCreating(true)}
+        onPick={(gid) => { if (draft) setPane({ kind: 'group', gid, start: expenseFromDraft(draft, me) }); setDraft(null); }} />
+      <NewGroupDialog key={draft?.cur} open={creating} currency={draft?.cur} onClose={() => setCreating(false)}
+        onCreated={(gid) => { setCreating(false); setPane({ kind: 'group', gid, ...(draft && { start: expenseFromDraft(draft, me) }) }); setDraft(null); }} />
     </div>
   );
 }

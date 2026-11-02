@@ -30,6 +30,9 @@ export interface Sdk {
   /** The key you share with one friend (for handing them a key of your own, e.g. a Split group's).
    *  Throws if they aren't a friend whose key is known. */
   pairKey(peer: string): Promise<CryptoKey>;
+  /** Open another Sanga app (its id: 'split', 'calendar', 'notes') with some starting values, which it
+   *  receives as its `params`, e.g. the Calendar sending a card bill to Split. */
+  open(app: string, params?: Record<string, string>): void;
   /** Ask before something that can't be undone. Resolves true if confirmed. */
   confirm(o: { title: string; description?: string; confirmText?: string; destructive?: boolean }): Promise<boolean>;
   /** A person's or group's photo (or initial). */

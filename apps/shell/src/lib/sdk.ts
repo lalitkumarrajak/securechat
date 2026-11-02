@@ -7,7 +7,8 @@ import { api, enablePush, frameHooks, ownIdentity, peerKey, pushSupported, ready
 import { useSettings } from '../state/settings';
 import { Avatar } from '../components/Avatar';
 import { displayName } from './types';
-import { useApp } from '../state/app';
+import { getApp, setApp, useApp } from '../state/app';
+import { go } from './nav';
 import { useMemo } from 'react';
 
 const listeners = new Map<string, Set<(m: any) => void>>();
@@ -46,6 +47,12 @@ export const shellSdk: Sdk = {
     ], [friends, groups]);
   },
   pairKey: peerKey,
+  open(app, params = {}) {
+    const section = ({ split: 'split', calendar: 'calendar', notes: 'diary' } as const)[app as 'split'];
+    if (!section) throw new Error(`No app “${app}”`);
+    setApp({ appParams: { ...getApp().appParams, [app]: params } });
+    go(section);
+  },
   confirm,
   Avatar,
   usePush: () => {

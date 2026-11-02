@@ -8,11 +8,11 @@ import { createGroup } from './store';
 import { GROUP_EMOJIS } from './emojis';
 
 /** Start a group: a name, an icon and a currency. People are added next. */
-export function NewGroupDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (gid: string) => void }) {
+export function NewGroupDialog({ open, currency: start, onClose, onCreated }: { open: boolean; currency?: string; onClose: () => void; onCreated: (gid: string) => void }) {
   const online = sdk().useOnline();
   const [name, setName] = useState('');
   const [emoji, setEmoji] = useState('👥');
-  const [currency, setCurrency] = useState(() => (/^en-IN|hi|-IN$/.test(navigator.language) ? 'INR' : 'USD'));
+  const [currency, setCurrency] = useState(() => start ?? (/^en-IN|hi|-IN$/.test(navigator.language) ? 'INR' : 'USD'));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 

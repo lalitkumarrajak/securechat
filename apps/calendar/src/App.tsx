@@ -2,7 +2,7 @@
 // (panchang, festivals and fasts) and a fast tracker. A separate Sanga app: the shell loads it when
 // the Calendar tab is opened, and it also runs on its own at /apps/calendar/.
 import { useEffect, useState } from 'react';
-import { ArrowLeft, CalendarDays, Flame, ListTodo, Plus, Settings } from 'lucide-react';
+import { ArrowLeft, CalendarDays, CreditCard, Flame, ListTodo, Plus, Settings } from 'lucide-react';
 import { IconButton } from '@sanga/ui/button';
 import { cn } from '@sanga/ui/utils';
 import { sdk, type AppProps } from '@sanga/sdk';
@@ -17,17 +17,24 @@ import { EventEditor } from './EventEditor';
 import { FastSheet } from './FastSheet';
 import { FastTracker } from './FastTracker';
 import { SettingsSheet } from './SettingsSheet';
+import { CardsView } from './CardsView';
+import { CardsBanner } from './CardsBanner';
+import { CardSheet } from './CardSheet';
+import { BillSheet } from './BillSheet';
+import type { CardBill, CreditCard as CardRec } from './cards';
 import { BRAND } from './util';
 
-type View = 'month' | 'agenda' | 'fasts';
+type View = 'month' | 'agenda' | 'fasts' | 'cards';
 
 export default function CalendarApp({ onClose, params, tab }: AppProps) {
-  const [view, setView] = useState<View>('month');
+  const [view, setView] = useState<View>(params.view === 'cards' ? 'cards' : 'month');
   const [selected, setSelected] = useState(() => (params.day && /^\d{4}-\d\d-\d\d$/.test(params.day) ? params.day : today()));
   const [ym, setYm] = useState(selected.slice(0, 7));
   const [editing, setEditing] = useState<{ e: CalEvent; day: string } | null>(null);
   const [fast, setFast] = useState<FastLog | null>(null);
   const [settings, setSettings] = useState(false);
+  const [cardEdit, setCardEdit] = useState<CardRec | null>(null);
+  const [billEdit, setBillEdit] = useState<{ b: CardBill; c: CardRec } | null>(null);
 
   useEffect(() => {
     startCalendar();
@@ -48,7 +55,7 @@ export default function CalendarApp({ onClose, params, tab }: AppProps) {
         {!tab && <IconButton label="Back" onClick={onClose}><ArrowLeft /></IconButton>}
         <h1 className={cn('min-w-0 flex-1 truncate text-xl font-bold tracking-tight', tab && 'pl-2')}>Calendar</h1>
         <nav className="mr-1 flex rounded-full bg-panel-2 p-1" role="tablist" aria-label="Calendar views">
-          {([['month', 'Month', CalendarDays], ['agenda', 'Upcoming', ListTodo], ['fasts', 'Fasts', Flame]] as const).map(([v, label, Icon]) => (
+          {([['month', 'Month', CalendarDays], ['agenda', 'Upcoming', ListTodo], ['fasts', 'Fasts', Flame], ['cards', 'Cards', CreditCard]] as const).map(([v, label, Icon]) => (
             <button key={v} role="tab" aria-selected={view === v} aria-label={label} onClick={() => setView(v)}
               className={cn('flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition', view === v ? 'bg-panel text-ink shadow-sm' : 'text-muted hover:text-ink')}>
               <Icon className="size-4" /><span className="hidden sm:inline">{label}</span>
@@ -60,6 +67,7 @@ export default function CalendarApp({ onClose, params, tab }: AppProps) {
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-6xl px-3 pb-24 md:px-5 md:pb-8">
+          {view !== 'cards' && <CardsBanner onOpen={() => setView('cards')} />}
           <TodayCard onOpen={openDay} />
           {view === 'month' && (
             <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
@@ -69,6 +77,7 @@ export default function CalendarApp({ onClose, params, tab }: AppProps) {
           )}
           {view === 'agenda' && <div className="mt-4"><Agenda onDay={openDay} onEdit={(e, day) => setEditing({ e, day })} /></div>}
           {view === 'fasts' && <div className="mt-4"><FastTracker onOpen={setFast} /></div>}
+          {view === 'cards' && <div className="mt-4"><CardsView onCard={setCardEdit} onBill={(b, c) => setBillEdit({ b, c })} /></div>}
         </div>
       </div>
 
@@ -79,6 +88,8 @@ export default function CalendarApp({ onClose, params, tab }: AppProps) {
 
       <EventEditor event={editing?.e ?? null} day={editing?.day ?? selected} onClose={() => setEditing(null)} />
       <FastSheet fast={fast} onClose={() => setFast(null)} />
+      <CardSheet card={cardEdit} onClose={() => setCardEdit(null)} />
+      <BillSheet bill={billEdit?.b ?? null} card={billEdit?.c ?? null} onClose={() => setBillEdit(null)} />
       <SettingsSheet open={settings} onClose={() => setSettings(false)} />
     </div>
   );

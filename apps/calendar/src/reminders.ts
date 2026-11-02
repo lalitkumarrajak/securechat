@@ -6,6 +6,7 @@
 import * as C from '@sanga/crypto';
 import { sdk } from '@sanga/sdk';
 import { addDays, observances } from './panchang';
+import { cardReminders } from './cards';
 import { eventsByDay, KINDS, occurrenceTimes, today, useCal, type CalEvent } from './model';
 
 const HORIZON_DAYS = 45;
@@ -30,7 +31,7 @@ function eventBody(e: CalEvent, start: number, at: number) {
 
 /** Everything to remind you of from now to HORIZON_DAYS ahead, soonest first. */
 export function upcoming(now = Date.now()): Upcoming[] {
-  const { events, fasts, settings: s } = useCal.getState();
+  const { events, fasts, cards, bills, settings: s } = useCal.getState();
   const from = addDays(today(), -1), to = addDays(today(), HORIZON_DAYS);
   const out: Upcoming[] = [];
   const push = (u: Upcoming) => { u.at = Math.round(u.at); if (u.at > now + 15e3 && u.at < now + HORIZON_DAYS * 86400e3) out.push(u); };
@@ -70,6 +71,8 @@ export function upcoming(now = Date.now()): Upcoming[] {
     if (f.deleted || f.status !== 'planned' || f.ref || f.day < from || f.day > to) continue;
     push({ key: `l|${f.id}`, at: atTime(addDays(f.day, -1), s.fastTime), title: `🙏 Tomorrow: ${f.name || 'your fast'}`, body: 'A fast you planned.' });
   }
+  // Credit cards: asking for the bill on statement day, and reminding before the due date.
+  for (const r of cardReminders(Object.values(cards), Object.values(bills), today())) push({ key: r.key, at: r.at, title: r.title, body: r.body });
   return out.sort((a, b) => a.at - b.at).slice(0, MAX);
 }
 

@@ -8,6 +8,7 @@ import * as C from '@sanga/crypto';
 import { sdk } from '@sanga/sdk';
 import { addDays, dayKey, dayStart, lunarMonth, tithiAt, type Group } from './panchang';
 import type { Place } from './astro';
+import { billId, suggestedDue, type CardBill, type CreditCard } from './cards';
 
 export type Kind = 'event' | 'birthday' | 'holiday' | 'fast' | 'reminder';
 export type Freq = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'tithi';
@@ -64,7 +65,7 @@ export interface Settings {
   edited: number;
   srv?: number; dirty?: boolean; deleted?: boolean;
 }
-type Item = CalEvent | FastLog | Settings;
+type Item = CalEvent | FastLog | Settings | CreditCard | CardBill;
 
 export const SETTINGS_ID = 'settings-v1';
 export const DEFAULT_SETTINGS: Settings = {
@@ -98,10 +99,12 @@ export const KINDS: Record<Kind, { label: string; emoji: string; color: string }
 interface CalState {
   events: Record<string, CalEvent>;
   fasts: Record<string, FastLog>;
+  cards: Record<string, CreditCard>;
+  bills: Record<string, CardBill>;
   settings: Settings;
   loaded: boolean;
 }
-export const useCal = create<CalState>(() => ({ events: {}, fasts: {}, settings: DEFAULT_SETTINGS, loaded: false }));
+export const useCal = create<CalState>(() => ({ events: {}, fasts: {}, cards: {}, bills: {}, settings: DEFAULT_SETTINGS, loaded: false }));
 
 // ---------- dates ----------
 export const today = () => dayKey(new Date());
@@ -123,6 +126,13 @@ export function newEvent(day: string, kind: Kind = 'event'): CalEvent {
     reminders: allDay ? (kind === 'holiday' ? [] : [-540]) : [15],
     created: Date.now(), edited: Date.now(),
   };
+}
+export function newCard(): CreditCard {
+  return { id: C.randomId(12), type: 'card', name: '', statementDay: 1, dueAfter: 20, remind: [3, 1, 0], time: '09:00', currency: 'INR', color: 'blue', created: Date.now(), edited: Date.now() };
+}
+/** A bill for the card's statement month, due when its usual gap says (change it to what the statement says). */
+export function newBill(card: CreditCard, month: string): CardBill {
+  return { id: billId(card.id, month), type: 'bill', card: card.id, month, amount: 0, due: suggestedDue(card, month), created: Date.now(), edited: Date.now() };
 }
 export function newFast(day: string, name: string, ref?: string): FastLog {
   return { id: C.randomId(12), type: 'fast', day, name, ref, status: day >= today() ? 'planned' : 'kept', fastType: 'phalahar', notes: '', created: Date.now(), edited: Date.now() };
@@ -265,25 +275,30 @@ export function startCalendar() {
 let loading: Promise<void> | null = null;
 export function load() {
   return (loading ??= sdk().store.prefix<Item>(KEY).then((list) => {
-    const events: Record<string, CalEvent> = {}, fasts: Record<string, FastLog> = {};
+    const events: Record<string, CalEvent> = {}, fasts: Record<string, FastLog> = {}, cards: Record<string, CreditCard> = {}, bills: Record<string, CardBill> = {};
     let settings: Settings | null = null;
     for (const x of list) {
       if (x.type === 'event') events[x.id] = x;
       else if (x.type === 'fast') fasts[x.id] = x;
+      else if (x.type === 'card') cards[x.id] = x;
+      else if (x.type === 'bill') bills[x.id] = x;
       else if (x.type === 'settings') settings = { ...DEFAULT_SETTINGS, ...x };
     }
-    useCal.setState((s) => ({ loaded: true, events: { ...events, ...s.events }, fasts: { ...fasts, ...s.fasts }, settings: settings ?? s.settings }));
+    useCal.setState((s) => ({ loaded: true, events: { ...events, ...s.events }, fasts: { ...fasts, ...s.fasts }, cards: { ...cards, ...s.cards }, bills: { ...bills, ...s.bills }, settings: settings ?? s.settings }));
   }));
 }
 
 function keep(x: Item) {
-  useCal.setState((s) => (x.type === 'event' ? { events: { ...s.events, [x.id]: x } } : x.type === 'fast' ? { fasts: { ...s.fasts, [x.id]: x } } : { settings: x }));
+  useCal.setState((s) => (x.type === 'event' ? { events: { ...s.events, [x.id]: x } } : x.type === 'fast' ? { fasts: { ...s.fasts, [x.id]: x } }
+    : x.type === 'card' ? { cards: { ...s.cards, [x.id]: x } } : x.type === 'bill' ? { bills: { ...s.bills, [x.id]: x } } : { settings: x }));
   return sdk().store.put(KEY + x.id, x);
 }
 function drop(x: Item) {
   useCal.setState((s) => {
     if (x.type === 'event') { const events = { ...s.events }; delete events[x.id]; return { events }; }
     if (x.type === 'fast') { const fasts = { ...s.fasts }; delete fasts[x.id]; return { fasts }; }
+    if (x.type === 'card') { const cards = { ...s.cards }; delete cards[x.id]; return { cards }; }
+    if (x.type === 'bill') { const bills = { ...s.bills }; delete bills[x.id]; return { bills }; }
     return { settings: DEFAULT_SETTINGS };
   });
   return sdk().store.del(KEY + x.id);
@@ -295,7 +310,7 @@ export const onChange = (fn: () => void) => { changed.add(fn); return () => chan
 const notify = () => changed.forEach((f) => f());
 
 export function save(x: Item) { keep({ ...x, edited: Date.now(), dirty: true } as Item).then(() => { notify(); soon(); }); }
-export function remove(x: CalEvent | FastLog) { keep({ ...x, deleted: true, dirty: true, edited: Date.now() }).then(() => { notify(); soon(); }); }
+export function remove(x: CalEvent | FastLog | CreditCard | CardBill) { keep({ ...x, deleted: true, dirty: true, edited: Date.now() }).then(() => { notify(); soon(); }); }
 export const saveSettings = (patch: Partial<Settings>) => save({ ...useCal.getState().settings, ...patch });
 
 // ---------- sync ----------
@@ -321,7 +336,7 @@ export function syncCalendar(): Promise<void> {
   return running;
 }
 
-const all = (): Item[] => { const s = useCal.getState(); return [...Object.values(s.events), ...Object.values(s.fasts), s.settings]; };
+const all = (): Item[] => { const s = useCal.getState(); return [...Object.values(s.events), ...Object.values(s.fasts), ...Object.values(s.cards), ...Object.values(s.bills), s.settings]; };
 const sealed = (x: Item) => { const { srv: _s, dirty: _d, ...rest } = x; return rest; };
 
 async function sync() {
@@ -368,6 +383,20 @@ function valid(o: any, id: string): Item | null {
   const str = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : '');
   const num = (v: unknown) => (Number.isSafeInteger(v) ? (v as number) : 0);
   if (o.type === 'settings' && id === SETTINGS_ID) return { ...DEFAULT_SETTINGS, ...o, id: SETTINGS_ID, type: 'settings', edited: num(o.edited) };
+  if (o.type === 'card') {
+    const day = Math.round(Number(o.statementDay));
+    return { id, type: 'card', name: str(o.name, 60), last4: /^\d{4}$/.test(o.last4) ? o.last4 : undefined, statementDay: day >= 1 && day <= 31 ? day : 1,
+      dueAfter: Number.isInteger(o.dueAfter) && o.dueAfter >= 0 && o.dueAfter <= 60 ? o.dueAfter : 20,
+      remind: Array.isArray(o.remind) ? [...new Set<number>(o.remind.filter((n: unknown) => Number.isInteger(n) && (n as number) >= 0 && (n as number) <= 30))].slice(0, 6) : [3, 1, 0],
+      time: /^\d\d:\d\d$/.test(o.time) ? o.time : '09:00', currency: /^[A-Z]{3}$/.test(o.currency) ? o.currency : 'INR', color: o.color in COLORS ? o.color : 'blue',
+      ...(o.archived && { archived: true }), created: num(o.created), edited: num(o.edited) };
+  }
+  if (o.type === 'bill' && typeof o.card === 'string' && /^\d{4}-\d\d$/.test(o.month) && typeof o.due === 'string' && DATE.test(o.due)) {
+    const amt = (v: unknown) => (Number.isSafeInteger(v) && (v as number) >= 0 ? (v as number) : undefined);
+    return { id, type: 'bill', card: o.card.slice(0, 40), month: o.month, amount: amt(o.amount) ?? 0, ...(amt(o.minDue) !== undefined && { minDue: amt(o.minDue) }), due: o.due.slice(0, 10),
+      ...(typeof o.paid === 'string' && /^\d{4}-\d\d-\d\d$/.test(o.paid) && { paid: o.paid, ...(amt(o.paidAmount) !== undefined && { paidAmount: amt(o.paidAmount) }) }),
+      ...(o.split && { split: true }), created: num(o.created), edited: num(o.edited) };
+  }
   if (o.type === 'fast' && typeof o.day === 'string' && DATE.test(o.day)) {
     return { id, type: 'fast', day: o.day.slice(0, 10), name: str(o.name, 120), ref: str(o.ref, 80) || undefined,
       status: ['planned', 'kept', 'partial', 'broken'].includes(o.status) ? o.status : 'kept',

@@ -117,6 +117,7 @@ function createSdk(s: Session): Sdk {
       const { pub } = await api<{ pub: string }>('/api/key?u=' + encodeURIComponent(peer));
       return conversationKey(s.priv, pub, s.u, peer);
     },
+    open(app, params = {}) { location.href = `/apps/${encodeURIComponent(app)}/?${new URLSearchParams(params)}`; },
     confirm,
     Avatar: Initial,
   };

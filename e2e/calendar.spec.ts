@@ -50,7 +50,11 @@ test('an event with a reminder: the server sends it at the time and the open app
   const start = new Date(Date.now() + 60e3);
   start.setSeconds(0, 0);
   if (start.getTime() - Date.now() < 25e3) start.setMinutes(start.getMinutes() + 1); // time to save it
-  await cal(P).getByRole('button', { name: 'Today', exact: true }).click().catch(() => {});
+  // Back to today: the "Today" button appears when another month is showing; otherwise today's own cell is there.
+  const now = new Date();
+  const todayCell = cal(P).getByRole('gridcell', { name: new RegExp(`${now.toLocaleDateString('en-US', { month: 'long' })} ${now.getDate()}(?!\\d)`) }).first();
+  const backToday = cal(P).getByRole('button', { name: 'Today', exact: true });
+  await (await backToday.isVisible() ? backToday : todayCell).click();
   await cal(P).getByRole('button', { name: 'Add', exact: true }).click();
   const ed = P.page.getByRole('dialog', { name: 'New event' });
   await ed.getByLabel('Title').fill('Call Maa');

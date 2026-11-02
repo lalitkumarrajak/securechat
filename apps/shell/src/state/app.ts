@@ -37,6 +37,7 @@ export interface AppState {
   editing: Msg | null;
   selection: string[] | null;            // selected message keys; null when not selecting
   panel: Panel;
+  appParams: Record<string, Record<string, string> | undefined>; // starting values for an app that is about to open (sdk.open)
   notesChat: string | null;              // the diary opens at this chat's notes ('' = personal, null = all)
   friendsTab: 'friends' | 'requests' | 'add';
   searchOpen: boolean;
@@ -74,6 +75,7 @@ export const useApp = create<AppState>(() => ({
   editing: null,
   selection: null,
   panel: null,
+  appParams: {},
   notesChat: null,
   friendsTab: 'friends',
   searchOpen: false,

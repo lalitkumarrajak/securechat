@@ -17,12 +17,12 @@ import { InsightsTab } from './InsightsTab';
 import { PeopleTab } from './PeopleTab';
 
 /** One group: expenses, balances, insights and people, with a button to add an expense. */
-export function GroupView({ gid, onBack, onGone }: { gid: string; onBack?: () => void; onGone: () => void }) {
+export function GroupView({ gid, start, onBack, onGone }: { gid: string; start?: Expense | null; onBack?: () => void; onGone: () => void }) {
   const me = useMe();
   const g = useGroup(gid);
   const { meta, expenses, settles } = useLedger(g);
   const [tab, setTab] = useState('expenses');
-  const [editing, setEditing] = useState<Expense | null>(null);
+  const [editing, setEditing] = useState<Expense | null>(start ?? null);
   const [viewing, setViewing] = useState<Expense | null>(null);
   const [settings, setSettings] = useState(false);
   const [adding, setAdding] = useState(false);

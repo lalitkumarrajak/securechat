@@ -68,7 +68,7 @@ export const BUILTIN_CATS: Category[] = [
   C('food', 'Food & drink', '🍽️', '#f97316'), C('cafe', 'Cafe & snacks', '☕', '#b45309'), C('groceries', 'Groceries', '🛒', '#22c55e'),
   C('gym', 'Gym & fitness', '🏋️', '#ef4444'), C('sports', 'Sports', '⚽', '#16a34a'), C('health', 'Health', '💊', '#10b981'),
   C('rent', 'Rent', '🏠', '#0891b2'), C('utilities', 'Utilities', '💡', '#14b8a6'), C('internet', 'Internet & phone', '📶', '#06b6d4'),
-  C('subscriptions', 'Subscriptions', '🔁', '#7c3aed'), C('entertainment', 'Entertainment', '🎬', '#ec4899'), C('party', 'Party & events', '🎉', '#f43f5e'),
+  C('subscriptions', 'Subscriptions', '🔁', '#7c3aed'), C('cards', 'Credit card bill', '💳', '#4f46e5'), C('entertainment', 'Entertainment', '🎬', '#ec4899'), C('party', 'Party & events', '🎉', '#f43f5e'),
   C('shopping', 'Shopping', '🛍️', '#e11d48'), C('gifts', 'Gifts', '🎁', '#d946ef'), C('education', 'Education', '🎓', '#2563eb'),
   C('travelmisc', 'Tickets & entry', '🎟️', '#0d9488'), C('pets', 'Pets', '🐾', '#65a30d'), C('repairs', 'Repairs', '🔧', '#64748b'),
   C('other', 'Other', '🧾', '#94a3b8'),
