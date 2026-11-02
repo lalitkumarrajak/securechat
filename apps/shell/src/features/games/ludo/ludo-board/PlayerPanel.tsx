@@ -3,6 +3,7 @@ import { cn } from '@sanga/ui/utils';
 import { homeAt } from '@sanga/game-rules/ludo.js';
 import type { Game } from '../../store';
 import { TurnRing } from '../../TurnRing';
+import { MentionText } from '../../MentionText';
 import { Chances } from '../../Chances';
 import { COLORS, COLOR_NAMES } from '../geometry';
 import { LudoState, Shown } from './types';
@@ -34,7 +35,7 @@ export function PlayerPanel({ g, i, me, shown, canRoll, onRoll, spinning, bubble
         <div className={cn('ludo-bubble absolute z-20 max-w-[160px] rounded-2xl bg-white px-3 py-1.5 text-sm font-medium text-slate-900 shadow-lg',
           below ? 'bottom-full mb-2' : 'top-full mt-2', right ? 'right-0' : 'left-0',
           /^\p{Extended_Pictographic}+$/u.test(bubble.replace(/\s/g, '')) && 'text-3xl px-2 py-0.5')}>
-          {bubble}
+          <MentionText text={bubble} users={g.players.map((p) => p.u)} me={me >= 0 ? g.players[me]?.u : undefined} />
         </div>
       )}
     </div>

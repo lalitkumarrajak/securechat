@@ -27,6 +27,9 @@ export interface Sdk {
   useOnline(): boolean;
   /** React hook: your friends and groups, e.g. to file a note under a chat. Peers: 'username' or 'g:<id>'. */
   useChats(): { peer: string; name: string }[];
+  /** The key you share with one friend (for handing them a key of your own, e.g. a Split group's).
+   *  Throws if they aren't a friend whose key is known. */
+  pairKey(peer: string): Promise<CryptoKey>;
   /** Ask before something that can't be undone. Resolves true if confirmed. */
   confirm(o: { title: string; description?: string; confirmText?: string; destructive?: boolean }): Promise<boolean>;
   /** A person's or group's photo (or initial). */
@@ -49,7 +52,7 @@ export interface AppProps {
 /** The live message types apps may receive. The shell handles every other type itself (messages,
  *  calls, stories, games…); an app neither sees those nor can take them over. Add a type here when
  *  an app's server part (server/<name>.js) sends a new one. */
-export const APP_FRAMES: readonly string[] = ['notes', 'calendar'];
+export const APP_FRAMES: readonly string[] = ['notes', 'calendar', 'split'];
 
 export function assertAppFrame(type: string) {
   if (!APP_FRAMES.includes(type)) throw new Error(`Apps can't listen to “${type}” messages`);

@@ -1,0 +1,5 @@
+/* Split's styles on its own page (/apps/split/) only. Inside Sanga the shell's stylesheet includes
+   Split's classes (see @source in apps/shell/src/index.css). */
+@import "tailwindcss";
+@import "@sanga/ui/theme.css";
+@source "../../../packages/ui/src";

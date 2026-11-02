@@ -166,6 +166,12 @@ export async function unwrapStoryKey(wrapKey, wrapped, owner, id, viewer) {
   const raw = await open(wrapKey, wrapped, `skey|${owner}|${id}|${viewer}`);
   return subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
 }
+// A key another person is handed (a Split group's): the raw bytes, so whoever holds it can wrap it for
+// the next person they add, and an AES key made from them.
+export async function unwrapKeyBytes(wrapKey, wrapped, owner, id, viewer) {
+  return new Uint8Array(await open(wrapKey, wrapped, `skey|${owner}|${id}|${viewer}`));
+}
+export const aesKeyFrom = (raw) => subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
 export const encryptStory = (key, obj, owner, id) => seal(key, te.encode(JSON.stringify(obj)), `story|${owner}|${id}`);
 export async function decryptStory(key, body, owner, id) {
   return JSON.parse(td.decode(await open(key, body, `story|${owner}|${id}`)));

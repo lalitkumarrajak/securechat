@@ -8,5 +8,5 @@
     ".": "./src/index.ts",
     "./standalone": "./src/standalone.tsx"
   },
-  "dependencies": { "@sanga/ui": "*" }
+  "dependencies": { "@sanga/crypto": "*", "@sanga/ui": "*" }
 }

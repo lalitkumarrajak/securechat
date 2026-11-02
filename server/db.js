@@ -138,6 +138,29 @@ const SCHEMA = (pg) => `
     PRIMARY KEY (username, app, id)
   );
   CREATE INDEX IF NOT EXISTS items_updated ON items(username, app, updated);
+  CREATE TABLE IF NOT EXISTS split_members (
+    gid      TEXT NOT NULL,
+    username TEXT NOT NULL,
+    wrapper  TEXT NOT NULL,
+    wrapped  TEXT NOT NULL,
+    added    BIGINT NOT NULL,
+    PRIMARY KEY (gid, username)
+  );
+  CREATE INDEX IF NOT EXISTS split_members_user ON split_members(username);
+  CREATE TABLE IF NOT EXISTS split_records (
+    gid      TEXT NOT NULL,
+    id       TEXT NOT NULL,
+    body     TEXT NOT NULL,
+    updated  BIGINT NOT NULL,
+    PRIMARY KEY (gid, id)
+  );
+  CREATE INDEX IF NOT EXISTS split_records_updated ON split_records(gid, updated);
+  CREATE TABLE IF NOT EXISTS split_bills (
+    gid  TEXT NOT NULL,
+    id   TEXT NOT NULL,
+    body TEXT NOT NULL,
+    PRIMARY KEY (gid, id)
+  );
   CREATE TABLE IF NOT EXISTS reminders (
     username TEXT NOT NULL,
     id       TEXT NOT NULL,
@@ -310,6 +333,28 @@ const SQL = {
   getItem: 'SELECT updated FROM items WHERE username = ? AND app = ? AND id = ?',
   itemStats: 'SELECT COUNT(*) AS n, COALESCE(MAX(updated), 0) AS last, COALESCE(SUM(octet_length(body)), 0) AS bytes FROM items WHERE username = ? AND app = ?',
 
+  // Split: groups of people sharing expenses. The server knows who is in a group and keeps sealed records
+  // and sealed bill photos; the group key is wrapped for each member and never seen in the clear.
+  splitMember: 'SELECT username, wrapper, wrapped, added FROM split_members WHERE gid = ? AND username = ?',
+  splitMembers: 'SELECT username, wrapper, wrapped, added FROM split_members WHERE gid = ? ORDER BY added, username',
+  splitGroupsFor: 'SELECT gid, wrapper, wrapped FROM split_members WHERE username = ? ORDER BY added',
+  addSplitMember: `INSERT INTO split_members (gid, username, wrapper, wrapped, added) VALUES (?, ?, ?, ?, ?)
+                   ON CONFLICT (gid, username) DO NOTHING`,
+  delSplitMember: 'DELETE FROM split_members WHERE gid = ? AND username = ?',
+  splitSince: 'SELECT id, body, updated FROM split_records WHERE gid = ? AND updated >= ? ORDER BY updated, id LIMIT ?',
+  putSplitRecord: `INSERT INTO split_records (gid, id, body, updated) VALUES (?, ?, ?, ?)
+                   ON CONFLICT (gid, id) DO UPDATE SET body = excluded.body, updated = excluded.updated`,
+  getSplitRecord: 'SELECT updated FROM split_records WHERE gid = ? AND id = ?',
+  splitStats: 'SELECT COUNT(*) AS n, COALESCE(MAX(updated), 0) AS last, COALESCE(SUM(octet_length(body)), 0) AS bytes FROM split_records WHERE gid = ?',
+  putSplitBill: `INSERT INTO split_bills (gid, id, body) VALUES (?, ?, ?)
+                 ON CONFLICT (gid, id) DO UPDATE SET body = excluded.body`,
+  getSplitBill: 'SELECT body FROM split_bills WHERE gid = ? AND id = ?',
+  splitBillStats: 'SELECT COUNT(*) AS n, COALESCE(SUM(octet_length(body)), 0) AS bytes FROM split_bills WHERE gid = ?',
+  delSplitBill: 'DELETE FROM split_bills WHERE gid = ? AND id = ?',
+  delSplitRecords: 'DELETE FROM split_records WHERE gid = ?',
+  delSplitBills: 'DELETE FROM split_bills WHERE gid = ?',
+  delSplitMembers: 'DELETE FROM split_members WHERE gid = ?',
+
   // Reminders: when to notify, and a title sealed so only the account's devices can read it.
   clearReminders: 'DELETE FROM reminders WHERE username = ?',
   putReminder: `INSERT INTO reminders (username, id, at, body) VALUES (?, ?, ?, ?)
@@ -428,9 +473,9 @@ async function openMongo(uri) {
   const mdb = client.db(client.options.dbName === 'test' ? 'securechat' : undefined);
   const c = (name) => mdb.collection(name);
   const [users, sessions, messages, hidden, avatars, friendships, blocks, profiles, pushSubs, games, config, groups, groupMembers, groupPhotos, notes,
-    stories, storyKeys, storyViews, storyComments, items, reminders] =
+    stories, storyKeys, storyViews, storyComments, items, reminders, splitMembers, splitRecords, splitBills] =
     ['users', 'sessions', 'messages', 'message_hidden', 'avatars', 'friendships', 'blocks', 'profiles', 'push_subs', 'games', 'config',
-      'groups', 'group_members', 'group_photos', 'notes', 'stories', 'story_keys', 'story_views', 'story_comments', 'items', 'reminders'].map(c);
+      'groups', 'group_members', 'group_photos', 'notes', 'stories', 'story_keys', 'story_views', 'story_comments', 'items', 'reminders', 'split_members', 'split_records', 'split_bills'].map(c);
   await Promise.all([
     sessions.createIndex({ expires: 1 }),
     sessions.createIndex({ username: 1 }),
@@ -449,6 +494,9 @@ async function openMongo(uri) {
     pushSubs.createIndex({ username: 1 }),
     notes.createIndex({ username: 1, updated: 1 }),
     items.createIndex({ username: 1, app: 1, updated: 1 }),
+    splitMembers.createIndex({ gid: 1 }),
+    splitMembers.createIndex({ username: 1 }),
+    splitRecords.createIndex({ gid: 1, updated: 1 }),
     reminders.createIndex({ at: 1 }),
     reminders.createIndex({ username: 1 }),
     stories.createIndex({ owner: 1, expires: 1 }),
@@ -657,6 +705,39 @@ async function openMongo(uri) {
       last: (await items.find({ username: u, app }).sort({ updated: -1 }).limit(1).next())?.updated ?? 0,
       bytes: await sumBytes(items, { username: u, app }),
     }),
+
+    splitMember: async (gid, u) => {
+      const d = await splitMembers.findOne({ _id: gid + '|' + u });
+      return d ? { username: u, wrapper: d.wrapper, wrapped: d.wrapped, added: d.added } : undefined;
+    },
+    splitMembers: async (gid) => (await splitMembers.find({ gid }).sort({ added: 1, username: 1 }).toArray())
+      .map((d) => ({ username: d.username, wrapper: d.wrapper, wrapped: d.wrapped, added: d.added })),
+    splitGroupsFor: async (u) => (await splitMembers.find({ username: u }).sort({ added: 1 }).toArray())
+      .map((d) => ({ gid: d.gid, wrapper: d.wrapper, wrapped: d.wrapped })),
+    addSplitMember: (gid, u, wrapper, wrapped, added) => insertIgnoringDupes(splitMembers, { _id: gid + '|' + u, gid, username: u, wrapper, wrapped, added }),
+    delSplitMember: async (gid, u) => changes((await splitMembers.deleteOne({ _id: gid + '|' + u })).deletedCount),
+    splitSince: async (gid, since, limit) => (await splitRecords.find({ gid, updated: { $gte: since } })
+      .sort({ updated: 1, id: 1 }).limit(limit).toArray()).map((d) => ({ id: d.id, body: d.body, updated: d.updated })),
+    putSplitRecord: async (gid, id, body, updated) => {
+      await splitRecords.replaceOne({ _id: gid + '|' + id }, { gid, id, body, updated }, { upsert: true });
+      return changes(1);
+    },
+    getSplitRecord: async (gid, id) => (await splitRecords.findOne({ _id: gid + '|' + id }, { projection: { updated: 1 } })) ?? undefined,
+    splitStats: async (gid) => ({
+      n: await splitRecords.countDocuments({ gid }),
+      last: (await splitRecords.find({ gid }).sort({ updated: -1 }).limit(1).next())?.updated ?? 0,
+      bytes: await sumBytes(splitRecords, { gid }),
+    }),
+    putSplitBill: async (gid, id, body) => {
+      await splitBills.replaceOne({ _id: gid + '|' + id }, { gid, id, body }, { upsert: true });
+      return changes(1);
+    },
+    getSplitBill: async (gid, id) => (await splitBills.findOne({ _id: gid + '|' + id }, { projection: { body: 1 } })) ?? undefined,
+    splitBillStats: async (gid) => ({ n: await splitBills.countDocuments({ gid }), bytes: await sumBytes(splitBills, { gid }) }),
+    delSplitBill: async (gid, id) => changes((await splitBills.deleteOne({ _id: gid + '|' + id })).deletedCount),
+    delSplitRecords: async (gid) => changes((await splitRecords.deleteMany({ gid })).deletedCount),
+    delSplitBills: async (gid) => changes((await splitBills.deleteMany({ gid })).deletedCount),
+    delSplitMembers: async (gid) => changes((await splitMembers.deleteMany({ gid })).deletedCount),
 
     clearReminders: async (u) => changes((await reminders.deleteMany({ username: u })).deletedCount),
     putReminder: async (u, id, at, body) => {

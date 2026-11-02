@@ -128,8 +128,11 @@ frameHooks.gerr = (m) => {
   toast.error(m.e || 'Something went wrong');
 };
 
+/** Sends a frame; false (and a warning) if the connection is down. */
 function sendOrWarn(frame: object) {
-  if (!sendFrame(frame)) toast.error('You’re offline', { description: 'Reconnect to play.' });
+  const sent = sendFrame(frame);
+  if (!sent) toast.error('You’re offline', { description: 'Reconnect to play.', id: 'game-offline' });
+  return sent;
 }
 
 // The registry needs the store, so names are looked up lazily to avoid a cycle.

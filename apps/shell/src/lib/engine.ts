@@ -202,7 +202,10 @@ function connect() {
   setConn('connecting');
   const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
   S.ws = ws;
-  ws.onopen = () => ws.send(JSON.stringify({ t: 'auth', token: S.token, act: visible() }));
+  // A handshake that never completes (a cold server, a dead network) would otherwise hang for
+  // minutes with no retry: give up after a few seconds and let onclose schedule the next attempt.
+  const stalled = window.setTimeout(() => { if (ws.readyState === 0) ws.close(); }, 8000);
+  ws.onopen = () => { clearTimeout(stalled); ws.send(JSON.stringify({ t: 'auth', token: S.token, act: visible() })); };
   ws.onmessage = (e) => {
     resetPong();
     let m;
@@ -211,6 +214,7 @@ function connect() {
     S.inbox = S.inbox.then(() => handle(m)).catch((err) => console.error(err));
   };
   ws.onclose = (e) => {
+    clearTimeout(stalled);
     if (S.ws !== ws) return;
     S.ready = false;
     S.synced = false;
@@ -221,7 +225,7 @@ function connect() {
     setConn(navigator.onLine ? 'connecting' : 'offline');
     // Exponential backoff with jitter so many clients don't reconnect in lockstep.
     S.reconnectTimer = window.setTimeout(connect, S.backoff * (0.5 + Math.random()));
-    S.backoff = Math.min(S.backoff * 2, 30000);
+    S.backoff = Math.min(S.backoff * 2, 8000);
   };
 }
 

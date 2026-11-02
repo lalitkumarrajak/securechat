@@ -1,10 +1,10 @@
-// Which tab you're on once signed in: Chats, Stories, Games, Diary or Calendar. Kept in the address
-// (#stories, #games, #diary, #calendar) so a reload stays put. Switching tabs doesn't add to the history.
+// Which tab you're on once signed in: Chats, Stories, Games, Diary, Calendar or Split. Kept in the address
+// (#stories, #games, #diary, #calendar, #split) so a reload stays put. Switching tabs doesn't add to the history.
 import { getApp, setApp, type Section } from '../state/app';
 
 export const sectionFromHash = (): Section => {
   const h = location.hash.slice(1);
-  return h === 'stories' || h === 'games' || h === 'diary' || h === 'calendar' ? h : 'chat';
+  return h === 'stories' || h === 'games' || h === 'diary' || h === 'calendar' || h === 'split' ? h : 'chat';
 };
 
 const base = () => location.pathname + location.search;

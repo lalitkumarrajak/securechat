@@ -19,6 +19,7 @@ import { routes as previewRoutes } from './preview.js';
 import { routes as groupRoutes } from './groups.js';
 import { routes as noteRoutes } from './notes.js';
 import { routes as itemRoutes } from './items.js';
+import { routes as splitRoutes } from './split.js';
 import { routes as reminderRoutes, startReminders } from './reminders.js';
 import { purgeStories, routes as storyRoutes } from './stories.js';
 import { handlers as callHandlers, onClose as callClosed, onConnect as callConnected, routes as callRoutes } from './calls.js';
@@ -39,20 +40,19 @@ async function cleanup() {
   await purgeGames();
   await purgeStories();
 }
-await cleanup();
+// Not awaited: purging old rows must not delay the first connection after a cold start.
+cleanup().catch((e) => console.error('cleanup failed', e.message));
 setInterval(() => cleanup().catch((e) => console.error('cleanup failed', e.message)), 3600e3).unref();
 
-const migrated = await migrateFriends();
+const [migrated] = await Promise.all([migrateFriends(), initPush(), loadGames()]);
 if (migrated) console.log(`made ${migrated} existing chat pair(s) friends`);
-await initPush();
-await loadGames();
 startReminders();
 loadStatic();
 
 const handlers = { ...messageHandlers, ...gameHandlers, ...callHandlers };
 
 // ---------- HTTP ----------
-const routes = { ...authRoutes, ...profileRoutes, ...friendRoutes, ...pushRoutes, ...gifRoutes, ...songRoutes, ...previewRoutes, ...groupRoutes, ...noteRoutes, ...itemRoutes, ...reminderRoutes, ...storyRoutes, ...callRoutes };
+const routes = { ...authRoutes, ...profileRoutes, ...friendRoutes, ...pushRoutes, ...gifRoutes, ...songRoutes, ...previewRoutes, ...groupRoutes, ...noteRoutes, ...itemRoutes, ...splitRoutes, ...reminderRoutes, ...storyRoutes, ...callRoutes };
 
 async function handleHttp(req, res) {
   const url = new URL(req.url, 'http://x');

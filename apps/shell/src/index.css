@@ -6,6 +6,7 @@
 @source "../../../packages/ui/src";
 @source "../../notes/src";
 @source "../../calendar/src";
+@source "../../split/src";
 
 /* ---------- chat wallpapers (Settings → Appearance): .wallpaper.wp-<name> ---------- */
 .wallpaper { background-color: var(--chat); }

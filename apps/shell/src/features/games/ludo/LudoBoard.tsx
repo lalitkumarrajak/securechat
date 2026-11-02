@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { homeAt } from '@sanga/game-rules/ludo.js';
 import { playSound } from '../sounds';
 import type { Game, GameEvent } from '../store';
+import { useApp } from '../../../state/app';
 import type { GameBoardProps } from '../registry';
 import { MISSES_OUT } from '@sanga/game-rules/core.js';
 import { makeLayout, pathOf } from './geometry';
@@ -100,12 +101,17 @@ export default function LudoBoard({ g: game, me, act, bubble }: GameBoardProps) 
   const L = useMemo(() => makeLayout(g.s.arms, myArm), [g.s.arms, myArm]);
   const { shown, busy } = usePlayback(g, meIdx);
   const [asked, setAsked] = useState(0); // version when I tapped the dice: it spins until the result arrives
-  const roll = () => { setAsked(g.v); act({ a: 'roll' }); };
-  useEffect(() => { // no reply (e.g. connection dropped): stop spinning
+  const online = useApp((s) => s.conn === 'online');
+  // Spin only once the roll has really been sent; offline, nothing is waiting for a reply.
+  const roll = () => { if (act({ a: 'roll' }) !== false) setAsked(g.v); };
+  useEffect(() => { // no reply: stop spinning
     if (!asked) return;
-    const t = setTimeout(() => setAsked(0), 5000);
+    const t = setTimeout(() => setAsked(0), 3000);
     return () => clearTimeout(t);
   }, [asked]);
+  // The connection dropped with a roll pending: no reply is coming on this connection, so stop
+  // spinning; the game is refreshed when it's back and shows what really happened.
+  useEffect(() => { if (!online) setAsked(0); }, [online]);
   const home = homeAt(g.s.arms);
   const myTurn = !busy && g.status === 'play' && g.turn === meIdx;
   const canRoll = myTurn && g.s.phase === 'roll' && asked !== g.v;
@@ -118,9 +124,12 @@ export default function LudoBoard({ g: game, me, act, bubble }: GameBoardProps) 
   });
   const row = (top: boolean) => seats.filter((s) => s.top === top).sort((a, b) => a.x - b.x);
 
+  // A lone panel in a row must stay over its own yard: justify-between alone would put it on the left.
   const panel = (s: (typeof seats)[number]) => (
-    <PlayerPanel key={s.pl.u} g={g} i={s.i} me={meIdx} shown={shown} canRoll={canRoll && s.i === meIdx}
-      onRoll={roll} spinning={asked === g.v && s.i === meIdx} bubble={bubble(s.pl.u)} right={s.x > 0} below={!s.top} />
+    <div key={s.pl.u} className={s.x > 0 ? 'ml-auto' : 'mr-auto'}>
+      <PlayerPanel g={g} i={s.i} me={meIdx} shown={shown} canRoll={canRoll && s.i === meIdx}
+        onRoll={roll} spinning={asked === g.v && s.i === meIdx} bubble={bubble(s.pl.u)} right={s.x > 0} below={!s.top} />
+    </div>
   );
 
   return (

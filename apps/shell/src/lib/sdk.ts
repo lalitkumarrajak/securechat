@@ -3,7 +3,7 @@
 import { assertAppFrame, provideSdk, scopedStore, type Sdk } from '@sanga/sdk';
 import { confirm } from '@sanga/ui/confirm';
 import * as db from './db';
-import { api, enablePush, frameHooks, ownIdentity, pushSupported, readyHooks } from './engine';
+import { api, enablePush, frameHooks, ownIdentity, peerKey, pushSupported, readyHooks } from './engine';
 import { useSettings } from '../state/settings';
 import { Avatar } from '../components/Avatar';
 import { displayName } from './types';
@@ -45,6 +45,7 @@ export const shellSdk: Sdk = {
       ...Object.values(groups).map((g) => ({ peer: 'g:' + g.id, name: g.name })),
     ], [friends, groups]);
   },
+  pairKey: peerKey,
   confirm,
   Avatar,
   usePush: () => {

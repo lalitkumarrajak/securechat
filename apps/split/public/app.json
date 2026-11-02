@@ -1,0 +1,1 @@
+{ "id": "split", "name": "Split", "icon": "wallet", "expose": "./App" }

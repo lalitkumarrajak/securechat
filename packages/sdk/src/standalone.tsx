@@ -5,6 +5,7 @@
 import { createElement, useEffect, useState, type ComponentType } from 'react';
 import { createRoot } from 'react-dom/client';
 import { confirm, ConfirmHost } from '@sanga/ui/confirm';
+import { conversationKey } from '@sanga/crypto';
 import { Initial } from './Initial';
 import { assertAppFrame, provideSdk, scopedStore, type AppProps, type Sdk } from '@sanga/sdk'; // by name: the same shared copy the app uses
 
@@ -111,6 +112,10 @@ function createSdk(s: Session): Sdk {
         return () => { subs.delete(f); };
       }, []);
       return people;
+    },
+    async pairKey(peer) {
+      const { pub } = await api<{ pub: string }>('/api/key?u=' + encodeURIComponent(peer));
+      return conversationKey(s.priv, pub, s.u, peer);
     },
     confirm,
     Avatar: Initial,

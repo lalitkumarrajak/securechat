@@ -3,6 +3,7 @@ import { useApp } from '../state/app';
 import { handleInvite } from '../lib/invite';
 import { DiaryPage } from './notes/DiaryPage';
 import { CalendarPage } from './calendar/CalendarPage';
+import { SplitPage } from './split/SplitPage';
 import { Overlays } from './shell/Overlays';
 import { Shell } from './shell/Shell';
 
@@ -19,22 +20,20 @@ export function Main() {
       {(section === 'chat' || section === 'stories') && <Shell />}
       {section === 'diary' && <DiaryPage />}
       {section === 'calendar' && <CalendarPage />}
+      {section === 'split' && <SplitPage />}
       {section === 'games' && <Suspense fallback={null}><GamesHub /></Suspense>}
       <Overlays />
     </>
   );
 }
 
-// Screens that load when first opened, fetched once the app has settled, so opening one is instant
-// without slowing down the start.
+// Nothing is downloaded ahead of use: Settings, Friends, Stories, Games and the other apps load when
+// you open them. Only apps you've already used and that work in the background (the calendar's
+// reminders) start once Sanga has settled; nothing is downloaded for the others.
 function usePrefetch() {
   useEffect(() => {
     const bg = setTimeout(() => void import('../lib/apps').then((m) => m.runBackgrounds()), 6000);
-    const t = setTimeout(() => {
-      for (const load of [() => import('./settings/SettingsPanel'), () => import('./friends/FriendsPanel'), 
-        () => import('./stories/StoryViewer'), () => import('./stories/StoryComposer'), () => import('./groups/GroupInfoPanel'), () => import('./games/GamesHub')]) load().catch(() => {});
-    }, 4000);
-    return () => { clearTimeout(t); clearTimeout(bg); };
+    return () => clearTimeout(bg);
   }, []);
 }
 

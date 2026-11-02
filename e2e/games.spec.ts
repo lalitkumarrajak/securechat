@@ -111,7 +111,7 @@ test('emoji, quick phrases and chat during the game', async () => {
   await expect(A.page.getByRole('button', { name: 'Game chat' })).toContainText(/\d/); // unread count
   await A.page.getByRole('button', { name: 'Game chat' }).click();
   await expect(A.page.getByRole('dialog', { name: 'Game chat' }).getByText('Good game everyone')).toBeVisible();
-  await expect(A.page.getByRole('dialog', { name: 'Game chat' }).locator('span.bg-amber-300\\/90', { hasText: '@' + A.u })).toBeVisible(); // my tag stands out
+  await expect(A.page.getByRole('dialog', { name: 'Game chat' }).locator('span.bg-blue-600', { hasText: '@' + A.u })).toBeVisible(); // my tag stands out
   await A.page.screenshot({ path: shots('24-ludo-chat') });
   await A.page.keyboard.press('Escape');
   await B.page.keyboard.press('Escape');

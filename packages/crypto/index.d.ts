@@ -35,3 +35,5 @@ export function encryptComment(key: CryptoKey, obj: unknown, id: string, author:
 export function decryptComment(key: CryptoKey, body: string, id: string, author: string, cid: string): Promise<any>;
 export function encryptStoryComment(pairKey: CryptoKey, obj: unknown, owner: string, id: string, author: string, cid: string): Promise<string>;
 export function decryptStoryComment(pairKey: CryptoKey, body: string, owner: string, id: string, author: string, cid: string): Promise<any>;
+export function unwrapKeyBytes(wrapKey: CryptoKey, wrapped: string, owner: string, id: string, viewer: string): Promise<Uint8Array>;
+export function aesKeyFrom(raw: Uint8Array): Promise<CryptoKey>;

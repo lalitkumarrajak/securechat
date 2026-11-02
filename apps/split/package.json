@@ -1,0 +1,14 @@
+{
+  "name": "@sanga/split",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Sanga Split: shared expenses in groups of friends, with bills, balances, settling up and spending charts. End-to-end encrypted. Loaded by the shell when opened, or on its own at /apps/split/",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "TZ=Asia/Kolkata vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": { "@sanga/crypto": "*", "@sanga/sdk": "*", "@sanga/ui": "*" }
+}

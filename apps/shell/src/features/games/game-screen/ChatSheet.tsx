@@ -5,7 +5,8 @@ import { IconButton } from '@sanga/ui/button';
 import { Dialog } from '@sanga/ui/dialog';
 import { myName } from '../../../lib/engine';
 import { cn } from '@sanga/ui/utils';
-import { insertMention, mentionQuery, splitMentions } from '../../../lib/mentions';
+import { insertMention, mentionQuery } from '../../../lib/mentions';
+import { MentionText } from '../MentionText';
 import { nameOf, say, useGames, type ChatLine, type Game } from '../store';
 import { QUICK_EMOJI, PHRASES } from './quickMessages';
 
@@ -48,9 +49,7 @@ export function ChatSheet({ g, open, onOpenChange }: { g: Game; open: boolean; o
           <div key={k} className={cn('flex', l.f === me ? 'justify-end' : 'justify-start')}>
             <div className={cn('max-w-[80%] rounded-2xl px-3 py-1.5 text-sm', l.f === me ? 'bg-accent text-accent-ink' : 'bg-panel shadow-bubble')}>
               {l.f !== me && <div className="text-xs font-semibold text-accent">{nameOf(g, l.f)}</div>}
-              {splitMentions(l.x, users).map((part, i) => part.u ? (
-                <span key={i} className={cn('font-semibold', part.u === me ? 'rounded bg-amber-300/90 px-0.5 text-amber-950' : l.f === me ? 'underline' : 'text-accent')}>{part.t}</span>
-              ) : <span key={i}>{part.t}</span>)}
+              <MentionText text={l.x} users={users} me={me} onDark={l.f === me} />
             </div>
           </div>
         ))}

@@ -8,7 +8,7 @@ import { registerGameNames, type Game } from './store';
 export interface GameBoardProps {
   g: Game;
   me: string;                              // my username
-  act: (a: object) => void;                // send an action (the game's own shape, e.g. { a: 'roll' })
+  act: (a: object) => boolean | void;                // send an action (the game's own shape, e.g. { a: 'roll' })
   bubble: (u: string) => string | null;    // what this player just said in chat, to show over them
 }
 
