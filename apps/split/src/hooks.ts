@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { sdk } from '@sanga/sdk';
 import { useSplit, type GroupData } from './store';
+import type { Activity } from './model';
 import { catOf, categoryMap, type Expense, type Meta, type Person, type Settlement } from './model';
 
 export const useMe = () => sdk().identity().me;
@@ -27,8 +28,17 @@ export function useLedger(g: GroupData | null) {
     const people = meta?.people ?? [];
     const cats = categoryMap(meta?.cats);
     const person = (id: string): Person => people.find((p) => p.id === id) ?? { id, name: id };
-    return { meta, expenses, settles, people, cats, person, catOf: (id: string) => catOf(cats, id) };
+    const activity = Object.values(g?.activity ?? {}).sort((a, b) => b.ts - a.ts) as Activity[];
+    return { meta, expenses, settles, activity, people, cats, person, catOf: (id: string) => catOf(cats, id) };
   }, [g]);
 }
 
 const newest = (a: { date: string; edited: number }, b: { date: string; edited: number }) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.edited - a.edited);
+
+/** How many entries in the group's activity are from other people and newer than when you last looked. */
+export function useUnread(gid: string) {
+  const me = useMe();
+  const seen = useSplit((s) => s.seen[gid]);
+  const activity = useSplit((s) => s.groups[gid]?.activity);
+  return useMemo(() => (seen === undefined ? 0 : Object.values(activity ?? {}).filter((a) => a.ts > seen && a.by !== me).length), [seen, activity, me]);
+}

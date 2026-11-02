@@ -50,6 +50,10 @@ export function ExpenseDetail({ g, expense, onClose, onEdit }: { g: GroupData; e
               })}
             </ul>
           </div>
+          <p className="text-xs text-muted">
+            Added by <b>{name(person(e.addedBy ?? e.by))}</b>{e.added ? ` · ${new Date(e.added).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}` : ''}
+            {e.by !== (e.addedBy ?? e.by) || (e.added && e.edited - e.added > 60_000) ? <> · last changed by <b>{name(person(e.by))}</b> {new Date(e.edited).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</> : null}
+          </p>
           {e.notes && <p className="rounded-xl bg-panel-2 p-3 text-sm whitespace-pre-wrap">{e.notes}</p>}
           {e.bill && <div><h3 className="mb-1.5 text-sm font-semibold">Bill</h3><BillView gid={g.gid} id={e.bill} /></div>}
           <div className="flex gap-2">

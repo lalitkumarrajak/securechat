@@ -9,9 +9,10 @@ import { COLORS, COLOR_NAMES } from '../geometry';
 import { LudoState, Shown } from './types';
 import { Dice } from './Dice';
 
-export function PlayerPanel({ g, i, me, shown, canRoll, onRoll, spinning, bubble, right, below }: {
+export function PlayerPanel({ g, i, me, shown, canRoll, onRoll, spinning, bubble, right, below, settled }: {
   g: Game<LudoState>; i: number; me: number; shown: Shown; canRoll: boolean; onRoll: () => void; spinning: boolean;
   bubble: string | null; right: boolean; below: boolean;
+  settled: boolean; // no move is still being played back
 }) {
   const pl = g.players[i];
   const arm = g.s.arm[i];
@@ -19,7 +20,11 @@ export function PlayerPanel({ g, i, me, shown, canRoll, onRoll, spinning, bubble
   const active = g.status === 'play' && shown.turn === i && pl.state === 'playing';
   const gone = pl.state === 'left' || pl.state === 'out';
   const dice = spinning ? { s: i, d: 6, rolling: true } : shown.dice?.s === i ? shown.dice : null;
-  const homeCount = g.s.tokens[i].filter((p) => p === homeAt(g.s.arms)).length;
+  const home = homeAt(g.s.arms);
+  const homeCount = shown.tokens[i].filter((p) => p === home).length;
+  // The place is shown once the last token has actually walked in (or the moves have all played, for a
+  // player who is placed without finishing, e.g. last one left), not the moment the server records it.
+  const rank = pl.rank && (homeCount === 4 || settled) ? pl.rank : 0;
   const missed = pl.missed || 0;
   const away = pl.state === 'playing' && missed > 0; // the server has been playing for them
 
@@ -30,7 +35,8 @@ export function PlayerPanel({ g, i, me, shown, canRoll, onRoll, spinning, bubble
           <Avatar u={pl.u} name={pl.n} size={40} className="[&>*]:rounded-lg" />
         </div>
       </TurnRing>
-      {pl.rank ? <span className="absolute -top-2 -right-2 grid size-6 place-items-center rounded-full bg-amber-400 text-xs font-bold text-amber-950 shadow">{pl.rank}</span> : null}
+      {rank === 1 && <span className="ludo-crown pointer-events-none absolute -top-5 left-1/2 z-10 -translate-x-1/2 text-2xl drop-shadow-[0_2px_3px_rgba(0,0,0,0.5)]" aria-label="Winner" role="img">👑</span>}
+      {rank ? <span className="ludo-rank-in absolute -top-2 -right-2 grid size-6 place-items-center rounded-full bg-amber-400 text-xs font-bold text-amber-950 shadow">{rank}</span> : null}
       {bubble && (
         <div className={cn('ludo-bubble absolute z-20 max-w-[160px] rounded-2xl bg-white px-3 py-1.5 text-sm font-medium text-slate-900 shadow-lg',
           below ? 'bottom-full mb-2' : 'top-full mt-2', right ? 'right-0' : 'left-0',
@@ -58,7 +64,7 @@ export function PlayerPanel({ g, i, me, shown, canRoll, onRoll, spinning, bubble
 
   return (
     <div className={cn('flex min-w-0 flex-col gap-1 rounded-2xl border-2 bg-black/25 p-1.5 shadow-lg backdrop-blur-sm transition-colors',
-      right ? 'items-end' : 'items-start', active ? '' : 'border-transparent')} style={active ? { borderColor: color } : undefined} data-player={pl.u}>
+      right ? 'items-end' : 'items-start', active ? '' : 'border-transparent', rank === 1 && 'shadow-[0_0_22px_rgba(250,204,21,0.65)]')} style={active ? { borderColor: color } : undefined} data-player={pl.u}>
       <div className={cn('flex items-center gap-1.5', right && 'flex-row-reverse')}>
         {avatar}
         {diceBox}
@@ -66,7 +72,7 @@ export function PlayerPanel({ g, i, me, shown, canRoll, onRoll, spinning, bubble
       <div className={cn('min-w-0 px-0.5 text-[11px] leading-tight text-white/90', right && 'text-right')}>
         <div className="max-w-[100px] truncate font-semibold">{i === me ? 'You' : pl.n || pl.u}</div>
         <div className={cn(away ? 'font-medium text-amber-300' : 'text-white/60')}>
-          {away ? 'Auto-playing' : gone ? (pl.state === 'out' ? 'Removed' : 'Left') : pl.rank ? ordinal(pl.rank) : `${COLOR_NAMES[arm]}${homeCount ? ` · ${homeCount}/4 home` : ''}`}
+          {away ? 'Auto-playing' : gone ? (pl.state === 'out' ? 'Removed' : 'Left') : rank ? ordinal(rank) : `${COLOR_NAMES[arm]}${homeCount ? ` · ${homeCount}/4 home` : ''}`}
         </div>
         {pl.state === 'playing' && !pl.bot && <Chances missed={missed} right={right} />}
       </div>

@@ -82,6 +82,26 @@ test('expenses sync both ways, with a bill, and balances agree', async () => {
   await addExpense(B, '60', 'Auto to station', { category: 'Cab' });
   await expect(split(A).getByText('Auto to station')).toBeVisible({ timeout: 20_000 });
 
+  // A's phone is on Expenses: the activity tab says one new thing (B's expense), and names who did it.
+  await expect(split(A).getByRole('tab', { name: /Activity/ })).toContainText('1');
+  await split(A).getByRole('tab', { name: /Activity/ }).click();
+  const feedA = split(A).getByRole('tabpanel', { name: /Activity/ });
+  await expect(feedA.getByText(`${B.u} added Auto to station`)).toBeVisible();
+  await expect(feedA.getByText('You added Beach dinner')).toBeVisible();
+  await expect(feedA.getByText(`You added ${B.u}`)).toBeVisible();
+  await expect(split(A).getByRole('tab', { name: /Activity/ })).not.toContainText('1'); // seen
+  await split(B).getByRole('tab', { name: /Activity/ }).click();
+  await expect(split(B).getByRole('tab', { name: /Activity/ })).toHaveAttribute('aria-selected', 'true');
+  const feedB = split(B).getByRole('tabpanel', { name: /Activity/ });
+  await expect(feedB.getByText(`${A.u} added Beach dinner`)).toBeVisible();
+  await expect(feedB.getByText('You added Auto to station')).toBeVisible();
+  await B.page.screenshot({ path: shots('83-split-activity') });
+  // Edit: the feed says what changed, and the expense still says who first added it.
+  await split(A).getByRole('tab', { name: 'Expenses' }).click();
+  await split(A).getByRole('button', { name: /Auto to station/ }).click();
+  await expect(A.page.getByRole('dialog', { name: 'Auto to station' }).getByText(`Added by ${B.u}`)).toBeVisible();
+  await A.page.keyboard.press('Escape');
+
   // 3 people share equally: A paid 1200 (owes 420), B paid 60 (owes 420), Rohan owes 420.
   await split(B).getByRole('tab', { name: 'Balances' }).click();
   await expect(split(B).getByText(/You\s+owes? \$?3[56]\d\.\d\d|owes \$360\.00/).first()).toBeVisible();

@@ -9,7 +9,8 @@ import { create } from 'zustand';
 import * as C from '@sanga/crypto';
 import { sdk } from '@sanga/sdk';
 import { prepareBill, type Bill } from './bills';
-import { BUILTIN_CATS, type Expense, type Meta, type Person, type Record_, type Settlement, validDay } from './model';
+import { ACTIVITY_KINDS, BUILTIN_CATS, type Activity, type Expense, type Meta, type Person, type Record_, type Settlement, validDay } from './model';
+import { activityFor } from './activity';
 
 type Local<T> = T & { srv?: number; dirty?: boolean };
 export interface Member { u: string; owner: boolean }
@@ -19,21 +20,23 @@ export interface GroupData {
   meta: Local<Meta> | null;
   expenses: Record<string, Local<Expense>>;
   settles: Record<string, Local<Settlement>>;
+  activity: Record<string, Local<Activity>>;
 }
 interface ListEntry { gid: string; wrapper: string; wrapped: string; members: { u: string; owner: boolean }[] }
 
-interface State { loaded: boolean; groups: Record<string, GroupData>; error: string }
-export const useSplit = create<State>(() => ({ loaded: false, groups: {}, error: '' }));
+interface State { loaded: boolean; groups: Record<string, GroupData>; error: string; seen: Record<string, number> }
+export const useSplit = create<State>(() => ({ loaded: false, groups: {}, error: '', seen: {} }));
 const set = useSplit.setState;
 const get = useSplit.getState;
 
 const LIST = 'app/split/groups';
 const REC = (gid: string, id: string) => `app/split/r/${gid}/${id}`;
 const SINCE = (gid: string) => `app/split/since/${gid}`;
+const SEEN = 'app/split/seen';
 const BILL = (gid: string, id: string) => `app/split/bill/${gid}/${id}`;
 const me = () => sdk().identity().me;
 
-const blank = (gid: string, members: Member[] = []): GroupData => ({ gid, members, meta: null, expenses: {}, settles: {} });
+const blank = (gid: string, members: Member[] = []): GroupData => ({ gid, members, meta: null, expenses: {}, settles: {}, activity: {} });
 const patch = (gid: string, fn: (g: GroupData) => GroupData) =>
   set((s) => ({ groups: { ...s.groups, [gid]: fn(s.groups[gid] ?? blank(gid)) } }));
 
@@ -76,7 +79,7 @@ export function startSplit() {
 
 function load() {
   return (loading ??= (async () => {
-    const [list, recs] = await Promise.all([sdk().store.get<ListEntry[]>(LIST), sdk().store.prefix<Local<Record_> & { gid: string }>('app/split/r/')]);
+    const [list, recs, seen] = await Promise.all([sdk().store.get<ListEntry[]>(LIST), sdk().store.prefix<Local<Record_> & { gid: string }>('app/split/r/'), sdk().store.get<Record<string, number>>(SEEN)]);
     const groups: Record<string, GroupData> = {};
     for (const e of list ?? []) groups[e.gid] = blank(e.gid, e.members);
     for (const r of recs) {
@@ -84,7 +87,7 @@ function load() {
       if (g) put(g, r);
     }
     cache = list ?? [];
-    set((s) => ({ loaded: true, groups: { ...groups, ...s.groups } }));
+    set((s) => ({ loaded: true, groups: { ...groups, ...s.groups }, seen: { ...(seen ?? {}), ...s.seen } }));
     // The keys: from the saved wrapped copies, so a group opens offline.
     await Promise.all(cache.map((e) => groupKey(e).catch(() => {})));
   })());
@@ -95,16 +98,17 @@ function put(g: GroupData, r: Local<Record_> & { gid?: string }) {
   if (r.type === 'meta') g.meta = r;
   else if (r.type === 'expense') g.expenses[r.id] = r;
   else if (r.type === 'settle') g.settles[r.id] = r;
+  else if (r.type === 'activity') g.activity[r.id] = r;
 }
 
 const keep = (gid: string, r: Local<Record_>) => {
-  patch(gid, (g) => { const n = { ...g, expenses: { ...g.expenses }, settles: { ...g.settles } }; put(n, r); return n; });
+  patch(gid, (g) => { const n = { ...g, expenses: { ...g.expenses }, settles: { ...g.settles }, activity: { ...g.activity } }; put(n, r); return n; });
   return sdk().store.put(REC(gid, r.id), { ...r, gid });
 };
 const drop = (gid: string, r: Record_) => {
   patch(gid, (g) => {
-    const n = { ...g, expenses: { ...g.expenses }, settles: { ...g.settles } };
-    if (r.type === 'expense') delete n.expenses[r.id]; else if (r.type === 'settle') delete n.settles[r.id];
+    const n = { ...g, expenses: { ...g.expenses }, settles: { ...g.settles }, activity: { ...g.activity } };
+    if (r.type === 'expense') delete n.expenses[r.id]; else if (r.type === 'settle') delete n.settles[r.id]; else if (r.type === 'activity') delete n.activity[r.id];
     return n;
   });
   return sdk().store.del(REC(gid, r.id));
@@ -116,9 +120,24 @@ const soon = () => { clearTimeout(timer); timer = window.setTimeout(() => void s
 
 /** Save an expense, settlement or the group's details: here first, then up to the server. */
 export function save(gid: string, r: Record_) {
-  void keep(gid, { ...r, by: me(), edited: Date.now(), dirty: true } as Local<Record_>).then(soon);
+  if (r.type === 'activity') return;
+  const g = get().groups[gid];
+  const prev = r.type === 'meta' ? g?.meta : r.type === 'expense' ? g?.expenses[r.id] : g?.settles[r.id];
+  const now = Date.now();
+  // Who first added an expense, and when, stays through edits; `by` is whoever made this latest change.
+  const rec = r.type === 'expense' ? { ...r, addedBy: (prev as Expense | undefined)?.addedBy ?? r.addedBy ?? me(), added: (prev as Expense | undefined)?.added ?? r.added ?? now } : r;
+  // The history first: it is written whenever the change is, here and then up to the others.
+  for (const a of activityFor(prev, rec, me(), now)) void keep(gid, { ...a, id: 'a' + C.randomId(8), dirty: true });
+  void keep(gid, { ...rec, by: me(), edited: now, dirty: true } as Local<Record_>).then(soon);
 }
 export const removeRecord = (gid: string, r: Expense | Settlement) => save(gid, { ...r, deleted: true });
+
+/** You've looked at the group's activity up to now. */
+export function markSeen(gid: string) {
+  const seen = { ...get().seen, [gid]: Date.now() };
+  set({ seen });
+  void sdk().store.put(SEEN, seen);
+}
 
 const newId = () => C.randomId(9);
 export { newId };
@@ -237,12 +256,14 @@ async function sync() {
   for (const e of groups) {
     try { await groupKey(e); } catch { set({ error: 'Some groups can’t be opened yet. Their key needs your friend’s details; try again when you’re online.' }); continue; }
     patch(e.gid, (g) => ({ ...g, members: e.members }));
+    if (get().seen[e.gid] === undefined) markSeen(e.gid); // its past isn't "new"
     await syncGroup(e.gid);
   }
 }
 
+const stamp = (r: Record_) => (r.type === 'activity' ? r.ts : r.edited);
 const dirtyOf = (g: GroupData): Local<Record_>[] =>
-  [...(g.meta ? [g.meta] : []), ...Object.values(g.expenses), ...Object.values(g.settles)].filter((r) => r.dirty);
+  [...(g.meta ? [g.meta] : []), ...Object.values(g.expenses), ...Object.values(g.settles), ...Object.values(g.activity)].filter((r) => r.dirty);
 
 const sealable = (r: Local<Record_>) => { const { srv: _s, dirty: _d, ...rest } = r as Local<Record_> & { gid?: string }; delete rest.gid; return rest; };
 
@@ -253,8 +274,8 @@ async function syncGroup(gid: string) {
     const body = deleted ? '' : await C.encryptItem(k, sealable(r), gid, 'split', r.id);
     const { updated } = await sdk().api<{ updated: number }>(`/api/split/records?gid=${gid}`, { id: r.id, body });
     const g = get().groups[gid];
-    const now = r.type === 'meta' ? g?.meta : r.type === 'expense' ? g?.expenses[r.id] : g?.settles[r.id];
-    if (!now || now.edited !== r.edited) continue; // changed again while sending: goes next time
+    const now = r.type === 'meta' ? g?.meta : r.type === 'expense' ? g?.expenses[r.id] : r.type === 'settle' ? g?.settles[r.id] : g?.activity[r.id];
+    if (!now || stamp(now) !== stamp(r)) continue; // changed again while sending: goes next time
     if (deleted) await drop(gid, r); else await keep(gid, { ...now, dirty: false, srv: updated });
   }
   let since: number = (await sdk().store.get<number>(SINCE(gid))) || 0;
@@ -269,7 +290,7 @@ async function syncGroup(gid: string) {
 
 async function receive(gid: string, k: CryptoKey, row: { id: string; body: string; updated: number }) {
   const g = get().groups[gid];
-  const local = row.id === 'meta' ? g?.meta : g?.expenses[row.id] ?? g?.settles[row.id];
+  const local = row.id === 'meta' ? g?.meta : g?.expenses[row.id] ?? g?.settles[row.id] ?? g?.activity[row.id];
   if (local?.dirty) return;                          // this device's newer change goes up next
   if (local?.srv && local.srv >= row.updated) return; // already have it
   if (!row.body) { if (local) await drop(gid, local); return; }
@@ -298,13 +319,22 @@ function valid(x: any, id: string): Record_ | null {
     if (!isStr(x.desc, 200) || !isAmt(x.amount) || !isStr(x.cat, 40) || !validDay(x.date) || !isStr(x.paidBy, 40) || !['equal', 'exact', 'percent', 'shares'].includes(x.mode)
       || !isMoneyMap(x.owed) || !isMoneyMap(x.values) || !isStr(x.by, 40)) return null;
     return { type: 'expense', id, desc: x.desc, amount: x.amount, cat: x.cat, date: x.date, paidBy: x.paidBy, mode: x.mode, values: x.values, owed: x.owed,
-      ...(isStr(x.notes, 1000) && x.notes && { notes: x.notes }), ...(isStr(x.bill, 40) && x.bill && { bill: x.bill }), by: x.by, edited: Number(x.edited) || 0 };
+      ...(isStr(x.notes, 1000) && x.notes && { notes: x.notes }), ...(isStr(x.bill, 40) && x.bill && { bill: x.bill }), by: x.by,
+      ...(isStr(x.addedBy, 40) && x.addedBy && { addedBy: x.addedBy, added: Number(x.added) || 0 }), edited: Number(x.edited) || 0 };
   }
   if (x.type === 'settle') {
     if (!isStr(x.from, 40) || !isStr(x.to, 40) || !isAmt(x.amount) || !validDay(x.date) || !isStr(x.by, 40)) return null;
     return { type: 'settle', id, from: x.from, to: x.to, amount: x.amount, date: x.date, ...(isStr(x.note, 300) && x.note && { note: x.note }), by: x.by, edited: Number(x.edited) || 0 };
   }
+  if (x.type === 'activity') {
+    if (!ACTIVITY_KINDS.includes(x.kind) || !isStr(x.by, 40) || !Number.isFinite(x.ts)) return null;
+    const s = (v: unknown, n: number) => (isStr(v, n) && v ? v : undefined);
+    const n = (v: unknown) => (isAmt(v) ? v : undefined);
+    return clean<Activity>({ type: 'activity', id, kind: x.kind, by: x.by, ts: Number(x.ts), ref: s(x.ref, 40), desc: s(x.desc, 200), amount: n(x.amount), wasDesc: s(x.wasDesc, 200),
+      wasAmount: n(x.wasAmount), who: s(x.who, 40), from: s(x.from, 40), to: s(x.to, 40), name: s(x.name, 80) });
+  }
   return null;
 }
+const clean = <T extends object>(o: T): T => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T;
 
 export { BUILTIN_CATS };

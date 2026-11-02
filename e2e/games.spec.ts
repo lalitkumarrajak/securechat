@@ -1,7 +1,7 @@
 // End-to-end: Ludo between people who aren't friends, joined from a shared link.
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
-import { newGame, phone, signUp, uname, type Phone } from './helpers';
+import { newGame, phone, signUp, tab, uname, type Phone } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -117,6 +117,17 @@ test('emoji, quick phrases and chat during the game', async () => {
   await B.page.keyboard.press('Escape');
 });
 
+test('tease: tap a player, throw a tomato, and it flies to them', async () => {
+  await B.page.locator(`[data-player="${A.u}"]`).click({ position: { x: 6, y: 6 } });
+  const menu = B.page.getByRole('menu', { name: /^Tease/ });
+  await expect(menu).toBeVisible();
+  await menu.getByRole('menuitem', { name: 'Tomato' }).click();
+  await expect(menu).toBeHidden();
+  await expect(A.page.getByText('🍅').first()).toBeVisible({ timeout: 3000 }); // in flight on the target's screen
+  await A.page.screenshot({ path: shots('24b-ludo-tease') });
+  await expect(A.page.getByText('💥').first()).toBeVisible({ timeout: 3000 }); // and where it lands
+});
+
 test('leaving: the last one left wins', async () => {
   for (const p of [B, C]) {
     await p.page.getByRole('button', { name: 'Game menu' }).click();
@@ -147,4 +158,17 @@ test('5 or 6 players use the six-arm board', async ({ browser }) => {
   } finally {
     for (const p of more) await p.ctx.close();
   }
+});
+
+test('opening Games keeps the tabs on screen while it downloads', async ({ browser }) => {
+  const P = await phone(browser, uname('gtab'));
+  try {
+    await signUp(P);
+    await P.page.route(/\/assets\/GamesHub-.*\.js/, async (route) => { await new Promise((r) => setTimeout(r, 2500)); await route.continue(); });
+    await tab(P, 'Games').click();
+    // Still downloading: the page shows its frame and every tab, not a blank screen.
+    await expect(P.page.getByRole('heading', { name: 'Games', exact: true })).toBeVisible({ timeout: 1000 });
+    for (const t of ['Chats', 'Stories', 'Games', 'Diary', 'Calendar', 'Split']) await expect(tab(P, t)).toBeVisible({ timeout: 500 });
+    await expect(P.page.getByRole('button', { name: 'Play Ludo' })).toBeVisible({ timeout: 10_000 });
+  } finally { await P.ctx.close(); }
 });

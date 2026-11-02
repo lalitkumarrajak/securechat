@@ -1384,12 +1384,21 @@ export async function enablePush(silent = false) {
       : 'This browser doesn’t support push notifications.');
   }
   const perm = silent ? Notification.permission : await Notification.requestPermission();
-  if (perm !== 'granted') throw new Error('Notifications are blocked. Allow them in your browser settings.');
+  if (perm !== 'granted') throw new Error('Notifications are blocked. Tap the lock icon next to the address, allow Notifications, then try again.');
   const reg = await navigator.serviceWorker.ready;
   const { key } = await api('/api/push/key');
-  const sub = (await reg.pushManager.getSubscription()) ||
-    (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64urlToBytes(key) }));
-  await api('/api/push/subscribe', { sub: sub.toJSON() });
+  const subscribe = () => reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64urlToBytes(key) })
+    .catch(() => { throw new Error('Your browser couldn’t reach its push service. Check your internet connection (and any VPN or ad blocker), then try again.'); });
+  let sub = (await reg.pushManager.getSubscription()) || (await subscribe());
+  try {
+    await api('/api/push/subscribe', { sub: sub.toJSON() });
+  } catch (e) {
+    // This browser still holds a subscription from another account (the server keeps it theirs), or one
+    // the server no longer accepts: drop it and take a fresh one, which is ours.
+    await sub.unsubscribe().catch(() => {});
+    sub = await subscribe();
+    await api('/api/push/subscribe', { sub: sub.toJSON() }).catch((e2) => { throw new Error(e2?.message || (e as Error).message); });
+  }
   setSettings({ push: true });
 }
 

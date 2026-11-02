@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, LogOut, MessageCircle, MoreVertical, Smile, Volume2, VolumeX } from 'lucide-react';
 import { IconButton, Spinner } from '@sanga/ui/button';
 import { confirm } from '@sanga/ui/confirm';
@@ -6,7 +6,9 @@ import { Menu, MenuContent, MenuItem, MenuTrigger } from '@sanga/ui/menu';
 import { myName } from '../../../lib/engine';
 import { setSettings, useSettings } from '../../../state/settings';
 import { GAME_UI } from '../registry';
-import { act, dismiss, leave, openGame, say, setChatOpen, useGames, type Game } from '../store';
+import { act, dismiss, leave, openGame, say, setChatOpen, tease, useGames, type Game } from '../store';
+import { TeaseLayer } from '../TeaseLayer';
+import { TeaseMenu } from '../TeaseMenu';
 import { QuickTray } from './QuickTray';
 import { ChatSheet } from './ChatSheet';
 import { Lobby } from './Lobby';
@@ -23,6 +25,8 @@ export function GameView({ g }: { g: Game }) {
   const bubbles = useGames((s) => s.bubble);
   const sound = useSettings((s) => s.gameSound);
   const [tray, setTray] = useState(false);
+  const [menu, setMenu] = useState<{ u: string; x: number; y: number; top: number } | null>(null);
+  const lastTease = useRef(0);
   const [, tick] = useState(0);
   const [showResults, setShowResults] = useState(g.status === 'over');
 
@@ -32,13 +36,31 @@ export function GameView({ g }: { g: Game }) {
   }, []);
   useEffect(() => { // let the last moves play before the results
     if (g.status !== 'over') return;
-    const t = setTimeout(() => setShowResults(true), 2500);
+    const t = setTimeout(() => setShowResults(true), 3500);
     return () => clearTimeout(t);
   }, [g.status]);
 
   const bubble = (u: string) => {
     const b = bubbles[`${g.id}/${u}`];
     return b && Date.now() - b.ts < BUBBLE_MS ? b.x : null;
+  };
+
+  // Tap another player's panel to throw something at them.
+  const onBoardClick = (e: React.MouseEvent) => {
+    if (g.status !== 'play' || !mePl || mePl.state === 'declined') return;
+    const target = e.target as HTMLElement;
+    const panel = target.closest<HTMLElement>('[data-player]');
+    if (!panel || target.closest('button, a, input')) return;
+    const u = panel.dataset.player!;
+    const pl = g.players.find((p) => p.u === u);
+    if (!pl || u === me || pl.state === 'declined' || pl.state === 'left' || pl.state === 'out') return;
+    const r = panel.getBoundingClientRect();
+    setMenu({ u, x: r.left + r.width / 2, y: r.bottom, top: r.top });
+  };
+  const throwAt = (k: string) => {
+    if (!menu) return;
+    if (Date.now() - lastTease.current > 900) { lastTease.current = Date.now(); tease(g.id, menu.u, k); }
+    setMenu(null);
   };
 
   const leaveGame = async () => {
@@ -73,7 +95,7 @@ export function GameView({ g }: { g: Game }) {
         </Menu>
       </header>
 
-      <main className="relative min-h-0 flex-1">
+      <main className="relative min-h-0 flex-1" onClick={onBoardClick}>
         {g.status === 'lobby' ? <Lobby g={g} me={me} onLeave={leaveGame} /> : ui ? (
           <Suspense fallback={<div className="grid h-full place-items-center"><Spinner /></div>}>
             <ui.Board g={g} me={me} act={(a) => act(g.id, a)} bubble={bubble} />
@@ -94,6 +116,8 @@ export function GameView({ g }: { g: Game }) {
         </footer>
       )}
 
+      <TeaseLayer gid={g.id} />
+      {menu && <TeaseMenu name={g.players.find((p) => p.u === menu.u)?.n || menu.u} at={menu} onPick={throwAt} onClose={() => setMenu(null)} />}
       <ChatSheet g={g} open={chatOpen} onOpenChange={setChatOpen} />
       {showResults && g.status === 'over' && <Results g={g} me={me} />}
     </div>

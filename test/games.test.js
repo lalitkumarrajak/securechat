@@ -60,6 +60,18 @@ describe('games', () => {
     assert.equal(await C.gets('gc', (m) => m.id === id), false); // C declined
   });
 
+  it('teasing: something thrown at a player reaches everyone in the game, only for real targets and things', async () => {
+    B.sendJson({ t: 'gtease', id, to: a.u, k: 'tomato' });
+    const t = await A.next('gt', (m) => m.id === id);
+    assert.deepEqual([t.f, t.to, t.k], [b.u, a.u, 'tomato']);
+    assert.equal((await B.next('gt', (m) => m.id === id)).k, 'tomato', 'the thrower sees it too');
+    B.sendJson({ t: 'gtease', id, to: a.u, k: 'rm -rf' });   // not on the list
+    B.sendJson({ t: 'gtease', id, to: b.u, k: 'rose' });     // not yourself
+    B.sendJson({ t: 'gtease', id, to: stranger.u, k: 'rose' }); // not someone outside the game
+    assert.equal(await A.gets('gt', (m) => m.id === id), false);
+    assert.equal(await C.gets('gt', (m) => m.id === id), false); // C declined
+  });
+
   it('plays for a player who runs out of time, and removes them after 5 missed turns', async () => {
     // Nobody acts: turns time out (700 ms each) until someone has missed 5 in a row.
     const over = await frame(A, (x) => x.id === id && x.status === 'over', 30_000);

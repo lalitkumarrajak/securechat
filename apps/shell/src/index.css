@@ -60,6 +60,7 @@ html[data-away]::after {
 .ludo-roll-hint { animation: ludo-nudge 1.1s ease-in-out infinite; }
 .ludo-dice-roll { animation: ludo-tumble 0.3s linear infinite; }
 .ludo-bubble { animation: ludo-pop 0.25s cubic-bezier(.2, 1.4, .5, 1); }
+.turn-bob { animation: ludo-bob 0.9s ease-in-out infinite; }
 .ludo-your-turn { left: 50%; translate: -50% 0; animation: ludo-bob 0.9s ease-in-out infinite; }
 @keyframes ludo-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
 /* UNO */
@@ -78,7 +79,22 @@ html[data-away]::after {
 @keyframes ludo-pulse { from { opacity: 0.9; transform: scale(0.7); } to { opacity: 0; transform: scale(1.25); } }
 @keyframes ludo-nudge { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
 @keyframes ludo-tumble { 0% { transform: rotate(0) scale(0.92); } 50% { transform: rotate(180deg) scale(1.05); } 100% { transform: rotate(360deg) scale(0.92); } }
+/* Tic-Tac-Toe and Connect Four */
+.ttt-draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: ttt-draw 0.35s ease-out forwards; }
+@keyframes ttt-draw { to { stroke-dashoffset: 0; } }
+.ttt-win { animation: ttt-win 0.9s ease-in-out infinite alternate; }
+@keyframes ttt-win { from { transform: scale(1); } to { transform: scale(1.06); } }
+@keyframes c4-drop { 0% { transform: translateY(calc(var(--fall) * -112%)); } 70% { transform: translateY(0); } 82% { transform: translateY(-9%); } 100% { transform: translateY(0); } }
+.c4-win { animation: c4-glow 0.8s ease-in-out infinite alternate; }
+@keyframes c4-glow { from { box-shadow: 0 0 0 0 #fff; transform: scale(1); } to { box-shadow: 0 0 14px 4px #fff; transform: scale(1.06); } }
+.snakes-active { animation: snakes-pulse 0.9s ease-in-out infinite alternate; }
+@keyframes snakes-pulse { from { stroke-width: 0.8; } to { stroke-width: 1.7; } }
+@keyframes ludo-crown { 0%, 100% { transform: translate(-50%, 0) rotate(-8deg); } 50% { transform: translate(-50%, -3px) rotate(8deg); } }
+.ludo-crown { animation: ludo-crown 1.6s ease-in-out infinite; }
+.ludo-rank-in { animation: ludo-rank 0.6s cubic-bezier(0.2, 1.7, 0.4, 1); }
+@keyframes ludo-rank { from { transform: scale(0) rotate(-90deg); } to { transform: scale(1) rotate(0); } }
 @keyframes ludo-pop { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) {
-  .ludo-token-can, .ludo-ring, .ludo-roll-hint, .ludo-dice-roll { animation: none; }
+  .ludo-token-can, .ludo-ring, .ludo-roll-hint, .ludo-dice-roll, .ludo-crown, .ttt-draw, .ttt-win, .c4-win, .snakes-active, .turn-bob { animation: none; }
+  .ttt-draw { stroke-dashoffset: 0; }
 }

@@ -128,7 +128,7 @@ export default function LudoBoard({ g: game, me, act, bubble }: GameBoardProps) 
   const panel = (s: (typeof seats)[number]) => (
     <div key={s.pl.u} className={s.x > 0 ? 'ml-auto' : 'mr-auto'}>
       <PlayerPanel g={g} i={s.i} me={meIdx} shown={shown} canRoll={canRoll && s.i === meIdx}
-        onRoll={roll} spinning={asked === g.v && s.i === meIdx} bubble={bubble(s.pl.u)} right={s.x > 0} below={!s.top} />
+        onRoll={roll} spinning={asked === g.v && s.i === meIdx} bubble={bubble(s.pl.u)} right={s.x > 0} below={!s.top} settled={!busy} />
     </div>
   );
 

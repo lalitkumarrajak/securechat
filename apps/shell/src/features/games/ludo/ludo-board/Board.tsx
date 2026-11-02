@@ -78,14 +78,15 @@ export function Board({ L, g, shown, home, movable, meIdx, onMove }: {
         const y = L.yard(a);
         const h = y.size / 2;
         const c = fillOf(a);
+        const free = !used.has(a); // nobody plays this colour: just a faded corner, no token spots
         return (
-          <g key={'y' + a}>
+          <g key={'y' + a} opacity={free ? 0.45 : 1}>
             {y.round ? <circle cx={y.c.x} cy={y.c.y} r={h} fill={c} stroke={used.has(a) ? DARK[a] : '#9aa5b8'} strokeWidth="0.06" />
               : <rect x={y.c.x - h} y={y.c.y - h} width={y.size} height={y.size} rx="0.2" fill={c} />}
             {y.round ? <circle cx={y.c.x} cy={y.c.y} r={h * 0.72} fill="#fff" filter="url(#inset)" />
               : <rect x={y.c.x - h * 0.66} y={y.c.y - h * 0.66} width={h * 1.32} height={h * 1.32} rx="0.45" fill="#fff" filter="url(#inset)" />}
-            {y.spots.map((s, k) => (
-              <g key={k} opacity={used.has(a) ? 1 : 0.5}>
+            {!free && y.spots.map((s, k) => (
+              <g key={k}>
                 <circle cx={s.x} cy={s.y} r="0.42" fill={c} />
                 <circle cx={s.x} cy={s.y} r="0.42" fill="none" stroke="#000" strokeOpacity="0.15" strokeWidth="0.05" />
               </g>

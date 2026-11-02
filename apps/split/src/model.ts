@@ -28,7 +28,8 @@ export interface Expense {
   owed: Record<string, number>;   // what each person owes, minor units; sums to `amount`
   notes?: string;
   bill?: string;                  // id of the sealed bill photo
-  by: string;                     // username of whoever entered it
+  by: string;                     // username of whoever made the latest change
+  addedBy?: string; added?: number; // who first added it, and when (kept through edits)
   edited: number; deleted?: boolean;
 }
 
@@ -37,7 +38,24 @@ export interface Settlement {
   by: string; edited: number; deleted?: boolean;
 }
 
-export type Record_ = Meta | Expense | Settlement;
+/** One line of the group's history, never changed or removed: who did what, and when. */
+export type ActivityKind = 'group_create' | 'group_rename' | 'person_add' | 'person_remove' | 'person_left' | 'category_add'
+  | 'expense_add' | 'expense_edit' | 'expense_delete' | 'settle_add' | 'settle_undo';
+export interface Activity {
+  type: 'activity'; id: string; kind: ActivityKind;
+  by: string;                      // username of whoever did it
+  ts: number;
+  ref?: string;                    // the expense it is about
+  desc?: string; amount?: number;  // what it was (an expense's description and total)
+  wasDesc?: string; wasAmount?: number; // what an edit changed it from
+  who?: string;                    // a Person id (added, removed, left)
+  from?: string; to?: string;      // a payment
+  name?: string;                   // a group or category name
+}
+export const ACTIVITY_KINDS: ActivityKind[] = ['group_create', 'group_rename', 'person_add', 'person_remove', 'person_left', 'category_add',
+  'expense_add', 'expense_edit', 'expense_delete', 'settle_add', 'settle_undo'];
+
+export type Record_ = Meta | Expense | Settlement | Activity;
 
 // ---------- categories ----------
 const C = (id: string, name: string, emoji: string, color: string): Category => ({ id, name, emoji, color });

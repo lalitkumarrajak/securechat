@@ -122,6 +122,13 @@ frameHooks.gc = (m) => {
   }
 };
 
+// Teases thrown in a game: handed to whoever is drawing the board (game-screen/TeaseLayer), never stored.
+type TeaseMsg = { id: string; f: string; to: string; k: string };
+const teaseListeners = new Set<(m: TeaseMsg) => void>();
+export const onTease = (fn: (m: TeaseMsg) => void) => { teaseListeners.add(fn); return () => { teaseListeners.delete(fn); }; };
+frameHooks.gt = (m) => teaseListeners.forEach((f) => f({ id: m.id, f: m.f, to: m.to, k: m.k }));
+export const tease = (id: string, to: string, k: string) => sendOrWarn({ t: 'gtease', id, to, k });
+
 frameHooks.gerr = (m) => {
   if (m.ref) pending.delete(m.ref);
   if (m.link) setLinkPending(null);

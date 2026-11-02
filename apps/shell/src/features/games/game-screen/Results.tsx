@@ -11,18 +11,19 @@ export function Results({ g, me }: { g: Game; me: string }) {
   const ranked = [...g.players].sort((a, b) => (a.rank || 99) - (b.rank || 99));
   const mine = g.players.find((p) => p.u === me);
   const cancelled = g.ev.some((e) => e.k === 'cancelled' || e.k === 'expired');
+  const draw = g.ev.some((e) => e.k === 'draw');
   const again = g.players.filter((p) => p.u !== me && friends[p.u]).map((p) => p.u);
   return (
     <div className="absolute inset-0 z-30 grid place-items-center overflow-hidden bg-black/60 p-5 animate-fade-in">
-      {mine?.rank === 1 && !cancelled && <Confetti />}
+      {mine?.rank === 1 && !cancelled && !draw && <Confetti />}
       <div className="relative w-full max-w-sm rounded-3xl bg-white p-6 text-center text-slate-900 shadow-2xl">
         {cancelled ? (
           <><div className="text-5xl">🕓</div><h2 className="mt-2 text-xl font-bold">Game called off</h2>
             <p className="mt-1 text-sm text-slate-500">Not enough players joined.</p></>
         ) : (
           <>
-            <div className="text-5xl">{mine?.rank === 1 ? '🏆' : '🎲'}</div>
-            <h2 className="mt-2 text-xl font-bold">{mine?.rank === 1 ? 'You won!' : mine?.rank ? `You came ${mine.rank}${['th', 'st', 'nd', 'rd'][mine.rank] || 'th'}` : 'Game over'}</h2>
+            <div className="text-5xl">{draw ? '🤝' : mine?.rank === 1 ? '🏆' : '🎲'}</div>
+            <h2 className="mt-2 text-xl font-bold">{draw ? 'It’s a draw!' : mine?.rank === 1 ? 'You won!' : mine?.rank ? `You came ${mine.rank}${['th', 'st', 'nd', 'rd'][mine.rank] || 'th'}` : 'Game over'}</h2>
             <ol className="mt-4 space-y-2 text-left">
               {ranked.map((p) => (
                 <li key={p.u} className="flex items-center gap-3 rounded-xl bg-slate-100 px-3 py-2">

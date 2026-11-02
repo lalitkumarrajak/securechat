@@ -5,10 +5,10 @@
 // Anyone with a game's link can join it while it's in the lobby, friends or not ("open" games).
 //
 // Client → server: gnew {type, to, ref} · gjoin · gdecline · gstart · gleave · gact {a} · gsay {x} · glist
-//                  glink (share by link) · gjoinlink (join from a link) · gbot {add | drop} (computer players)
+//                  gtease {to, k} (throw something at a player: not kept) · glink (share by link) · gjoinlink (join from a link) · gbot {add | drop} (computer players)
 //
 // Computer players sit in seats like people (u "bot:<id>"); the server plays their turns.
-// Server → client: g {g, ref} after every change · gc {id, f, x, ts} chat line · gl {games} on glist
+// Server → client: g {g, ref} after every change · gc {id, f, x, ts} chat line · gt {id, f, to, k} a tease · gl {games} on glist
 import crypto from 'node:crypto';
 import { config, USER_RE } from './config.js';
 import { ctx } from './context.js';
@@ -25,6 +25,7 @@ const games = new Map();  // id -> game
 const timers = new Map(); // id -> timeout
 const MAX_OPEN = 5;       // unfinished games per person
 const CHAT_KEEP = 50;
+export const TEASES = ['tomato', 'egg', 'rose', 'kiss', 'banana', 'bomb', 'snow', 'fire', 'clown', 'turtle', 'cake', 'clap']; // what can be thrown
 const KEEP_OVER_MS = 10 * 60e3;
 const rand = (n) => (n === 6 && config.gameTestDice.length ? config.gameTestDice.shift() - 1 : crypto.randomInt(n));
 const ID_RE = /^[A-Za-z0-9_-]{12}$/;
@@ -246,6 +247,16 @@ export const handlers = {
     if (i === turn) g.players[i].missed = 0;
     if (i === turn || g.turn !== turn || g.turnNo !== turnNo) turnDeadline(g);
     await commit(g);
+  },
+
+  // Throwing something at another player (a tomato, a rose…): shown to everyone in the game, kept by no one.
+  async gtease(ws, m) {
+    const g = find(ws, m);
+    if (!g || g.status !== 'play' || g.players[seat(g, ws.user)].state === 'declined') return;
+    const target = typeof m.to === 'string' ? g.players.find((p) => p.u === m.to && p.state !== 'declined') : null;
+    if (!target || target.u === ws.user || !TEASES.includes(m.k)) return;
+    if (rateLimited('gtease:' + ws.user, 12, 10e3)) return send(ws, { t: 'gerr', id: g.id, e: 'Slow down' });
+    for (const u of members(g)) sendTo(u, { t: 'gt', id: g.id, f: ws.user, to: target.u, k: m.k });
   },
 
   async gsay(ws, m) {

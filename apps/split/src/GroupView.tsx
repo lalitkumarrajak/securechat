@@ -3,7 +3,8 @@ import { ArrowLeft, Plus, Settings } from 'lucide-react';
 import { IconButton } from '@sanga/ui/button';
 import { Tabs, TabsContent, TabsList } from '@sanga/ui/tabs';
 import { balances, money, type Expense } from './model';
-import { useGroup, useLedger, useMe } from './hooks';
+import { useGroup, useLedger, useMe, useUnread } from './hooks';
+import { ActivityTab } from './ActivityTab';
 import { blankExpense } from './blankExpense';
 import { AddPeopleDialog } from './AddPeopleDialog';
 import { BalancesTab } from './BalancesTab';
@@ -25,6 +26,7 @@ export function GroupView({ gid, onBack, onGone }: { gid: string; onBack?: () =>
   const [viewing, setViewing] = useState<Expense | null>(null);
   const [settings, setSettings] = useState(false);
   const [adding, setAdding] = useState(false);
+  const unread = useUnread(gid);
   const mine = useMemo(() => balances(expenses, settles)[me] ?? 0, [expenses, settles, me]);
 
   if (!g || !meta) return <Empty emoji="🔐" title="Opening the group…">If this stays, check your connection.</Empty>;
@@ -46,7 +48,7 @@ export function GroupView({ gid, onBack, onGone }: { gid: string; onBack?: () =>
 
       <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col">
         <div className="px-4 py-2">
-          <TabsList tabs={[{ value: 'expenses', label: 'Expenses' }, { value: 'balances', label: 'Balances' }, { value: 'insights', label: 'Insights' }, { value: 'people', label: 'People' }]} />
+          <TabsList tabs={[{ value: 'expenses', label: 'Expenses' }, { value: 'balances', label: 'Balances' }, { value: 'insights', label: 'Insights' }, { value: 'people', label: 'People' }, { value: 'activity', label: <span className="relative">Activity{unread > 0 && tab !== 'activity' && <span className="absolute -top-1.5 -right-4 grid min-w-4 place-items-center rounded-full bg-danger px-1 text-[10px] font-bold text-white" aria-label={`${unread} new`}>{unread}</span>}</span> }]} />
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto pb-24 md:pb-6">
           {alone && tab === 'expenses' && (
@@ -58,6 +60,7 @@ export function GroupView({ gid, onBack, onGone }: { gid: string; onBack?: () =>
           <TabsContent value="balances"><BalancesTab g={g} /></TabsContent>
           <TabsContent value="insights"><InsightsTab scope={{ kind: 'group', gid }} /></TabsContent>
           <TabsContent value="people"><PeopleTab g={g} /></TabsContent>
+          <TabsContent value="activity"><ActivityTab g={g} onOpenExpense={(id) => setViewing(g.expenses[id] ?? null)} /></TabsContent>
         </div>
       </Tabs>
 
