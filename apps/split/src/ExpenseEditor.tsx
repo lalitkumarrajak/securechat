@@ -93,10 +93,10 @@ function Form({ g, expense, onClose }: { g: GroupData; expense: Expense; onClose
       </div>
       <div><Label>Category</Label><CategoryPicker cats={catList} value={cat} onChange={setCat} /></div>
       <div className="grid grid-cols-2 gap-3">
-        <div><Label htmlFor="date">Date</Label><Input id="date" type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value)} /></div>
-        <div>
+        <div className="min-w-0"><Label htmlFor="date">Date</Label><Input id="date" type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value)} /></div>
+        <div className="min-w-0">
           <Label htmlFor="paid">Paid by</Label>
-          <select id="paid" value={paidBy} onChange={(e) => setPaidBy(e.target.value)} className="h-11 w-full rounded-xl border border-line bg-panel-2 px-3 text-[0.95rem] outline-none focus:border-accent">
+          <select id="paid" value={paidBy} onChange={(e) => setPaidBy(e.target.value)} className="h-11 w-full min-w-0 rounded-xl border border-line bg-panel-2 px-3 text-[0.95rem] outline-none focus:border-accent">
             {choices.map((p) => <option key={p.id} value={p.id}>{name(p)}</option>)}
           </select>
         </div>

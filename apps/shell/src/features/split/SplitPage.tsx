@@ -11,7 +11,7 @@ export function SplitPage() {
   const [params] = useState(() => getApp().appParams.split ?? {});
   useEffect(() => { if (getApp().appParams.split) setApp({ appParams: { ...getApp().appParams, split: undefined } }); }, []);
   return (
-    <section aria-label="Split" className="mx-auto flex h-[var(--app-h,100dvh)] max-w-[1600px] flex-col bg-bg md:border-x md:border-line">
+    <section aria-label="Split" className="mx-auto flex h-[var(--app-h,100dvh)] max-w-[1600px] flex-col overflow-hidden bg-bg md:border-x md:border-line">
       <div className="flex min-h-0 flex-1 flex-col">
         <AppFrame id="split" name="Split" onClose={() => go('chat')} params={params} tab />
       </div>

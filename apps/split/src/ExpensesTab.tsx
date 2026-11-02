@@ -72,7 +72,7 @@ export function ExpensesTab({ g, onOpen }: { g: GroupData; onOpen: (e: Expense) 
               </li>
             ) : (
               <li key={it.e.id}>
-                <ExpenseRow e={it.e} cat={catOf(it.e.cat)} payer={name(person(it.e.paidBy))} currency={currency} addedBy={(it.e.addedBy ?? it.e.by) !== me ? name(person(it.e.addedBy ?? it.e.by)) : undefined} onOpen={() => onOpen(it.e)}
+                <ExpenseRow e={it.e} cat={catOf(it.e.cat)} payer={name(person(it.e.paidBy))} currency={currency} involved={it.e.paidBy === me || (it.e.owed[me] ?? 0) > 0} addedBy={(it.e.addedBy ?? it.e.by) !== me ? name(person(it.e.addedBy ?? it.e.by)) : undefined} onOpen={() => onOpen(it.e)}
                   mine={it.e.paidBy === me ? it.e.amount - (it.e.owed[me] ?? 0) : -(it.e.owed[me] ?? 0)} />
               </li>
             ))}

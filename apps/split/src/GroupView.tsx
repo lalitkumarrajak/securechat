@@ -33,7 +33,7 @@ export function GroupView({ gid, start, onBack, onGone }: { gid: string; start?:
   const alone = g.meta!.people.filter((p) => !p.gone).length < 2;
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col bg-bg">
+    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden bg-bg">
       <header className="flex shrink-0 items-center gap-1 px-2 pt-2">
         {onBack && <IconButton label="Back to groups" onClick={onBack}><ArrowLeft /></IconButton>}
         <span className="ml-2 text-2xl" aria-hidden>{meta.emoji}</span>
@@ -52,7 +52,7 @@ export function GroupView({ gid, start, onBack, onGone }: { gid: string; start?:
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto pb-24 md:pb-6">
           {alone && tab === 'expenses' && (
-            <button type="button" onClick={() => setAdding(true)} className="mx-4 mb-3 w-full rounded-2xl border border-dashed border-accent/50 bg-accent/10 p-3 text-sm font-medium text-accent">
+            <button type="button" onClick={() => setAdding(true)} className="mx-4 mb-3 block w-[calc(100%-2rem)] rounded-2xl border border-dashed border-accent/50 bg-accent/10 p-3 text-sm font-medium text-accent">
               Just you here. Add people to split with →
             </button>
           )}

@@ -85,6 +85,6 @@ test('add it to Split: the bill arrives as your own expense', async () => {
   await P.page.screenshot({ path: shots('92-cards-split') });
   await ed.getByRole('button', { name: 'Add expense' }).click();
   await expect(P.page.getByRole('region', { name: 'Split' }).getByText('HDFC Millennia card bill')).toBeVisible();
-  await expect(P.page.getByRole('region', { name: 'Split' }).getByText(/you lent|not involved/).first()).toBeVisible();
+  await expect(P.page.getByRole('region', { name: 'Split' }).getByText(/your own expense/).first()).toBeVisible();
   expect(P.errors).toEqual([]);
 });

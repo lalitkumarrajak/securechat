@@ -2,8 +2,8 @@ import { Paperclip } from 'lucide-react';
 import { money, type Category, type Expense } from './model';
 
 /** One expense in the list: what, who paid, the total and what it means for you. */
-export function ExpenseRow({ e, cat, payer, mine, currency, addedBy, onOpen }: {
-  e: Expense; cat: Category; payer: string; mine: number; currency: string; addedBy?: string; onOpen: () => void;
+export function ExpenseRow({ e, cat, payer, mine, currency, addedBy, involved, onOpen }: {
+  e: Expense; cat: Category; payer: string; mine: number; currency: string; addedBy?: string; involved: boolean; onOpen: () => void;
 }) {
   return (
     <button type="button" onClick={onOpen} className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-hover">
@@ -14,7 +14,7 @@ export function ExpenseRow({ e, cat, payer, mine, currency, addedBy, onOpen }: {
       </span>
       <span className="shrink-0 text-right">
         <span className={`block text-sm font-semibold tabular-nums ${mine > 0 ? 'text-emerald-600 dark:text-emerald-400' : mine < 0 ? 'text-danger' : 'text-muted'}`}>
-          {mine === 0 ? 'not involved' : mine > 0 ? `you lent ${money(mine, currency)}` : `you owe ${money(-mine, currency)}`}
+          {mine === 0 ? (involved ? 'your own expense' : 'not involved') : mine > 0 ? `you lent ${money(mine, currency)}` : `you owe ${money(-mine, currency)}`}
         </span>
       </span>
     </button>
