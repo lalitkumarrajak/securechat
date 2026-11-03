@@ -5,6 +5,7 @@ import { balances, money, rangeFor, sum, inRange, linesOf } from './model';
 import { useMe, useUnread } from './hooks';
 import { useSplit, type GroupData } from './store';
 import { Empty } from './Empty';
+import { Overview } from './Overview';
 
 function Card({ g, active, onOpen }: { g: GroupData; active: boolean; onOpen: () => void }) {
   const me = useMe();
@@ -47,5 +48,10 @@ export function GroupList({ active, onOpen, onNew }: { active: string | null; on
       <button type="button" onClick={onNew} className="mx-auto mt-4 block rounded-xl bg-accent px-5 py-2.5 font-semibold text-white">Create your first group</button>
     </Empty>
   );
-  return <ul className="divide-y divide-line bg-panel">{list.map((g) => <Card key={g.gid} g={g} active={active === g.gid} onOpen={() => onOpen(g.gid)} />)}</ul>;
+  return (
+    <>
+      <Overview />
+      <ul className="divide-y divide-line bg-panel">{list.map((g) => <Card key={g.gid} g={g} active={active === g.gid} onOpen={() => onOpen(g.gid)} />)}</ul>
+    </>
+  );
 }

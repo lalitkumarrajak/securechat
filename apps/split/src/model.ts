@@ -80,6 +80,33 @@ export function moveLedger(expenses: Expense[], settles: Settlement[], from: str
   return out;
 }
 
+// ---------- across all groups ----------
+export interface Standing { cur: string; get: number; owe: number; people: { key: string; name: string; u?: string; amount: number }[] }
+
+/** What you are owed and what you owe over all your groups, per currency, and with whom (positive: they owe you). */
+export function standing(groups: { currency: string; people: Person[]; expenses: Expense[]; settles: Settlement[] }[], me: string): Standing[] {
+  const by = new Map<string, Standing & { map: Map<string, { key: string; name: string; u?: string; amount: number }> }>();
+  for (const g of groups) {
+    const self = g.people.find((p) => p.u === me || p.id === me)?.id ?? me;
+    const net = balances(g.expenses, g.settles);
+    const st = by.get(g.currency) ?? { cur: g.currency, get: 0, owe: 0, people: [], map: new Map() };
+    by.set(g.currency, st);
+    const mine = net[self] ?? 0;
+    if (mine > 0) st.get += mine; else st.owe -= mine;
+    for (const t of simplify(net)) {
+      if (t.from !== self && t.to !== self) continue;
+      const other = g.people.find((p) => p.id === (t.from === self ? t.to : t.from));
+      if (!other) continue;
+      const key = other.u ?? 'n:' + other.name.toLowerCase();
+      const row = st.map.get(key) ?? { key, name: other.name, ...(other.u && { u: other.u }), amount: 0 };
+      row.amount += t.to === self ? t.amount : -t.amount;
+      st.map.set(key, row);
+    }
+  }
+  return [...by.values()].map(({ map, ...st }) => ({ ...st, people: [...map.values()].filter((r) => r.amount !== 0).sort((a, b) => b.amount - a.amount) }))
+    .sort((a, b) => b.get + b.owe - (a.get + a.owe));
+}
+
 // ---------- categories ----------
 const C = (id: string, name: string, emoji: string, color: string): Category => ({ id, name, emoji, color });
 
@@ -91,7 +118,7 @@ export const BUILTIN_CATS: Category[] = [
   C('food', 'Food & drink', '🍽️', '#f97316'), C('cafe', 'Cafe & snacks', '☕', '#b45309'), C('groceries', 'Groceries', '🛒', '#22c55e'),
   C('gym', 'Gym & fitness', '🏋️', '#ef4444'), C('sports', 'Sports', '⚽', '#16a34a'), C('health', 'Health', '💊', '#10b981'),
   C('rent', 'Rent', '🏠', '#0891b2'), C('utilities', 'Utilities', '💡', '#14b8a6'), C('internet', 'Internet & phone', '📶', '#06b6d4'),
-  C('subscriptions', 'Subscriptions', '🔁', '#7c3aed'), C('cards', 'Credit card bill', '💳', '#4f46e5'), C('entertainment', 'Entertainment', '🎬', '#ec4899'), C('party', 'Party & events', '🎉', '#f43f5e'),
+  C('subscriptions', 'Subscriptions', '🔁', '#7c3aed'), C('cards', 'Credit card bill', '💳', '#4f46e5'), C('lent', 'Lent', '🤝', '#059669'), C('borrowed', 'Borrowed', '🙏', '#dc2626'), C('entertainment', 'Entertainment', '🎬', '#ec4899'), C('party', 'Party & events', '🎉', '#f43f5e'),
   C('shopping', 'Shopping', '🛍️', '#e11d48'), C('gifts', 'Gifts', '🎁', '#d946ef'), C('education', 'Education', '🎓', '#2563eb'),
   C('travelmisc', 'Tickets & entry', '🎟️', '#0d9488'), C('pets', 'Pets', '🐾', '#65a30d'), C('repairs', 'Repairs', '🔧', '#64748b'),
   C('other', 'Other', '🧾', '#94a3b8'),

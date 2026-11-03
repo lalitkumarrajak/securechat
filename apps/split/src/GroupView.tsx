@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowLeft, Plus, Settings } from 'lucide-react';
+import { ArrowLeft, Bell, PieChart, Plus, Receipt, Scale, Settings, Users } from 'lucide-react';
 import { IconButton } from '@sanga/ui/button';
 import { Tabs, TabsContent, TabsList } from '@sanga/ui/tabs';
 import { balances, money, type Expense } from './model';
@@ -15,6 +15,16 @@ import { ExpensesTab } from './ExpensesTab';
 import { GroupSettings } from './GroupSettings';
 import { InsightsTab } from './InsightsTab';
 import { PeopleTab } from './PeopleTab';
+
+/** A tab's name: on a phone the icon sits above a small label, so five of them fit and read at a glance. */
+function TabLabel({ icon: Icon, badge = 0, children }: { icon: typeof Bell; badge?: number; children: string }) {
+  return (
+    <span className="relative flex flex-col items-center gap-0.5 text-[11px] leading-tight sm:flex-row sm:gap-0 sm:text-sm">
+      <Icon className="size-[18px] sm:hidden" aria-hidden />{children}
+      {badge > 0 && <span className="absolute -top-1 left-1/2 ml-1.5 grid min-w-4 place-items-center rounded-full bg-danger px-1 text-[10px] font-bold text-white sm:-top-1.5 sm:-right-4 sm:left-auto sm:ml-0" aria-label={`${badge} new`}>{badge}</span>}
+    </span>
+  );
+}
 
 /** One group: expenses, balances, insights and people, with a button to add an expense. */
 export function GroupView({ gid, start, onBack, onGone }: { gid: string; start?: Expense | null; onBack?: () => void; onGone: () => void }) {
@@ -48,7 +58,13 @@ export function GroupView({ gid, start, onBack, onGone }: { gid: string; start?:
 
       <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col">
         <div className="px-4 py-2">
-          <TabsList tabs={[{ value: 'expenses', label: 'Expenses' }, { value: 'balances', label: 'Balances' }, { value: 'insights', label: 'Insights' }, { value: 'people', label: 'People' }, { value: 'activity', label: <span className="relative">Activity{unread > 0 && tab !== 'activity' && <span className="absolute -top-1.5 -right-4 grid min-w-4 place-items-center rounded-full bg-danger px-1 text-[10px] font-bold text-white" aria-label={`${unread} new`}>{unread}</span>}</span> }]} />
+          <TabsList tabs={[
+            { value: 'expenses', label: <TabLabel icon={Receipt}>Expenses</TabLabel> },
+            { value: 'balances', label: <TabLabel icon={Scale}>Balances</TabLabel> },
+            { value: 'insights', label: <TabLabel icon={PieChart}>Insights</TabLabel> },
+            { value: 'people', label: <TabLabel icon={Users}>People</TabLabel> },
+            { value: 'activity', label: <TabLabel icon={Bell} badge={tab !== 'activity' ? unread : 0}>Activity</TabLabel> },
+          ]} />
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto pb-24 md:pb-6">
           {alone && tab === 'expenses' && (

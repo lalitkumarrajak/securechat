@@ -77,3 +77,16 @@ test('linking the name to a friend: they get the group and the same balance', as
   expect(A.errors).toEqual([]);
   expect(B.errors).toEqual([]);
 });
+
+test('the list shows what you will get and owe over all groups, and with whom', async () => {
+  await split(A).getByRole('button', { name: 'Back to groups' }).click().catch(() => {}); // wide screens have no back button
+  const o = split(A).getByRole('region', { name: 'Your balance' });
+  await expect(o.getByText('You’ll get')).toBeVisible();
+  await expect(o.getByText('$450.00').first()).toBeVisible();
+  await o.getByRole('button', { name: 'By person' }).click();
+  await expect(o.getByText(`owes you $450.00`)).toBeVisible();
+  await expect(o.getByText(B.u)).toBeVisible();
+  await tab(B, 'Split').click();
+  const ob = split(B).getByRole('region', { name: 'Your balance' });
+  await expect(ob.getByText('You owe').locator('..').getByText('$450.00')).toBeVisible();
+});

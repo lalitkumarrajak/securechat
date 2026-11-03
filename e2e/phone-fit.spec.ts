@@ -70,6 +70,7 @@ test('Split: every screen of a group fits, and the tabs stay put while the list 
   expect(last!.x + last!.width, 'the last group tab is on screen').toBeLessThanOrEqual(390);
   await split.getByRole('button', { name: 'Back to groups' }).click();
   await fits(P.page, 'Split, group list');
+  await P.page.screenshot({ path: shots('97-phone-group-list') });
   await split.getByRole('button', { name: 'My spending' }).click();
   await fits(P.page, 'Split, my spending');
 });

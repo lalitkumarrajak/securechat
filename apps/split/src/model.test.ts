@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, apportion, balances, byCategory, grainFor, linesOf, moveLedger, parseAmount, rangeFor, series, simplify, splitAmount, sum, toInput, type Expense, type Settlement } from './model';
+import { addDays, apportion, balances, byCategory, grainFor, linesOf, moveLedger, standing, parseAmount, rangeFor, series, simplify, splitAmount, sum, toInput, type Expense, type Settlement } from './model';
 
 const exp = (o: Partial<Expense>): Expense => ({ type: 'expense', id: 'e' + Math.random(), desc: 'x', amount: 0, cat: 'food', date: '2026-11-02', paidBy: 'a', mode: 'equal', values: {}, owed: {}, by: 'a', edited: 0, ...o });
 
@@ -110,5 +110,18 @@ describe('linking a name to an account', () => {
     expect(after.me).toBe(before.me);
     expect(after.p1 ?? 0).toBe(0);
     expect(e2[1].owed).toEqual({ me: 50, ravi: 50 });
+  });
+});
+
+describe('standing across groups', () => {
+  const people = [{ id: 'me', name: 'me', u: 'me' }, { id: 'ravi', name: 'Ravi', u: 'ravi' }, { id: 'p1', name: 'Rohan' }];
+  it('totals what you get and owe, per currency, and with whom', () => {
+    const trip = { currency: 'INR', people, expenses: [exp({ amount: 900, paidBy: 'me', owed: { me: 300, ravi: 300, p1: 300 } })], settles: [] };
+    const flat = { currency: 'INR', people, expenses: [exp({ amount: 500, paidBy: 'ravi', owed: { me: 250, ravi: 250 } })], settles: [] };
+    const usd = { currency: 'USD', people, expenses: [exp({ amount: 100, paidBy: 'p1', owed: { me: 50, p1: 50 } })], settles: [] };
+    const [inr, usdS] = standing([trip, flat, usd], 'me');
+    expect(inr).toMatchObject({ cur: 'INR', get: 600, owe: 250 });
+    expect(inr.people.map((p) => [p.name, p.amount])).toEqual([['Rohan', 300], ['Ravi', 50]]);
+    expect(usdS).toMatchObject({ cur: 'USD', get: 0, owe: 50 });
   });
 });
