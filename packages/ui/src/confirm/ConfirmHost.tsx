@@ -1,4 +1,5 @@
 import * as A from '@radix-ui/react-alert-dialog';
+import { t } from '@sanga/i18n';
 import { Button } from '../button/Button';
 import { useConfirm } from './store';
 
@@ -13,7 +14,7 @@ export function ConfirmHost() {
           <A.Title className="text-lg font-semibold">{req?.title}</A.Title>
           <A.Description className={req?.description ? 'mt-2 text-sm text-muted' : 'sr-only'}>{req?.description || req?.title}</A.Description>
           <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-            <A.Cancel asChild><Button variant="secondary">Cancel</Button></A.Cancel>
+            <A.Cancel asChild><Button variant="secondary">{t('Cancel')}</Button></A.Cancel>
             {req?.actions.map((a) => (
               <Button key={a.value} variant={a.variant || 'primary'} onClick={() => done(a.value)}>{a.label}</Button>
             ))}

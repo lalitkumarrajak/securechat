@@ -1,6 +1,7 @@
 // Snakes & Ladders on the classic 100-square board. The server rolls and moves; this plays the events back.
 import { useEffect, useMemo, useState } from 'react';
 import { cn } from '@sanga/ui/utils';
+import { t } from '@sanga/i18n';
 import { GOAL, LADDERS, SNAKES } from '@sanga/game-rules/snakes.js';
 import { useApp } from '../../../state/app';
 import type { Game } from '../store';
@@ -23,7 +24,7 @@ export default function SnakesBoard({ g: game, me, act, bubble }: GameBoardProps
   const myTurn = !busy && g.status === 'play' && g.turn === meIdx;
   const canRoll = myTurn && asked !== g.v;
   const roll = () => { if (act({ a: 'roll' }) !== false) setAsked(g.v); };
-  useEffect(() => { if (!asked) return; const t = setTimeout(() => setAsked(0), 3000); return () => clearTimeout(t); }, [asked]);
+  useEffect(() => { if (!asked) return; const tm = setTimeout(() => setAsked(0), 3000); return () => clearTimeout(tm); }, [asked]);
   useEffect(() => { if (!online) setAsked(0); }, [online]);
 
   const spinning = asked === g.v;
@@ -38,11 +39,11 @@ export default function SnakesBoard({ g: game, me, act, bubble }: GameBoardProps
       <div className="grid w-full max-w-xl grid-cols-2 gap-1.5">
         {g.players.map((p, i) => <SeatCard key={p.u} g={g} i={i} me={meIdx} color={COLORS[i]} bubble={bubble(p.u)} align={i % 2 ? 'right' : 'left'}
           mark={<span className="size-3.5 rounded-full border-2 border-white" style={{ background: COLORS[i] }} aria-hidden />}
-          status={p.rank ? undefined : shown.pos[i] > 0 ? `Square ${shown.pos[i]}` : 'Not started'} />)}
+          status={p.rank ? undefined : shown.pos[i] > 0 ? t('Square {n}', { n: shown.pos[i] }) : t('Not started')} />)}
       </div>
 
       <div className="flex min-h-0 w-full flex-1 items-center justify-center">
-        <svg viewBox="-1 -1 102 112" className="max-h-full w-full max-w-[520px] select-none" role="img" aria-label="Snakes and Ladders board">
+        <svg viewBox="-1 -1 102 112" className="max-h-full w-full max-w-[520px] select-none" role="img" aria-label={t('Snakes and Ladders board')}>
           <rect x="-1" y="-1" width="102" height="102" rx="2.5" fill="#fdf6e3" stroke="#b7791f" strokeWidth="1.2" />
           {cells.map((n) => {
             const { x, y } = center(n);
@@ -73,7 +74,7 @@ export default function SnakesBoard({ g: game, me, act, bubble }: GameBoardProps
           ))}
 
           <rect x="0" y="101" width="100" height="9" rx="2" fill="#000" fillOpacity="0.12" />
-          <text x="97" y="106.4" fontSize="2.8" textAnchor="end" fill="#fff" fillOpacity="0.7">start</text>
+          <text x="97" y="106.4" fontSize="2.8" textAnchor="end" fill="#fff" fillOpacity="0.7">{t('start')}</text>
           {shown.pos.map((p, i) => {
             if (p < 0) return null;
             const slot = waiting.findIndex((w) => w.i === i);
@@ -83,7 +84,7 @@ export default function SnakesBoard({ g: game, me, act, bubble }: GameBoardProps
             const k = mates.findIndex((o) => o.j === i);
             const off = mates.length > 1 ? (k - (mates.length - 1) / 2) * 3.4 : 0;
             return (
-              <g key={i} data-token={i} style={{ transform: `translate(${at.x + off}px, ${at.y}px)`, transition: shown.jumping ? 'transform 0.7s ease-in-out' : 'transform 0.17s linear' }}>
+              <g key={i} data-token={i} style={{ transform: `translate(${at.x + off}px, ${at.y}px)`, transition: shown.jumping ? 'transform 0.7s ease-in-out' : 'transform 0.17s linear' }}>{/* i18n-ok */}
                 <circle r="3.1" fill="#000" fillOpacity="0.25" cy="0.7" />
                 <circle r="3" fill={COLORS[i]} stroke="#fff" strokeWidth="0.8" className={cn(shown.turn === i && g.status === 'play' && 'snakes-active')} />
                 <circle r="1.1" cx="-0.9" cy="-1" fill="#fff" fillOpacity="0.55" />
@@ -94,7 +95,7 @@ export default function SnakesBoard({ g: game, me, act, bubble }: GameBoardProps
       </div>
 
       <div className="flex w-full max-w-md items-center justify-center gap-4">
-        <button type="button" disabled={!canRoll} onClick={roll} aria-label={canRoll ? 'Roll dice' : dice ? `Rolled ${dice.d}` : 'Dice'}
+        <button type="button" disabled={!canRoll} onClick={roll} aria-label={canRoll ? t('Roll dice') : dice ? t('Rolled {n}', { n: dice.d }) : t('Dice')}
           className={cn('grid size-20 place-items-center rounded-3xl bg-white/15 shadow-lg transition', canRoll && 'hover:bg-white/25 active:scale-95')}>
           <span className={cn('block scale-[1.6]', canRoll && 'ludo-roll-hint')}><Dice value={dice?.d || 6} rolling={!!dice?.rolling} dim={!dice && !canRoll} /></span>
         </button>

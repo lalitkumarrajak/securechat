@@ -18,6 +18,7 @@ import { Header } from './chat-pane/Header';
 import { SelectionBar } from './chat-pane/SelectionBar';
 import { SearchBar } from './chat-pane/SearchBar';
 import { PinnedBar } from './chat-pane/PinnedBar';
+import { t } from '@sanga/i18n';
 
 // Esc closes the top-most thing first (menus and dialogs claim it themselves), then selection,
 // search, a reply or edit being written, and finally the chat itself, like WhatsApp.
@@ -56,7 +57,7 @@ export function ChatPane({ peer }: { peer: string }) {
   });
   const group = useApp((s) => (isGroup(peer) ? s.groups[groupIdOf(peer)] : undefined));
   const groupsLoaded = useApp((s) => s.groupsLoaded);
-  const name = isGroup(peer) ? group?.name || 'Group' : displayName(friend, peer);
+  const name = isGroup(peer) ? group?.name || t('Group') : displayName(friend, peer);
   const canSend = isGroup(peer) ? !!group && (!group.adminsOnly || group.admin) : !!friend && !blocked && !keyChanged;
 
   return (
@@ -66,27 +67,27 @@ export function ChatPane({ peer }: { peer: string }) {
       {searchOpen && !selection && <SearchBar />}
       <PinnedBar peer={peer} />
       {keyChanged && !isGroup(peer) && (
-        <Banner icon={<ShieldAlert className="size-5 text-danger" />} action={<Button size="sm" variant="outline" onClick={() => setChatUi({ verify: true })}>Review</Button>}>
-          {name}’s security code changed. Sending is paused until you verify it.
+        <Banner icon={<ShieldAlert className="size-5 text-danger" />} action={<Button size="sm" variant="outline" onClick={() => setChatUi({ verify: true })}>{t('Review')}</Button>}>
+          {t('{name}’s security code changed. Sending is paused until you verify it.', { name })}
         </Banner>
       )}
       <MessageList key={topic} peer={peer} peerName={name} unreadAtOpen={topic ? 0 : unreadAtOpen} />
       {canSend ? <Composer key={peer} peer={peer} peerName={name} /> : (
         <div className="shrink-0 border-t border-line bg-panel px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-center text-sm">
           {isGroup(peer) ? (
-            group ? <span className="text-muted">Only admins can send messages.</span>
-              : groupsLoaded ? <>You’re no longer in this group. <Action onClick={() => deleteChatHere(peer)}>Delete chat</Action></>
-              : <span className="text-muted">Loading…</span>
+            group ? <span className="text-muted">{t('Only admins can send messages.')}</span> // i18n-ok
+              : groupsLoaded ? <>{t('You’re no longer in this group.')} <Action onClick={() => deleteChatHere(peer)}>{t('Delete chat')}</Action></>
+              : <span className="text-muted">{t('Loading…')}</span>
           ) : blocked ? (
-            <>You blocked {name}. <Action onClick={() => unblockUser(peer)}>Unblock</Action></>
+            <>{t('You blocked {name}.', { name })} <Action onClick={() => unblockUser(peer)}>{t('Unblock')}</Action></>
           ) : keyChanged ? (
-            <>Verify the new security code to keep chatting.</>
+            <>{t('Verify the new security code to keep chatting.')}</>
           ) : requestIn ? (
-            <>{name} wants to be your friend. <Action onClick={() => acceptRequest(peer)}>Accept</Action></>
+            <>{t('{name} wants to be your friend.', { name })} <Action onClick={() => acceptRequest(peer)}>{t('Accept')}</Action></>
           ) : requestOut ? (
-            <span className="text-muted">Friend request sent. You can chat once {name} accepts.</span>
+            <span className="text-muted">{t('Friend request sent. You can chat once {name} accepts.', { name })}</span>
           ) : (
-            <>You’re not friends with {name}. <Action onClick={() => sendRequest(peer).then(() => toast.success('Friend request sent'))}>Send friend request</Action></>
+            <>{t('You’re not friends with {name}.', { name })} <Action onClick={() => sendRequest(peer).then(() => toast.success(t('Friend request sent')))}>{t('Send friend request')}</Action></>
           )}
         </div>
       )}

@@ -11,6 +11,7 @@ import { api, frameHooks, ownIdentity, peerKey, peerKeyChanged, readyHooks } fro
 import { getApp } from '../state/app';
 import { displayName } from './types';
 import { validSong, type Song } from './songs';
+import { t } from '@sanga/i18n';
 
 export interface StoryMeta {
   id: string; u: string; ts: number; exp: number; key: string; seen: boolean; liked: boolean;
@@ -106,7 +107,7 @@ export function loadStory(s: StoryMeta): Promise<void> {
           const { body } = await api<{ body: string }>('/api/stories/body?id=' + encodeURIComponent(s.id));
           c = valid(await C.decryptStory(await storyKey(s), body, s.u, s.id));
         } catch (e) {
-          if ((e as Error).message.startsWith('No connection')) throw e;
+          if ((e as Error).name === 'NetworkError') throw e; // offline: try again later
           c = null;
         }
         if (c) await db.put('kv', c, 'story/' + s.id);
@@ -122,7 +123,7 @@ const USER = /^[a-z0-9_.]{3,24}$/;
 // What a friend's app sent: check it so a bad story can't break the viewer.
 function valid(o: any): StoryContent | null {
   if (!o || typeof o !== 'object') return null;
-  const tags = Array.isArray(o.tags) ? o.tags.filter((t: unknown) => typeof t === 'string' && USER.test(t)).slice(0, 20) : [];
+  const tags = Array.isArray(o.tags) ? o.tags.filter((tg: unknown) => typeof tg === 'string' && USER.test(tg)).slice(0, 20) : [];
   const song = validSong(o.song);
   const extra = { ...(tags.length && { tags }), ...(typeof o.via === 'string' && USER.test(o.via) && { via: o.via }), ...(song && { song }) };
   if (o.type === 'img' && typeof o.src === 'string' && o.src.length < 3_000_000 && PHOTO_SRC.test(o.src)) {
@@ -146,7 +147,7 @@ export async function postStory(content: StoryContent, audience: string[]) {
     if (await peerKeyChanged(u)) continue; // their security code changed: not until it's verified
     try { wrapped.push({ u, key: await C.wrapStoryKey(await peerKey(u), k.raw, me, id, u) }); } catch { /* no key for them */ }
   }
-  await api('/api/stories', { id, body, keys: wrapped, tags: (content.tags || []).filter((t) => audience.includes(t)) });
+  await api('/api/stories', { id, body, keys: wrapped, tags: (content.tags || []).filter((tg) => audience.includes(tg)) });
   await db.put('kv', content, 'story/' + id);
   useStories.setState((s) => ({ content: { ...s.content, [id]: content } }));
   await refreshStories();
@@ -217,8 +218,8 @@ frameHooks.story = (m: { u: string; tag?: string; gone?: string; act?: string; l
   if (m.act) useStories.setState((s) => ({ activity: s.activity + 1 }));
   clearTimeout(timer);
   timer = window.setTimeout(() => void refreshStories(), 250);
-  if (m.tag) toast(`${who(m.u)} tagged you in their story`, { action: { label: 'View', onClick: () => refreshStories().then(() => openStories(m.u)) } });
-  if (m.cmt) toast(`${who(m.cmt)} commented on your story`, { action: { label: 'View', onClick: () => openStories(m.u) } });
-  if (m.like) toast(`❤️ ${who(m.like)} liked your story`);
+  if (m.tag) toast(t('{name} tagged you in their story', { name: who(m.u) }), { action: { label: t('View'), onClick: () => refreshStories().then(() => openStories(m.u)) } });
+  if (m.cmt) toast(t('{name} commented on your story', { name: who(m.cmt) }), { action: { label: t('View'), onClick: () => openStories(m.u) } });
+  if (m.like) toast(t('❤️ {name} liked your story', { name: who(m.like) }));
 };
 readyHooks.push(() => void refreshStories());

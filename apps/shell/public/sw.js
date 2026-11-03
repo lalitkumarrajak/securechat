@@ -8,7 +8,7 @@ self.addEventListener('install', (e) => {
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys()
-    .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+    .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== LANG_CACHE).map((k) => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 
@@ -66,28 +66,60 @@ async function newer(saved, res) {
   for (const w of await self.clients.matchAll({ type: 'window' })) w.postMessage({ t: 'update', build: latest });
 }
 self.addEventListener('message', (e) => {
+  if (e.data?.t === 'lang') { e.waitUntil?.(saveLang(e.data.lang)); return; }
   if (e.data?.t === 'build' && latest && e.data.build && e.data.build !== latest) e.source?.postMessage({ t: 'update', build: latest });
 });
+
+// ---------- language ----------
+// Notifications are worded here, so they follow the language picked in Settings. The page can't share
+// its localStorage with the worker: it posts the language (lib/swLang.ts) and the worker keeps it in a
+// small cache of its own, which survives restarts. The Hindi is written next to the English below.
+const LANG_CACHE = 'sanga-lang';
+let lang = null;
+async function saveLang(l) {
+  lang = l === 'hi' ? 'hi' : 'en';
+  try { await (await caches.open(LANG_CACHE)).put('/lang', new Response(lang)); } catch { /* kept for now only */ }
+}
+async function currentLang() {
+  if (lang) return lang;
+  try { lang = (await (await (await caches.open(LANG_CACHE)).match('/lang'))?.text()) === 'hi' ? 'hi' : 'en'; } catch { lang = 'en'; }
+  return lang;
+}
 
 // Push payloads carry only who it's from, never message content (that stays end-to-end encrypted).
 self.addEventListener('push', (e) => {
   let d = {};
   try { d = e.data.json(); } catch {}
   if (d.t === 'remind') { e.waitUntil(remind(d)); return; }
-  const name = d.name || d.from || 'Someone';
-  const title = d.t === 'fr' ? 'New friend request' : d.t === 'signin' ? 'New sign-in to your account' : d.t === 'gmsg' ? (d.group || 'Group') : name;
-  const body = d.t === 'fr' ? `${name} wants to be your friend`
-    : d.t === 'game' ? `invited you to play ${d.game || 'a game'} 🎲`
-    : d.t === 'gmention' ? `mentioned you in ${d.game || 'a game'}`
-    : d.t === 'gmsg' ? `${name}${d.mention ? ' mentioned you' : ': New message'}`
-    : d.t === 'signin' ? `A device signed in${d.where || ''}. If this wasn’t you, open Sanga → Settings → Active sessions.`
-    : d.t === 'call' ? `Incoming ${d.v ? 'video' : 'voice'} call`
-    : d.t === 'missed' ? `Missed ${d.v ? 'video' : 'voice'} call`
-    : d.t === 'stag' ? 'tagged you in their story'
-    : d.t === 'scmt' ? 'commented on your story'
-    : 'New message';
   const call = d.t === 'call' || d.t === 'missed';
   e.waitUntil((async () => {
+    const hi = (await currentLang()) === 'hi';
+    const name = d.name || d.from || (hi ? 'कोई' : 'Someone');
+    const game = d.game || (hi ? 'एक गेम' : 'a game');
+    const near = (d.where || '').replace(/^ near /, ''); // the server sends " near Delhi, India"
+    const title = d.t === 'fr' ? (hi ? 'दोस्ती की नई रिक्वेस्ट' : 'New friend request')
+      : d.t === 'signin' ? (hi ? 'आपके अकाउंट में नया साइन-इन' : 'New sign-in to your account')
+      : d.t === 'gmsg' ? (d.group || (hi ? 'ग्रुप' : 'Group')) : name;
+    const body = hi ? (d.t === 'fr' ? `${name} आपसे दोस्ती करना चाहते हैं`
+      : d.t === 'game' ? `ने आपको ${game} खेलने बुलाया है 🎲`
+      : d.t === 'gmention' ? `ने ${game} में आपका ज़िक्र किया`
+      : d.t === 'gmsg' ? (d.mention ? `${name} ने आपका ज़िक्र किया` : `${name}: नया मैसेज`)
+      : d.t === 'signin' ? `${near ? near + ' के पास ' : ''}एक डिवाइस ने साइन इन किया। अगर यह आप नहीं थे, तो Sanga → सेटिंग्स → चालू सेशन खोलें।`
+      : d.t === 'call' ? (d.v ? 'वीडियो कॉल आ रही है' : 'वॉइस कॉल आ रही है')
+      : d.t === 'missed' ? (d.v ? 'मिस्ड वीडियो कॉल' : 'मिस्ड वॉइस कॉल')
+      : d.t === 'stag' ? 'ने आपको अपनी स्टोरी में टैग किया'
+      : d.t === 'scmt' ? 'ने आपकी स्टोरी पर कमेंट किया'
+      : 'नया मैसेज')
+      : d.t === 'fr' ? `${name} wants to be your friend`
+      : d.t === 'game' ? `invited you to play ${game} 🎲`
+      : d.t === 'gmention' ? `mentioned you in ${game}`
+      : d.t === 'gmsg' ? `${name}${d.mention ? ' mentioned you' : ': New message'}`
+      : d.t === 'signin' ? `A device signed in${d.where || ''}. If this wasn’t you, open Sanga → Settings → Active sessions.`
+      : d.t === 'call' ? `Incoming ${d.v ? 'video' : 'voice'} call`
+      : d.t === 'missed' ? `Missed ${d.v ? 'video' : 'voice'} call`
+      : d.t === 'stag' ? 'tagged you in their story'
+      : d.t === 'scmt' ? 'commented on your story'
+      : 'New message';
     // Don't notify if the app is open and visible: the page shows the message itself.
     const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     if (wins.some((w) => w.visibilityState === 'visible')) return;
@@ -161,8 +193,9 @@ async function remind(d) {
   if (wins.some((w) => w.visibilityState === 'visible')) return; // the open app shows it
   let r = null;
   try { r = await unseal(String(d.id), String(d.b)); } catch { /* shown plain */ }
-  await self.registration.showNotification(r?.title || 'Reminder', {
-    body: r?.body || 'Open Sanga to see it', icon: '/icon-192.png', badge: '/icon-192.png',
+  const hi = (await currentLang()) === 'hi';
+  await self.registration.showNotification(r?.title || (hi ? 'रिमाइंडर' : 'Reminder'), {
+    body: r?.body || (hi ? 'देखने के लिए Sanga खोलें' : 'Open Sanga to see it'), icon: '/icon-192.png', badge: '/icon-192.png',
     tag: 'remind-' + d.id, renotify: true, data: { calendar: true },
   });
 }

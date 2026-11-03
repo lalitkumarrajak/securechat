@@ -6,10 +6,11 @@ import { create } from 'zustand';
 import { setSettings, useSettings } from '../state/settings';
 import { logout } from './engine';
 import { checkPin, hashPin } from './pin';
+import { tk } from '@sanga/i18n';
 
 export const LOCK_AFTER = [
-  { ms: 0, label: 'Immediately' }, { ms: 60e3, label: 'After 1 minute' }, { ms: 5 * 60e3, label: 'After 5 minutes' },
-  { ms: 15 * 60e3, label: 'After 15 minutes' }, { ms: 60 * 60e3, label: 'After 1 hour' },
+  { ms: 0, label: tk('Immediately') }, { ms: 60e3, label: tk('After 1 minute') }, { ms: 5 * 60e3, label: tk('After 5 minutes') },
+  { ms: 15 * 60e3, label: tk('After 15 minutes') }, { ms: 60 * 60e3, label: tk('After 1 hour') },
 ];
 export const MAX_TRIES = 10;
 const WAIT_EVERY = 5, WAIT_MS = 30e3;

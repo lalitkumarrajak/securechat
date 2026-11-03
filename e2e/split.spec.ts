@@ -104,7 +104,7 @@ test('expenses sync both ways, with a bill, and balances agree', async () => {
 
   // 3 people share equally: A paid 1200 (owes 420), B paid 60 (owes 420), Rohan owes 420.
   await split(B).getByRole('tab', { name: 'Balances' }).click();
-  await expect(split(B).getByText(/You\s+owes? \$?3[56]\d\.\d\d|owes \$360\.00/).first()).toBeVisible();
+  await expect(split(B).getByText(/You\s+owes? [$₹]?3[56]\d\.\d\d|owes ₹360\.00/).first()).toBeVisible();
   await B.page.screenshot({ path: shots('81-split-balances') });
 });
 

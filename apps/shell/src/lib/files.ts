@@ -1,6 +1,7 @@
 // Files are sent inside the encrypted message, with a preview made on the sender's device:
 // the first page of a PDF, a frame of a video, or the start of a text file.
 import { unb64 } from '@sanga/crypto';
+import { t } from '@sanga/i18n';
 
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
@@ -51,7 +52,7 @@ function videoThumb(src: string) {
     v.muted = true;
     v.preload = 'auto';
     v.src = src;
-    const done = (t?: string) => { v.removeAttribute('src'); v.load(); resolve(t); };
+    const done = (th?: string) => { v.removeAttribute('src'); v.load(); resolve(th); };
     v.onloadeddata = () => { v.currentTime = Math.min(1, (v.duration || 2) / 2); };
     v.onseeked = () => done(canvasThumb((ctx, w, h) => ctx.drawImage(v, 0, 0, w, h), v.videoWidth || 320, v.videoHeight || 180));
     v.onerror = () => done();
@@ -60,7 +61,7 @@ function videoThumb(src: string) {
 }
 
 export async function prepareFile(file: File): Promise<FileContent> {
-  if (file.size > MAX_FILE_BYTES) throw new Error(`Files can be up to ${MAX_FILE_BYTES / 1024 / 1024} MB.`);
+  if (file.size > MAX_FILE_BYTES) throw new Error(t('Files can be up to {mb} MB.', { mb: MAX_FILE_BYTES / 1024 / 1024 }));
   const mime = file.type || 'application/octet-stream';
   const src = await readAsDataUrl(file);
   const out: FileContent = { name: file.name.slice(0, 200) || 'file', size: file.size, mime, src };

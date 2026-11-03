@@ -10,6 +10,7 @@ import { api, frameHooks, myName, peerKey, peerKeyChanged, readyHooks, sendConte
 import { getApp } from '../state/app';
 import { useStories } from './stories';
 import { displayName, isGroup, type CallStatus } from './types';
+import { t, tk } from '@sanga/i18n';
 
 export const MAX_PEOPLE = 4; // the server's limit too: every phone sends to every other one
 
@@ -118,13 +119,14 @@ async function getMedia(video: boolean, facing: 'user' | 'environment' = 'user')
     });
   } catch (e) {
     const name = (e as Error).name;
-    const what = video ? 'camera and microphone' : 'microphone';
-    throw new Error(name === 'NotAllowedError' ? `Allow ${what} access to make calls` : name === 'NotFoundError' ? `No ${video ? 'camera' : 'microphone'} found` : `Couldn’t start your ${what}`);
+    throw new Error(name === 'NotAllowedError' ? (video ? t('Allow camera and microphone access to make calls') : t('Allow microphone access to make calls'))
+      : name === 'NotFoundError' ? (video ? t('No camera found') : t('No microphone found'))
+      : video ? t('Couldn’t start your camera and microphone') : t('Couldn’t start your microphone'));
   }
   // Some browsers hand back just the microphone when the camera is blocked.
   if (video && !s.getVideoTracks().length) {
-    s.getTracks().forEach((t) => t.stop());
-    throw new Error('Allow camera access for video calls');
+    s.getTracks().forEach((tr) => tr.stop());
+    throw new Error(t('Allow camera access for video calls'));
   }
   return s;
 }
@@ -138,7 +140,7 @@ async function link(id: string, u: string) {
   R.links.get(u)?.pc.close();
   R.links.set(u, l);
   const local = useCall.getState().local;
-  if (local) for (const t of local.getTracks()) pc.addTrack(t, local);
+  if (local) for (const tr of local.getTracks()) pc.addTrack(tr, local);
   if (R.screen) { // sharing already: they see the screen too
     const v = pc.getSenders().find((x) => x.track?.kind === 'video');
     if (v) await v.replaceTrack(R.screen);
@@ -178,8 +180,8 @@ async function link(id: string, u: string) {
 function lost(u: string) {
   const c = cur();
   if (!c) return;
-  if (isGroupCall(c)) { unlink(u); if (!R.links.size) finish('ok', 'Connection lost'); return; }
-  finish(c.started ? 'ok' : 'failed', c.started ? 'Connection lost' : 'Couldn’t connect');
+  if (isGroupCall(c)) { unlink(u); if (!R.links.size) finish('ok', tk('Connection lost')); return; }
+  finish(c.started ? 'ok' : 'failed', c.started ? tk('Connection lost') : tk('Couldn’t connect'));
 }
 
 function unlink(u: string) {
@@ -224,23 +226,23 @@ async function offerTo(id: string, u: string) {
 
 // ---------- placing, answering, ending ----------
 export async function startCall(peer: string, video: boolean) {
-  if (cur()) { toast('You’re already on a call'); return; }
+  if (cur()) { toast(t('You’re already on a call')); return; }
   if (isGroup(peer)) return;
-  if (!supported()) { toast.error('Calls don’t work in this browser'); return; }
-  if (!getApp().friends[peer]) { toast.error('You can only call friends'); return; }
-  if (await peerKeyChanged(peer)) { toast.warning('Calling is paused', { description: 'This contact’s security code changed. Verify it first.' }); return; }
-  if (getApp().conn !== 'online') { toast.error('You’re offline', { description: 'Connect to the internet to call.' }); return; }
+  if (!supported()) { toast.error(t('Calls don’t work in this browser')); return; }
+  if (!getApp().friends[peer]) { toast.error(t('You can only call friends')); return; }
+  if (await peerKeyChanged(peer)) { toast.warning(t('Calling is paused'), { description: t('This contact’s security code changed. Verify it first.') }); return; }
+  if (getApp().conn !== 'online') { toast.error(t('You’re offline'), { description: t('Connect to the internet to call.') }); return; }
   const id = C.randomId(18);
   useCall.setState({ call: { id, peer, video, out: true, phase: 'outgoing', members: [{ u: peer, state: 'ringing' }], muted: false, camOff: false, facing: 'user' }, minimized: false, remotes: {} });
   try {
     const local = await getMedia(video);
-    if (cur()?.id !== id) { local.getTracks().forEach((t) => t.stop()); return; } // hung up meanwhile
+    if (cur()?.id !== id) { local.getTracks().forEach((tr) => tr.stop()); return; } // hung up meanwhile
     useCall.setState({ local });
     const { sdp } = await offerTo(id, peer);
     if (cur()?.id !== id) return;
-    if (!sendFrame({ t: 'call', id, to: peer, v: video ? 1 : 0, b: await seal(peer, id, 'offer', { sdp, at: Date.now() }) })) throw new Error('You’re offline');
+    if (!sendFrame({ t: 'call', id, to: peer, v: video ? 1 : 0, b: await seal(peer, id, 'offer', { sdp, at: Date.now() }) })) throw new Error(t('You’re offline'));
     startTone('ringback');
-    R.timers.push(window.setTimeout(() => { if (cur()?.id === id && !anyAnswered()) { sendFrame({ t: 'cend', id, r: 'ended' }); finish('missed', 'No answer'); } }, 60_000));
+    R.timers.push(window.setTimeout(() => { if (cur()?.id === id && !anyAnswered()) { sendFrame({ t: 'cend', id, r: 'ended' }); finish('missed', tk('No answer')); } }, 60_000));
   } catch (e) {
     toast.error((e as Error).message);
     finish('failed', null);
@@ -251,15 +253,15 @@ export async function startCall(peer: string, video: boolean) {
 export async function addToCall(u: string) {
   const c = cur();
   if (!c || c.phase !== 'active' || c.members.some((x) => x.u === u)) return;
-  if (c.members.length + 1 >= MAX_PEOPLE) { toast(`A call can have up to ${MAX_PEOPLE} people`); return; }
+  if (c.members.length + 1 >= MAX_PEOPLE) { toast(t('A call can have up to {n} people', { n: MAX_PEOPLE })); return; }
   if (!getApp().friends[u]) return;
-  if (await peerKeyChanged(u)) { toast.warning('Calling is paused', { description: 'This contact’s security code changed. Verify it first.' }); return; }
+  if (await peerKeyChanged(u)) { toast.warning(t('Calling is paused'), { description: t('This contact’s security code changed. Verify it first.') }); return; }
   setMember(u, { state: 'ringing' });
   try {
     const { sdp } = await offerTo(c.id, u);
     if (cur()?.id !== c.id) return;
     sendFrame({ t: 'cadd', id: c.id, to: u, b: await seal(u, c.id, 'offer', { sdp, at: Date.now() }) });
-  } catch { unlink(u); toast.error('Couldn’t add them to the call'); }
+  } catch { unlink(u); toast.error(t('Couldn’t add them to the call')); }
 }
 
 export async function accept() {
@@ -269,7 +271,7 @@ export async function accept() {
   stopTone();
   try {
     const local = await getMedia(c.video);
-    if (cur()?.id !== c.id) { local.getTracks().forEach((t) => t.stop()); return; }
+    if (cur()?.id !== c.id) { local.getTracks().forEach((tr) => tr.stop()); return; }
     useCall.setState({ local });
     const l = await link(c.id, R.from);
     await l.pc.setRemoteDescription({ type: 'offer', sdp: R.offer });
@@ -299,7 +301,7 @@ export function hangUp() {
   if (!c || c.phase === 'ended') return;
   if (c.phase === 'incoming') return decline();
   sendFrame({ t: 'cend', id: c.id, r: 'ended' });
-  finish(anyAnswered() ? 'ok' : 'cancelled', isGroupCall(c) ? 'You left the call' : 'Call ended');
+  finish(anyAnswered() ? 'ok' : 'cancelled', isGroupCall(c) ? tk('You left the call') : tk('Call ended'));
 }
 
 /** The call is over: release the microphone and camera, log it, show why for a moment. */
@@ -307,9 +309,9 @@ function finish(st: CallStatus, label: string | null) {
   const c = cur();
   if (!c || c.phase === 'ended') return;
   stopTone();
-  for (const t of R.timers) clearTimeout(t);
+  for (const tm of R.timers) clearTimeout(tm);
   for (const l of R.links.values()) { clearTimeout(l.drop); l.pc.close(); }
-  useCall.getState().local?.getTracks().forEach((t) => t.stop());
+  useCall.getState().local?.getTracks().forEach((tr) => tr.stop());
   R.screen?.stop();
   if (c.out) {
     const dur = st === 'ok' && c.started ? Math.round((Date.now() - c.started) / 1000) : 0;
@@ -319,7 +321,7 @@ function finish(st: CallStatus, label: string | null) {
   const gone = { local: null, screen: null, remotes: {}, minimized: false };
   if (!label) { useCall.setState({ call: null, ...gone }); return; }
   if (c.phase !== 'incoming') playEnd();
-  useCall.setState({ call: { ...c, phase: 'ended', ended: label }, ...gone });
+  useCall.setState({ call: { ...c, phase: 'ended', ended: t(label) }, ...gone });
   window.setTimeout(() => { if (cur()?.id === c.id) useCall.setState({ call: null }); }, 1800);
 }
 
@@ -327,7 +329,7 @@ function finish(st: CallStatus, label: string | null) {
 export function toggleMute() {
   const c = cur();
   if (!c) return;
-  useCall.getState().local?.getAudioTracks().forEach((t) => { t.enabled = c.muted; });
+  useCall.getState().local?.getAudioTracks().forEach((tr) => { tr.enabled = c.muted; });
   set({ muted: !c.muted });
   sendState();
 }
@@ -335,7 +337,7 @@ export function toggleMute() {
 export function toggleCamera() {
   const c = cur();
   if (!c?.video) return;
-  useCall.getState().local?.getVideoTracks().forEach((t) => { t.enabled = c.camOff; });
+  useCall.getState().local?.getVideoTracks().forEach((tr) => { tr.enabled = c.camOff; });
   set({ camOff: !c.camOff });
   sendState();
 }
@@ -351,11 +353,11 @@ export async function switchCamera() {
     const track = s.getVideoTracks()[0];
     track.enabled = !c.camOff;
     if (!R.screen) for (const l of R.links.values()) await l.pc.getSenders().find((x) => x.track?.kind === 'video')?.replaceTrack(track);
-    for (const t of local.getVideoTracks()) { t.stop(); local.removeTrack(t); }
+    for (const tr of local.getVideoTracks()) { tr.stop(); local.removeTrack(tr); }
     local.addTrack(track);
     useCall.setState({ local: new MediaStream(local.getTracks()) });
     set({ facing });
-  } catch { toast('This device has only one camera'); }
+  } catch { toast(t('This device has only one camera')); }
 }
 
 // ---------- sharing the screen ----------
@@ -371,9 +373,9 @@ export async function shareScreen() {
   if (!c || c.phase !== 'active' || !R.links.size || c.sharing || !canShareScreen()) return;
   let s: MediaStream;
   try { s = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 15, max: 30 } }, audio: false }); }
-  catch (e) { if ((e as Error).name !== 'NotAllowedError') toast.error('Couldn’t share your screen'); return; }
+  catch (e) { if ((e as Error).name !== 'NotAllowedError') toast.error(t('Couldn’t share your screen')); return; }
   const track = s.getVideoTracks()[0];
-  if (!track || cur()?.id !== c.id) { s.getTracks().forEach((t) => t.stop()); return; }
+  if (!track || cur()?.id !== c.id) { s.getTracks().forEach((tr) => tr.stop()); return; }
   track.contentHint = 'detail'; // text stays sharp rather than smooth
   track.onended = () => void stopSharing();
   R.screen = track;
@@ -390,11 +392,11 @@ export async function shareScreen() {
 }
 
 export async function stopSharing() {
-  const t = R.screen;
-  if (!t) return;
+  const tr = R.screen;
+  if (!tr) return;
   R.screen = null;
-  t.onended = null;
-  t.stop();
+  tr.onended = null;
+  tr.stop();
   const cam = useCall.getState().local?.getVideoTracks()[0] ?? null;
   for (const l of R.links.values()) await videoSender(l)?.replaceTrack(l.screenSender ? null : cam).catch(() => {});
   useCall.setState({ screen: null });
@@ -434,7 +436,7 @@ frameHooks.call = async (m: { id: string; f: string; v: number; b: string; m?: s
   if (document.visibilityState !== 'visible' && 'Notification' in window && Notification.permission === 'granted') {
     const name = displayName(getApp().friends[m.f], m.f);
     navigator.serviceWorker?.ready.then((reg) => reg.showNotification(name, {
-      body: `Incoming ${others.length ? 'group ' : ''}${m.v ? 'video' : 'voice'} call`, icon: '/icon-192.png', tag: 'call-' + m.f, requireInteraction: true, data: { peer: m.f },
+      body: others.length ? (m.v ? t('Incoming group video call') : t('Incoming group voice call')) : m.v ? t('Incoming video call') : t('Incoming voice call'), icon: '/icon-192.png', tag: 'call-' + m.f, requireInteraction: true, data: { peer: m.f },
     })).catch(() => {});
   }
 };
@@ -452,7 +454,7 @@ frameHooks.cans = async (m: { id: string; b: string; f?: string }) => {
     await l.pc.setRemoteDescription({ type: 'answer', sdp });
   } catch {
     if (isGroupCall(c)) { unlink(u); return; }
-    sendFrame({ t: 'cend', id: c.id, r: 'failed' }); finish('failed', 'Couldn’t connect'); return;
+    sendFrame({ t: 'cend', id: c.id, r: 'failed' }); finish('failed', tk('Couldn’t connect')); return;
   }
   l.answered = true;
   stopTone();
@@ -486,8 +488,8 @@ frameHooks.cnot = (m: { id: string; u: string; r: string }) => {
   if (c?.id !== m.id) return;
   unlink(m.u);
   const name = displayName(getApp().friends[m.u], m.u);
-  toast(m.r === 'notfriends' ? `${name} isn’t friends with everyone on the call` : m.r === 'full' ? `A call can have up to ${MAX_PEOPLE} people`
-    : m.r === 'busy' ? `${name} is on another call` : `Couldn’t add ${name}`);
+  toast(m.r === 'notfriends' ? t('{name} isn’t friends with everyone on the call', { name }) : m.r === 'full' ? t('A call can have up to {n} people', { n: MAX_PEOPLE })
+    : m.r === 'busy' ? t('{name} is on another call', { name }) : t('Couldn’t add {name}', { name }));
 };
 
 // Someone left (or didn't answer).
@@ -497,10 +499,10 @@ frameHooks.cleft = (m: { id: string; u: string; r: string }) => {
   const was = member(m.u);
   unlink(m.u);
   const name = displayName(getApp().friends[m.u], m.u);
-  if (m.r === 'declined') toast(`${name} declined`);
-  else if (m.r === 'missed') toast(`${name} didn’t answer`);
-  else if (m.r === 'busy') toast(`${name} is on another call`);
-  else if (was?.state !== 'ringing') toast(`${name} left the call`);
+  if (m.r === 'declined') toast(t('{name} declined', { name }));
+  else if (m.r === 'missed') toast(t('{name} didn’t answer', { name }));
+  else if (m.r === 'busy') toast(t('{name} is on another call', { name }));
+  else if (was?.state !== 'ringing') toast(t('{name} left the call', { name }));
 };
 
 frameHooks.csig = async (m: { id: string; k: string; b: string; f?: string }) => {
@@ -554,12 +556,12 @@ frameHooks.cend = (m: { id: string; r: string }) => {
   if (!c || c.id !== m.id || c.phase === 'ended') return;
   switch (m.r) {
     case 'elsewhere': return finish('ok', null); // answered on another of my devices
-    case 'declined': return finish('declined', 'Declined');
-    case 'busy': return finish('busy', 'Busy on another call');
-    case 'missed': return finish('missed', c.out ? 'No answer' : 'Missed call');
-    case 'cancelled': return finish('cancelled', 'Missed call');
-    case 'failed': return finish('failed', 'Call failed');
-    default: return finish(anyAnswered() ? 'ok' : 'cancelled', 'Call ended');
+    case 'declined': return finish('declined', tk('Declined'));
+    case 'busy': return finish('busy', tk('Busy on another call'));
+    case 'missed': return finish('missed', c.out ? tk('No answer') : tk('Missed call'));
+    case 'cancelled': return finish('cancelled', tk('Missed call'));
+    case 'failed': return finish('failed', tk('Call failed'));
+    default: return finish(anyAnswered() ? 'ok' : 'cancelled', tk('Call ended'));
   }
 };
 
@@ -579,19 +581,19 @@ function beep(freqs: number[], len: number, vol: number) {
   try {
     audio ??= new AudioContext();
     if (audio.state === 'suspended') void audio.resume();
-    const t = audio.currentTime;
+    const at = audio.currentTime;
     const g = audio.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + 0.03);
-    g.gain.setValueAtTime(vol, t + len - 0.05);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(vol, at + 0.03);
+    g.gain.setValueAtTime(vol, at + len - 0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + len);
     g.connect(audio.destination);
     for (const f of freqs) {
       const o = audio.createOscillator();
       o.frequency.value = f;
       o.connect(g);
-      o.start(t);
-      o.stop(t + len);
+      o.start(at);
+      o.stop(at + len);
     }
   } catch { /* no audio */ }
 }

@@ -58,7 +58,7 @@ export interface AppProps {
 export const APP_FRAMES: readonly string[] = ['notes', 'calendar', 'split'];
 
 export function assertAppFrame(type: string) {
-  if (!APP_FRAMES.includes(type)) throw new Error(`Apps can't listen to “${type}” messages`);
+  if (!APP_FRAMES.includes(type)) throw new Error(`Apps can't listen to “${type}” messages`); // i18n-ok
 }
 
 /** The storage keys apps may use: the diary's ('note/<id>', 'notesSince', from before this rule) and
@@ -72,7 +72,7 @@ const prefixAllowed = (p: string) => typeof p === 'string' && (p.startsWith('not
 
 /** Wraps a device store so apps only reach their own keys. */
 export function scopedStore(s: Sdk['store']): Sdk['store'] {
-  const check = (ok: boolean, k: string) => { if (!ok) throw new Error(`Apps can't use the storage key “${k}”`); };
+  const check = (ok: boolean, k: string) => { if (!ok) throw new Error(`Apps can't use the storage key “${k}”`); }; // i18n-ok
   return {
     get: async (k) => { check(storeKeyAllowed(k), k); return s.get(k); },
     put: async (k, v) => { check(storeKeyAllowed(k), k); return s.put(k, v); },
@@ -88,6 +88,6 @@ export function provideSdk(s: Sdk) { current = s; }
 
 /** The SDK, inside an app. */
 export function sdk(): Sdk {
-  if (!current) throw new Error('Sanga SDK not provided: load this app through the shell or its standalone page');
+  if (!current) throw new Error('Sanga SDK not provided: load this app through the shell or its standalone page'); // i18n-ok
   return current;
 }

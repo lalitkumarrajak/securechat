@@ -19,7 +19,7 @@ export const shellSdk: Sdk = {
   on(type, fn) {
     assertAppFrame(type); // only app types: frameHooks.call, .story, … are the shell's own
     if (!listeners.has(type)) {
-      if (Object.hasOwn(frameHooks, type)) throw new Error(`“${type}” messages are the shell's`);
+      if (Object.hasOwn(frameHooks, type)) throw new Error(`“${type}” messages are the shell's`); // i18n-ok: for app developers
       listeners.set(type, new Set());
       frameHooks[type] = (m) => listeners.get(type)!.forEach((f) => f(m));
     }

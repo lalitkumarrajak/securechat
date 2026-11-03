@@ -3,6 +3,7 @@ import { Spinner } from '@sanga/ui/button';
 import { searchGifs } from '../../lib/engine';
 import type { GifItem } from '../../lib/types';
 import { cn } from '@sanga/ui/utils';
+import { t } from '@sanga/i18n';
 
 /** Trending (empty query) or search results, two columns, loading more as you scroll. */
 export function KlipyResults({ kind, q, onPick }: { kind: 'gifs' | 'stickers'; q: string; onPick: (g: GifItem) => void }) {
@@ -14,8 +15,8 @@ export function KlipyResults({ kind, q, onPick }: { kind: 'gifs' | 'stickers'; q
   const query = useRef('');
 
   useEffect(() => {
-    const t = setTimeout(() => { query.current = q.trim(); setItems([]); setNext(1); setError(''); load(1, q.trim()); }, q ? 300 : 0);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => { query.current = q.trim(); setItems([]); setNext(1); setError(''); load(1, q.trim()); }, q ? 300 : 0);
+    return () => clearTimeout(timer);
   }, [q, kind]); // new search when the query changes
 
   async function load(page: number, term: string) {
@@ -45,16 +46,16 @@ export function KlipyResults({ kind, q, onPick }: { kind: 'gifs' | 'stickers'; q
         {items.map((g) => (
           <button key={g.id} onClick={() => onPick(g)} title={g.title}
             className={cn('mb-1.5 block w-full overflow-hidden rounded-lg bg-panel-2 transition active:scale-95', sticker && 'aspect-square bg-transparent')}>
-            <img src={g.thumb} alt={g.title || (sticker ? 'Sticker' : 'GIF')} loading="lazy" referrerPolicy="no-referrer"
+            <img src={g.thumb} alt={g.title || (sticker ? t('Sticker') : 'GIF')} loading="lazy" referrerPolicy="no-referrer"
               className={cn('block w-full', sticker ? 'h-full object-contain' : 'h-auto')}
               style={!sticker && g.w && g.h ? { aspectRatio: `${g.w} / ${g.h}` } : undefined} />
           </button>
         ))}
       </div>
-      {!loading && !items.length && <p className="px-4 py-8 text-center text-sm text-muted">{q ? 'Nothing found.' : 'Nothing here yet.'}</p>}
+      {!loading && !items.length && <p className="px-4 py-8 text-center text-sm text-muted">{q ? t('Nothing found.') : t('Nothing here yet.')}</p>}
       <div ref={sentinel} className="h-8" />
       {loading && <div className="grid place-items-center pb-4 text-accent"><Spinner className="size-5" /></div>}
-      {!sticker && <p className="pb-3 text-center text-[11px] text-muted">Powered by KLIPY</p>}
+      {!sticker && <p className="pb-3 text-center text-[11px] text-muted">Powered by KLIPY{/* i18n-ok */}</p>}
     </>
   );
 }

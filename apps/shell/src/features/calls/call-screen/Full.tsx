@@ -3,6 +3,7 @@ import { ChevronDown, Mic, MicOff, MonitorUp, MonitorX, Phone, PhoneOff, SwitchC
 import { Avatar } from '../../../components/Avatar';
 import { accept, canShareScreen, decline, hangUp, isGroupCall, MAX_PEOPLE, setMinimized, shareScreen, stopSharing, switchCamera, toggleCamera, toggleMute, useCall, type Call } from '../../../lib/calls';
 import { cn } from '@sanga/ui/utils';
+import { t } from '@sanga/i18n';
 import { Media } from './Media';
 import { useNames, joinNames, status, useNow, showsVideo } from './helpers';
 import { Sharing } from './Sharing';
@@ -25,7 +26,7 @@ export function Full({ call }: { call: Call }) {
   const canAdd = call.phase === 'active' && call.members.length + 1 < MAX_PEOPLE;
 
   return (
-    <div role="dialog" aria-modal="true" aria-label={`Call with ${name}`}
+    <div role="dialog" aria-modal="true" aria-label={t('Call with {name}', { name })}
       className="pointer-events-auto fixed inset-0 z-[60] flex flex-col bg-gradient-to-b from-[#0f2b2a] to-[#05100f] text-white animate-fade-in">
       {remoteVideo && <Media stream={remotes[them.u]} fit={them.sharing} className="absolute inset-0 size-full" />}
       {/* before they pick up, a video call shows your own camera full screen */}
@@ -33,18 +34,18 @@ export function Full({ call }: { call: Call }) {
 
       <header className="relative z-10 flex items-center gap-2 px-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         {call.phase !== 'incoming' && call.phase !== 'ended' && (
-          <button onClick={() => setMinimized(true)} aria-label="Minimise call" className="grid size-10 place-items-center rounded-full bg-black/25 hover:bg-black/40">
+          <button onClick={() => setMinimized(true)} aria-label={t('Minimise call')} className="grid size-10 place-items-center rounded-full bg-black/25 hover:bg-black/40">
             <ChevronDown className="size-6" />
           </button>
         )}
-        <span className="flex-1 text-center text-xs text-white/70">🔒 End-to-end encrypted</span>
+        <span className="flex-1 text-center text-xs text-white/70">{t('🔒 End-to-end encrypted')}</span>
         <span className="size-10" />
       </header>
 
       {group && call.phase !== 'incoming' ? (
         <>
           <div className="relative z-10 px-6 pt-2 text-center">
-            <h2 className="text-lg font-semibold">Group call · {call.members.length + 1} people</h2>
+            <h2 className="text-lg font-semibold">{t('Group call · {n} people', { n: call.members.length + 1 })}</h2>
             <p className="mt-0.5 text-sm text-white/80" aria-live="polite">{status(call, now)}</p>
             <Sharing call={call} nameOf={nameOf} />
           </div>
@@ -65,8 +66,8 @@ export function Full({ call }: { call: Call }) {
           )}
           <h2 className={cn('text-center font-semibold drop-shadow', remoteVideo ? 'text-lg' : 'mt-5 text-2xl')}>{name}</h2>
           <p className="mt-1 text-sm text-white/80 drop-shadow" aria-live="polite">{status(call, now)}</p>
-          {them && call.phase === 'active' && them.muted && <p className="mt-2 flex items-center gap-1.5 rounded-full bg-black/40 px-3 py-1 text-xs"><MicOff className="size-3.5" />{name} is muted</p>}
-          {them && call.phase === 'active' && call.video && them.camOff && !them.sharing && <p className="mt-2 text-xs text-white/70">{name}’s camera is off</p>}
+          {them && call.phase === 'active' && them.muted && <p className="mt-2 flex items-center gap-1.5 rounded-full bg-black/40 px-3 py-1 text-xs"><MicOff className="size-3.5" />{t('{name} is muted', { name })}</p>}
+          {them && call.phase === 'active' && call.video && them.camOff && !them.sharing && <p className="mt-2 text-xs text-white/70">{t('{name}’s camera is off', { name })}</p>}
           <Sharing call={call} nameOf={nameOf} />
         </div>
       )}
@@ -82,8 +83,8 @@ export function Full({ call }: { call: Call }) {
       <footer className="relative z-10 mt-auto px-6 pt-4 pb-[max(2rem,env(safe-area-inset-bottom))]">
         {call.phase === 'incoming' ? (
           <div className="flex items-center justify-around">
-            <Round label="Decline" onClick={decline} className="bg-red-500"><PhoneOff /></Round>
-            <Round label={call.video ? 'Accept video call' : 'Accept'} onClick={() => void accept()} className="bg-green-500" ping>
+            <Round label={t('Decline')} onClick={decline} className="bg-red-500"><PhoneOff /></Round>
+            <Round label={call.video ? t('Accept video call') : t('Accept')} onClick={() => void accept()} className="bg-green-500" ping>
               {call.video ? <Video /> : <Phone />}
             </Round>
           </div>
@@ -91,23 +92,23 @@ export function Full({ call }: { call: Call }) {
           <div className="h-16" />
         ) : (
           <div className="mx-auto flex max-w-md items-center justify-around gap-1 rounded-full bg-black/35 px-3 py-3 backdrop-blur">
-            <Round label={call.muted ? 'Unmute' : 'Mute'} pressed={call.muted} onClick={toggleMute} small className={call.muted ? 'bg-white text-black' : 'bg-white/15'}>
+            <Round label={call.muted ? t('Unmute') : t('Mute')} pressed={call.muted} onClick={toggleMute} small className={call.muted ? 'bg-white text-black' : 'bg-white/15'}>
               {call.muted ? <MicOff /> : <Mic />}
             </Round>
             {call.video && (
-              <Round label={call.camOff ? 'Turn camera on' : 'Turn camera off'} pressed={call.camOff} onClick={toggleCamera} small className={call.camOff ? 'bg-white text-black' : 'bg-white/15'}>
+              <Round label={call.camOff ? t('Turn camera on') : t('Turn camera off')} pressed={call.camOff} onClick={toggleCamera} small className={call.camOff ? 'bg-white text-black' : 'bg-white/15'}>
                 {call.camOff ? <VideoOff /> : <Video />}
               </Round>
             )}
-            {call.video && <Round label="Switch camera" onClick={() => void switchCamera()} small className="bg-white/15"><SwitchCamera /></Round>}
+            {call.video && <Round label={t('Switch camera')} onClick={() => void switchCamera()} small className="bg-white/15"><SwitchCamera /></Round>}
             {canShareScreen() && call.phase === 'active' && (
-              <Round label={call.sharing ? 'Stop sharing screen' : 'Share screen'} pressed={!!call.sharing} small
+              <Round label={call.sharing ? t('Stop sharing screen') : t('Share screen')} pressed={!!call.sharing} small
                 onClick={() => void (call.sharing ? stopSharing() : shareScreen())} className={call.sharing ? 'bg-sky-500' : 'bg-white/15'}>
                 {call.sharing ? <MonitorX /> : <MonitorUp />}
               </Round>
             )}
-            {canAdd && <Round label="Add people" onClick={() => setAdding(true)} small className="bg-white/15"><UserPlus /></Round>}
-            <Round label={group ? 'Leave call' : 'End call'} onClick={hangUp} small className="bg-red-500"><PhoneOff /></Round>
+            {canAdd && <Round label={t('Add people')} onClick={() => setAdding(true)} small className="bg-white/15"><UserPlus /></Round>}
+            <Round label={group ? t('Leave call') : t('End call')} onClick={hangUp} small className="bg-red-500"><PhoneOff /></Round>
           </div>
         )}
       </footer>

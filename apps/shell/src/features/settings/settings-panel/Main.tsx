@@ -1,4 +1,5 @@
-import { ChevronRight, Bell, Info, KeyRound, MessageSquare, MonitorSmartphone, Palette, Shield } from 'lucide-react';
+import { LANGS, lang, t } from '@sanga/i18n';
+import { ChevronRight, Languages, Bell, Info, KeyRound, MessageSquare, MonitorSmartphone, Palette, Shield } from 'lucide-react';
 import { Avatar } from '../../../components/Avatar';
 import { useApp } from '../../../state/app';
 import { NavRow } from './NavRow';
@@ -18,13 +19,14 @@ export function Main({ go }: { go: (p: Page) => void }) {
         <ChevronRight className="size-4 text-muted" />
       </button>
       <Section>
-        <NavRow icon={<Palette />} label="Appearance" sub="Theme, colour, wallpaper, text size" onClick={() => go('appearance')} />
-        <NavRow icon={<Shield />} label="Privacy" sub="Last seen, read receipts, app lock, privacy screen, blocked" onClick={() => go('privacy')} />
-        <NavRow icon={<Bell />} label="Notifications" sub="Push notifications, sounds" onClick={() => go('notifications')} />
-        <NavRow icon={<MessageSquare />} label="Chats" sub="Enter to send, archived chats" onClick={() => go('chats')} />
-        <NavRow icon={<MonitorSmartphone />} label="Active sessions" sub="Devices signed in to your account" onClick={() => go('sessions')} />
-        <NavRow icon={<KeyRound />} label="Account" sub="Password, sign out" onClick={() => go('account')} />
-        <NavRow icon={<Info />} label="About" onClick={() => go('about')} />
+        <NavRow icon={<Palette />} label={t('Appearance')} sub={t('Theme, colour, wallpaper, text size')} onClick={() => go('appearance')} />
+        <NavRow icon={<Shield />} label={t('Privacy')} sub={t('Last seen, read receipts, app lock, privacy screen, blocked')} onClick={() => go('privacy')} />
+        <NavRow icon={<Bell />} label={t('Notifications')} sub={t('Push notifications, sounds')} onClick={() => go('notifications')} />
+        <NavRow icon={<Languages />} label={t('Language')} sub={LANGS.find((l) => l.id === lang())!.name} onClick={() => go('language')} />{/* i18n-ok: the language's own name */}
+        <NavRow icon={<MessageSquare />} label={t('Chats')} sub={t('Enter to send, archived chats')} onClick={() => go('chats')} />
+        <NavRow icon={<MonitorSmartphone />} label={t('Active sessions')} sub={t('Devices signed in to your account')} onClick={() => go('sessions')} />
+        <NavRow icon={<KeyRound />} label={t('Account')} sub={t('Password, sign out')} onClick={() => go('account')} />
+        <NavRow icon={<Info />} label={t('About')} onClick={() => go('about')} />
       </Section>
     </>
   );

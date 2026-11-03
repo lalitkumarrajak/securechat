@@ -3,12 +3,13 @@
 import { go } from '../../lib/nav';
 import { AppFrame } from '../apps/AppFrame';
 import { AppTabs } from '../nav/AppTabs';
+import { t } from '@sanga/i18n';
 
 export function CalendarPage() {
   return (
-    <section aria-label="Calendar" className="mx-auto flex h-[var(--app-h,100dvh)] max-w-[1600px] flex-col overflow-hidden bg-bg md:border-x md:border-line">
+    <section aria-label={t('Calendar')} className="mx-auto flex h-[var(--app-h,100dvh)] max-w-[1600px] flex-col overflow-hidden bg-bg md:border-x md:border-line">
       <div className="flex min-h-0 flex-1 flex-col">
-        <AppFrame id="calendar" name="the calendar" onClose={() => go('chat')} tab />
+        <AppFrame id="calendar" name={t('the calendar')} onClose={() => go('chat')} tab />
       </div>
       <AppTabs />
     </section>

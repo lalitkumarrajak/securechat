@@ -1,6 +1,7 @@
 import * as D from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { t } from '@sanga/i18n';
 import { cn } from '../utils';
 
 /** A centred dialog on desktop that becomes a bottom sheet on phones. */
@@ -29,7 +30,7 @@ export function Dialog({ open, onOpenChange, title, description, children, class
               {description ? <D.Description className="mt-1 text-sm text-muted">{description}</D.Description>
                 : <D.Description className="sr-only">{title}</D.Description>}
             </div>
-            <D.Close className="-m-1 rounded-full p-1.5 text-muted hover:bg-hover hover:text-ink" aria-label="Close">
+            <D.Close className="-m-1 rounded-full p-1.5 text-muted hover:bg-hover hover:text-ink" aria-label={t('Close')}>
               <X className="size-5" />
             </D.Close>
           </div>

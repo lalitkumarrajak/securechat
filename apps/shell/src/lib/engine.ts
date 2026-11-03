@@ -13,6 +13,8 @@ import { getApp, setApp } from '../state/app';
 import { go } from './nav';
 import { deviceHints, deviceName, placeName } from './device';
 import { setSettings, useSettings } from '../state/settings';
+import './swLang'; // push notifications in the language now on
+import { t } from '@sanga/i18n';
 
 const S = {
   token: null as string | null,
@@ -52,11 +54,14 @@ export async function api<T = any>(path: string, body?: unknown): Promise<T> {
   try {
     res = await fetch(path, body !== undefined ? { method: 'POST', headers, body: JSON.stringify(body) } : { headers });
   } catch {
-    throw new Error('No connection. Check your internet and try again.');
+    const e = new Error(t('No connection. Check your internet and try again.'));
+    e.name = 'NetworkError'; // so callers can tell it apart whatever the language
+    throw e;
   }
   const data = await res.json().catch(() => ({}));
-  if (res.status === 401 && S.token && path !== '/api/password') { sessionExpired(); throw new Error('Session expired'); }
-  if (!res.ok) throw new Error(data.error || 'Something went wrong');
+  if (res.status === 401 && S.token && path !== '/api/password') { sessionExpired(); throw new Error(t('Session expired')); }
+  // The server answers in English (the messages are listed in serverText.ts): shown in the language now on.
+  if (!res.ok) throw new Error(typeof data.error === 'string' && data.error ? t(data.error) : t('Something went wrong'));
   return data;
 }
 
@@ -187,7 +192,7 @@ export async function changePassword(current: string, next: string) {
   let encPriv: string;
   // If the current password is wrong, its key can't decrypt the backup.
   try { encPriv = await C.rewrapIdentity(me.encPriv!, old.wrapKey, fresh.wrapKey); }
-  catch { throw new Error('Current password is wrong'); }
+  catch { throw new Error(t('Current password is wrong')); }
   await api('/api/password', { auth: old.auth, newAuth: fresh.auth, encPriv });
 }
 
@@ -329,7 +334,7 @@ async function handle(m: any) {
       await saveSeq(Math.max(...m.items.map((i: any) => i.seq)));
       break;
     case 'delr':
-      if (m.failed.length) toast.error("Couldn't delete for everyone", { description: 'The 5-minute limit has passed.' });
+      if (m.failed.length) toast.error(t("Couldn't delete for everyone"), { description: t('The 5-minute limit has passed.') });
       break;
     case 'hid':
       for (const id of m.ids) {
@@ -356,18 +361,19 @@ async function handle(m: any) {
       await refreshFriends();
       if (m.req) {
         const who = getApp().incoming.find((r) => r.u === m.u);
-        toast(`${who?.name || m.u} sent you a friend request`, {
-          action: { label: 'View', onClick: () => setApp({ panel: 'friends', friendsTab: 'requests' }) },
+        toast(t('{name} sent you a friend request', { name: who?.name || m.u }), {
+          action: { label: t('View'), onClick: () => setApp({ panel: 'friends', friendsTab: 'requests' }) },
         });
       }
       break;
     }
     case 'signin': { // someone signed in to this account on another device
       const where = placeName(m.loc);
-      toast.warning(`New sign-in: ${deviceName(m.ua, m.device)}`, {
-        description: `${where ? where + ' · ' : ''}IP ${m.ip}. If this wasn’t you, sign it out and change your password.`,
+      toast.warning(t('New sign-in: {device}', { device: deviceName(m.ua, m.device) }), {
+        description: where ? t('{place} · IP {ip}. If this wasn’t you, sign it out and change your password.', { place: where, ip: m.ip })
+          : t('IP {ip}. If this wasn’t you, sign it out and change your password.', { ip: m.ip }),
         duration: 30_000,
-        action: { label: 'Review', onClick: () => setApp({ panel: 'settings', settingsPage: 'sessions' }) },
+        action: { label: t('Review'), onClick: () => setApp({ panel: 'settings', settingsPage: 'sessions' }) },
       });
       break;
     }
@@ -380,9 +386,9 @@ async function handle(m: any) {
         await db.del('outbox', m.cid);
         const msg = await db.getMsg(S.me + '/' + m.cid);
         if (msg) await updateStatus({ ...msg, s: -2 });
-        if (m.e === 'not-friends') toast.error('Message not sent', { description: 'You can only message friends who haven’t blocked you.' });
-        if (m.e === 'not-member') toast.error('Message not sent', { description: 'You’re no longer in this group.' });
-        if (m.e === 'admins-only') toast.error('Message not sent', { description: 'Only admins can send messages in this group.' });
+        if (m.e === 'not-friends') toast.error(t('Message not sent'), { description: t('You can only message friends who haven’t blocked you.') });
+        if (m.e === 'not-member') toast.error(t('Message not sent'), { description: t('You’re no longer in this group.') });
+        if (m.e === 'admins-only') toast.error(t('Message not sent'), { description: t('Only admins can send messages in this group.') });
       }
       break;
   }
@@ -590,25 +596,26 @@ async function updateStatus(m: Msg) {
 
 /** "Missed voice call", "Outgoing video call", … */
 export function callText(c: CallLog, out: boolean) {
-  const kind = c.v ? 'video call' : 'voice call';
-  if (c.st === 'ok') return `${out ? 'Outgoing' : 'Incoming'} ${kind}`;
-  if (out) return c.st === 'declined' ? `${cap(kind)} declined` : c.st === 'busy' ? `${cap(kind)} · busy` : c.st === 'failed' ? `${cap(kind)} failed` : `${cap(kind)} · no answer`;
-  return c.st === 'declined' ? `Declined ${kind}` : c.st === 'failed' ? `${cap(kind)} failed` : `Missed ${kind}`;
+  const v = !!c.v;
+  if (c.st === 'ok') return out ? (v ? t('Outgoing video call') : t('Outgoing voice call')) : v ? t('Incoming video call') : t('Incoming voice call');
+  if (c.st === 'failed') return v ? t('Video call failed') : t('Voice call failed');
+  if (out) return c.st === 'declined' ? (v ? t('Video call declined') : t('Voice call declined'))
+    : c.st === 'busy' ? (v ? t('Video call · busy') : t('Voice call · busy')) : v ? t('Video call · no answer') : t('Voice call · no answer');
+  return c.st === 'declined' ? (v ? t('Declined video call') : t('Declined voice call')) : v ? t('Missed video call') : t('Missed voice call');
 }
-const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 
 export const preview = (m: Pick<Msg, 'type' | 'text' | 'dur' | 'file' | 'call'> & Partial<Pick<Msg, 'sys' | 'pending' | 'peer' | 'out'>>): string =>
   m.type === 'sys' && m.sys ? sysText(m.sys, m.peer ? getApp().groups[groupIdOf(m.peer)] : undefined)
-    : m.pending ? '🔒 Waiting for this message'
-    : m.type === 'img' ? '📷 Photo' + (m.text ? ': ' + m.text : '')
-    : m.type === 'voice' ? `🎤 Voice message`
+    : m.pending ? t('🔒 Waiting for this message')
+    : m.type === 'img' ? t('📷 Photo') + (m.text ? ': ' + m.text : '')
+    : m.type === 'voice' ? t('🎤 Voice message')
     : m.type === 'gif' ? 'GIF'
-    : m.type === 'file' ? '📄 ' + (m.file?.name || 'File')
-    : m.type === 'location' ? '📍 Location'
+    : m.type === 'file' ? '📄 ' + (m.file?.name || t('File'))
+    : m.type === 'location' ? t('📍 Location')
     : m.type === 'call' && m.call ? (m.call.v ? '🎥 ' : '📞 ') + callText(m.call, !!m.out)
-    : m.type === 'sticker' ? 'Sticker'
-    : m.type === 'deleted' ? '🚫 This message was deleted'
-    : m.type === 'err' ? '🔒 Unable to decrypt'
+    : m.type === 'sticker' ? t('Sticker')
+    : m.type === 'deleted' ? t('🚫 This message was deleted')
+    : m.type === 'err' ? t('🔒 Unable to decrypt')
     : (m.text || '').slice(0, 100);
 
 export const KLIPY_MEDIA = 'https://static.klipy.com/';
@@ -674,7 +681,7 @@ async function convKey(peer: string) {
     let p = await db.get('peers', peer);
     if (!p) {
       const f = getApp().friends[peer] || (await api('/api/key?u=' + encodeURIComponent(peer)).catch(() => null));
-      if (!f) throw new Error('No key for ' + peer);
+      if (!f) throw new Error(t('No key for {name}', { name: peer }));
       p = { u: peer, pub: f.pub };
       await db.put('peers', p);
     }
@@ -811,25 +818,26 @@ async function storeGroupKey(c: any, from: string) {
 }
 
 const nameOf = (u: string, group?: Group) =>
-  u === S.me ? 'You' : getApp().friends[u]?.name || group?.members.find((m) => m.u === u)?.n || u;
+  u === S.me ? t('You') : getApp().friends[u]?.name || group?.members.find((m) => m.u === u)?.n || u;
 const names = (us: string[] = [], g?: Group) => us.map((u) => nameOf(u, g)).join(', ');
 
 /** "Lalit added Rakhi", "You changed the group name to …" */
 export function sysText(ev: SysEvent, g?: Group) {
   const by = nameOf(ev.by, g);
   switch (ev.e) {
-    case 'create': return `${by} created the group “${ev.name}”`;
-    case 'add': return `${by} added ${names(ev.u, g)}`;
-    case 'remove': return `${by} removed ${names(ev.u, g)}`;
-    case 'left': return `${by} left`;
-    case 'joined': return `${by} joined using the invite link`;
-    case 'admin': return ev.auto ? `${names(ev.u, g)} ${ev.u?.[0] === S.me ? 'are' : 'is'} now an admin` : `${by} made ${names(ev.u, g)} an admin`;
-    case 'unadmin': return `${by} dismissed ${names(ev.u, g)} as admin`;
-    case 'name': return `${by} changed the group name to “${ev.name}”`;
-    case 'about': return `${by} changed the group description`;
-    case 'photo': return ev.on ? `${by} changed the group photo` : `${by} removed the group photo`;
-    case 'adminsOnly': return ev.on ? `${by} set it so only admins can send messages` : `${by} let everyone send messages`;
-    default: return 'Group updated';
+    case 'create': return t('{by} created the group “{name}”', { by, name: ev.name ?? '' });
+    case 'add': return t('{by} added {names}', { by, names: names(ev.u, g) });
+    case 'remove': return t('{by} removed {names}', { by, names: names(ev.u, g) });
+    case 'left': return t('{by} left', { by });
+    case 'joined': return t('{by} joined using the invite link', { by });
+    case 'admin': return ev.auto ? (ev.u?.[0] === S.me ? t('{names} are now an admin', { names: names(ev.u, g) }) : t('{names} is now an admin', { names: names(ev.u, g) }))
+      : t('{by} made {names} an admin', { by, names: names(ev.u, g) });
+    case 'unadmin': return t('{by} dismissed {names} as admin', { by, names: names(ev.u, g) });
+    case 'name': return t('{by} changed the group name to “{name}”', { by, name: ev.name ?? '' });
+    case 'about': return t('{by} changed the group description', { by });
+    case 'photo': return ev.on ? t('{by} changed the group photo', { by }) : t('{by} removed the group photo', { by });
+    case 'adminsOnly': return ev.on ? t('{by} set it so only admins can send messages', { by }) : t('{by} let everyone send messages', { by });
+    default: return t('Group updated');
   }
 }
 
@@ -873,7 +881,7 @@ export async function refreshGroups() {
 // left or was removed) and handed to each member, and my other devices, who don't have it yet.
 async function groupSendingKey(gid: string) {
   const g = getApp().groups[gid];
-  if (!g) throw new Error('You’re no longer in this group');
+  if (!g) throw new Error(t('You’re no longer in this group'));
   let cur: { kid: string; raw: string; epoch: number; to: string[] } | undefined = await db.get('kv', 'gsend/' + gid);
   if (!cur || cur.epoch !== g.epoch) {
     const k = C.newGroupKey();
@@ -901,7 +909,7 @@ async function bumpChat(peer: string, msg: Msg, unread: boolean, fromSync: boole
   const chat = (await db.getChat(peer)) || newChat(peer);
   // In groups the list shows who said it: "Rakhi: see you". Messages in a tab say which: "🏠 House · Rent paid".
   const who = isGroup(peer) && !msg.out && msg.type !== 'sys' ? nameOf(senderOf(msg), getApp().groups[groupIdOf(peer)]) + ': ' : '';
-  const topic = msg.tp && chat.topics?.find((t) => t.id === msg.tp);
+  const topic = msg.tp && chat.topics?.find((tp) => tp.id === msg.tp);
   const tab = topic ? `${topic.emoji} ${topic.name} · ` : '';
   if (msg.ts >= chat.ts) Object.assign(chat, { ts: msg.ts, last: tab + who + preview(msg), lastOut: msg.out, lastK: msg.k, lastS: msg.s });
   if (unread) chat.unread++;
@@ -942,7 +950,7 @@ async function applyTopic(c: any, from: string, ts: number, peer: string) {
   if (typeof c.id !== 'string' || !TOPIC_ID.test(c.id)) return;
   const chat = (await db.getChat(peer)) || newChat(peer);
   const topics = chat.topics || [];
-  const old = topics.find((t) => t.id === c.id);
+  const old = topics.find((tp) => tp.id === c.id);
   if (old && old.ts > ts) return;
   if (!c.on) {
     if (!old) return;
@@ -952,15 +960,15 @@ async function applyTopic(c: any, from: string, ts: number, peer: string) {
     const keys = new Set(gone.map((m) => m.k));
     const tunread = { ...chat.tunread };
     delete tunread[c.id];
-    await saveChat({ ...chat, topics: topics.filter((t) => t.id !== c.id), tunread, pins: (chat.pins || []).filter((p) => !keys.has(p.k)) });
+    await saveChat({ ...chat, topics: topics.filter((tp) => tp.id !== c.id), tunread, pins: (chat.pins || []).filter((p) => !keys.has(p.k)) });
     if (getApp().active === peer) await openTopic(peer, getApp().topic === c.id ? '' : getApp().topic, true);
     return;
   }
   const name = typeof c.name === 'string' ? c.name.trim().slice(0, 30) : '';
   const emoji = typeof c.emoji === 'string' ? [...c.emoji].slice(0, 4).join('') : '';
   if (!name || (!old && topics.length >= MAX_TOPICS)) return;
-  const t: Topic = { id: c.id, name, emoji, by: old?.by || from, ts };
-  await saveChat({ ...chat, topics: old ? topics.map((x) => (x.id === c.id ? t : x)) : [...topics, t] });
+  const tp: Topic = { id: c.id, name, emoji, by: old?.by || from, ts };
+  await saveChat({ ...chat, topics: old ? topics.map((x) => (x.id === c.id ? tp : x)) : [...topics, tp] });
 }
 
 /** Show one tab of the open chat ('' = the main chat). */
@@ -1068,13 +1076,13 @@ async function encryptAndQueue(peer: string, content: Content, quiet: boolean, m
 export async function sendContent(peer: string, content: Extract<Content, { type: 'text' | 'img' | 'voice' | 'gif' | 'sticker' | 'file' | 'location' | 'call' }>, mn?: string[], quiet = false) {
   if (isGroup(peer)) {
     const g = getApp().groups[groupIdOf(peer)];
-    if (!g) { toast.error('You’re no longer in this group'); return; }
-    if (g.adminsOnly && !g.admin) { toast.error('Only admins can send messages in this group'); return; }
+    if (!g) { toast.error(t('You’re no longer in this group')); return; }
+    if (g.adminsOnly && !g.admin) { toast.error(t('Only admins can send messages in this group')); return; }
     // Who's @mentioned rides inside the encrypted message (for highlighting) and next to it (for their notification).
     if (mn?.length) (content as any).mn = mn;
   } else if (await peerKeyChanged(peer)) {
     setApp((s) => ({ keyChanged: { ...s.keyChanged, [peer]: true } }));
-    toast.warning('Sending is paused', { description: 'This contact’s security code changed. Verify it first.' });
+    toast.warning(t('Sending is paused'), { description: t('This contact’s security code changed. Verify it first.') });
     return;
   }
   // Sent from a tab: it goes in that tab. Call logs always go in the main chat.
@@ -1195,7 +1203,7 @@ export async function togglePin(m: Msg) {
   const chat = getApp().chats.find((c) => c.peer === m.peer);
   const pinned = !!chat?.pins?.some((p) => p.k === m.k);
   await sendControl(m.peer, { type: 'pin', k: m.k, on: !pinned });
-  toast.success(pinned ? 'Message unpinned' : 'Message pinned');
+  toast.success(pinned ? t('Message unpinned') : t('Message pinned'));
 }
 
 export async function forward(msgs: Msg[], peers: string[]) {
@@ -1236,7 +1244,7 @@ async function flushHides() {
 /** Delete for everyone (server enforces: own messages, within 5 minutes). */
 export function deleteForEveryone(msgs: Msg[]) {
   const ids = msgs.map((m) => m.id).filter((id): id is number => id != null);
-  if (!wsSend({ t: 'del', ids })) throw new Error("You're offline. Try again when connected.");
+  if (!wsSend({ t: 'del', ids })) throw new Error(t("You're offline. Try again when connected."));
 }
 
 // ---------- typing ----------
@@ -1297,7 +1305,7 @@ window.addEventListener('popstate', () => { if (getApp().active) setApp(closedCh
 export async function setArchived(peer: string, archived: boolean) {
   const chat = (await db.getChat(peer)) || newChat(peer);
   await saveChat({ ...chat, archived });
-  toast(archived ? 'Chat archived' : 'Chat unarchived');
+  toast(archived ? t('Chat archived') : t('Chat unarchived'));
 }
 
 export function saveDraft(peer: string, text: string) {
@@ -1328,17 +1336,17 @@ let audioCtx: AudioContext | null = null;
 function playSound() {
   try {
     audioCtx ??= new AudioContext();
-    const t = audioCtx.currentTime;
+    const at = audioCtx.currentTime;
     for (const [i, f] of [880, 1320].entries()) {
       const o = audioCtx.createOscillator();
       const g = audioCtx.createGain();
       o.frequency.value = f;
-      g.gain.setValueAtTime(0.0001, t + i * 0.09);
-      g.gain.exponentialRampToValueAtTime(0.12, t + i * 0.09 + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.09 + 0.16);
+      g.gain.setValueAtTime(0.0001, at + i * 0.09);
+      g.gain.exponentialRampToValueAtTime(0.12, at + i * 0.09 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + i * 0.09 + 0.16);
       o.connect(g).connect(audioCtx.destination);
-      o.start(t + i * 0.09);
-      o.stop(t + i * 0.09 + 0.18);
+      o.start(at + i * 0.09);
+      o.stop(at + i * 0.09 + 0.18);
     }
   } catch { /* audio not available */ }
 }
@@ -1355,7 +1363,8 @@ function alertIncoming(peer: string, msg: Msg) {
     const group = isGroup(peer) ? getApp().groups[groupIdOf(peer)] : undefined;
     const hide = useSettings.getState().privacyScreen; // privacy screen: no names or text on the lock screen either
     const name = hide ? 'Sanga' : group?.name || getApp().friends[peer]?.name || peer;
-    const body = hide ? 'New message' : group ? `${nameOf(senderOf(msg), group)}${mentioned ? ' mentioned you' : ''}: ${preview(msg)}` : preview(msg);
+    const body = hide ? t('New message') : !group ? preview(msg)
+      : mentioned ? t('{name} mentioned you: {text}', { name: nameOf(senderOf(msg), group), text: preview(msg) }) : nameOf(senderOf(msg), group) + ': ' + preview(msg);
     navigator.serviceWorker?.ready.then((reg) => reg.showNotification(name, {
       body, icon: '/icon-192.png', tag: 'chat-' + peer, data: { peer },
     })).catch(() => {});
@@ -1382,25 +1391,25 @@ export const pushSupported = () => 'serviceWorker' in navigator && 'PushManager'
 function blockedHelp(perm: NotificationPermission) {
   const ua = navigator.userAgent;
   const installed = matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone === true;
-  if (perm === 'default') return 'The notification prompt was closed without an answer. Tap the switch again and choose Allow.';
-  if (/iPhone|iPad/.test(ua)) return 'Notifications are blocked. Open Settings → Notifications → Sanga and turn on Allow Notifications, then try again.';
-  if (installed) return 'Notifications are blocked. Press and hold the Sanga icon → App info → Notifications, turn them on, then try again.';
-  if (/Android/.test(ua)) return 'Notifications are blocked. In Chrome tap ⋮ → Settings → Site settings → Notifications, find this site and set it to Allow, then try again.';
-  return 'Notifications are blocked. Tap the lock icon next to the address, allow Notifications, then try again.';
+  if (perm === 'default') return t('The notification prompt was closed without an answer. Tap the switch again and choose Allow.');
+  if (/iPhone|iPad/.test(ua)) return t('Notifications are blocked. Open Settings → Notifications → Sanga and turn on Allow Notifications, then try again.');
+  if (installed) return t('Notifications are blocked. Press and hold the Sanga icon → App info → Notifications, turn them on, then try again.');
+  if (/Android/.test(ua)) return t('Notifications are blocked. In Chrome tap ⋮ → Settings → Site settings → Notifications, find this site and set it to Allow, then try again.');
+  return t('Notifications are blocked. Tap the lock icon next to the address, allow Notifications, then try again.');
 }
 
 export async function enablePush(silent = false) {
   if (!pushSupported()) {
     throw new Error(/iPhone|iPad/.test(navigator.userAgent)
-      ? 'On iPhone, add Sanga to your Home Screen first (Share → Add to Home Screen).'
-      : 'This browser doesn’t support push notifications.');
+      ? t('On iPhone, add Sanga to your Home Screen first (Share → Add to Home Screen).')
+      : t('This browser doesn’t support push notifications.'));
   }
   const perm = silent ? Notification.permission : await Notification.requestPermission();
   if (perm !== 'granted') throw new Error(blockedHelp(perm));
   const reg = await navigator.serviceWorker.ready;
   const { key } = await api('/api/push/key');
   const subscribe = () => reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64urlToBytes(key) })
-    .catch(() => { throw new Error('Your browser couldn’t reach its push service. Check your internet connection (and any VPN or ad blocker), then try again.'); });
+    .catch(() => { throw new Error(t('Your browser couldn’t reach its push service. Check your internet connection (and any VPN or ad blocker), then try again.')); });
   let sub = (await reg.pushManager.getSubscription()) || (await subscribe());
   try {
     await api('/api/push/subscribe', { sub: sub.toJSON() });

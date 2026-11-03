@@ -1,11 +1,12 @@
 import { cn } from '@sanga/ui/utils';
 import { ChatListSkeleton } from './ChatListSkeleton';
 import { bar } from './skeletonBar';
+import { t } from '@sanga/i18n';
 
 /** The whole app while it starts: the chat list on the left, an empty pane on wide screens. */
 export function ShellSkeleton() {
   return (
-    <div className="mx-auto flex h-dvh max-w-[1600px] overflow-hidden bg-panel md:border-x md:border-line" role="status" aria-label="Loading Sanga">
+    <div className="mx-auto flex h-dvh max-w-[1600px] overflow-hidden bg-panel md:border-x md:border-line" role="status" aria-label={t('Loading Sanga')}>
       <aside className="flex w-full flex-col md:w-[360px] md:shrink-0 md:border-r md:border-line lg:w-[400px]">
         <div className="flex h-16 shrink-0 items-center gap-3 px-3">
           <span className="size-10 rounded-full bg-line/70 animate-pulse" />

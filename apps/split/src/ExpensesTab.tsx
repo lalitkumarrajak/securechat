@@ -1,7 +1,8 @@
+import { locale, t, tx } from '@sanga/i18n';
 import { useMemo, useState } from 'react';
 import { HandCoins, Search } from 'lucide-react';
 import { cn } from '@sanga/ui/utils';
-import { money, parseDay, type Expense } from './model';
+import { catName, money, parseDay, type Expense } from './model';
 import { useLedger, useMe, useNames } from './hooks';
 import type { GroupData } from './store';
 import { Empty } from './Empty';
@@ -22,10 +23,13 @@ export function ExpensesTab({ g, onOpen }: { g: GroupData; onOpen: (e: Expense) 
   const days = useMemo(() => {
     const s = q.trim().toLowerCase();
     const items: Item[] = expenses
-      .filter((e) => (!cat || e.cat === cat) && (!s || e.desc.toLowerCase().includes(s) || (e.notes ?? '').toLowerCase().includes(s) || catOf(e.cat).name.toLowerCase().includes(s)))
+      .filter((e) => (!cat || e.cat === cat) && (!s || e.desc.toLowerCase().includes(s) || (e.notes ?? '').toLowerCase().includes(s) || catName(catOf(e.cat)).toLowerCase().includes(s)))
       .map((e) => ({ kind: 'e' as const, e }));
     if (!cat && !s) {
-      for (const p of settles) items.push({ kind: 's', id: p.id, date: p.date, text: `${name(person(p.from))} paid ${name(person(p.to))} ${money(p.amount, currency)}${p.pending ? ' · waiting for confirmation' : ''}` });
+      for (const p of settles) {
+        const v = { from: name(person(p.from)), to: name(person(p.to)), amount: money(p.amount, currency) };
+        items.push({ kind: 's', id: p.id, date: p.date, text: p.pending ? t('{from} paid {to} {amount} · waiting for confirmation', v) : t('{from} paid {to} {amount}', v) });
+      }
     }
     items.sort((a, b) => { const da = a.kind === 'e' ? a.e.date : a.date, db = b.kind === 'e' ? b.e.date : b.date; return da < db ? 1 : da > db ? -1 : 0; });
     const out: { day: string; items: Item[] }[] = [];
@@ -36,34 +40,34 @@ export function ExpensesTab({ g, onOpen }: { g: GroupData; onOpen: (e: Expense) 
     return out;
   }, [expenses, settles, q, cat, currency, name, person, catOf]);
 
-  if (!expenses.length && !settles.length) return <Empty emoji="🧾" title="No expenses yet">Tap <b>+</b> to add the first one.</Empty>;
+  if (!expenses.length && !settles.length) return <Empty emoji="🧾" title={t('No expenses yet')}>{tx('Tap {plus} to add the first one.', { plus: <b>+</b> })}</Empty>;
 
   return (
     <div>
       <div className="space-y-2 px-4 pb-2">
         <label className="relative block">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search expenses" aria-label="Search expenses"
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('Search expenses')} aria-label={t('Search expenses')}
             className="h-10 w-full rounded-xl border border-line bg-panel-2 pr-3 pl-9 text-sm outline-none focus:border-accent" />
         </label>
         {used.length > 1 && (
-          <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1" role="group" aria-label="Filter by category">
+          <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1" role="group" aria-label={t('Filter by category')}>
             {used.map((id) => {
               const c = catOf(id);
               return (
                 <button key={id} type="button" aria-pressed={cat === id} onClick={() => setCat(cat === id ? null : id)}
                   className={cn('shrink-0 rounded-full border px-3 py-1 text-sm transition', cat === id ? 'border-transparent font-semibold text-white' : 'border-line hover:bg-hover')}
-                  style={cat === id ? { background: c.color } : undefined}>{c.emoji} {c.name}</button>
+                  style={cat === id ? { background: c.color } : undefined}>{c.emoji} {catName(c)}</button>
               );
             })}
           </div>
         )}
       </div>
-      {days.length === 0 && <p className="px-4 py-10 text-center text-sm text-muted">Nothing matches.</p>}
+      {days.length === 0 && <p className="px-4 py-10 text-center text-sm text-muted">{t('Nothing matches.')}</p>}
       {days.map(({ day, items }) => (
         <section key={day} aria-label={day}>
           <h3 className="sticky top-0 z-[1] bg-bg/95 px-4 py-1.5 text-xs font-semibold tracking-wide text-muted uppercase backdrop-blur">
-            {parseDay(day).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: parseDay(day).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' })}
+            {parseDay(day).toLocaleDateString(locale(), { weekday: 'short', day: 'numeric', month: 'short', year: parseDay(day).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' })}
           </h3>
           <ul className="divide-y divide-line bg-panel">
             {items.map((it) => it.kind === 's' ? (

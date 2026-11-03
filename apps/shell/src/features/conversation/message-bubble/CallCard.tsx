@@ -4,6 +4,7 @@ import { callText } from '../../../lib/engine';
 import { startCall } from '../../../lib/calls';
 import { isGroup, type Msg } from '../../../lib/types';
 import { cn } from '@sanga/ui/utils';
+import { t } from '@sanga/i18n';
 
 /** A call in the chat: "Missed voice call", "Outgoing video call · 3:24", with a button to call back. */
 export function CallCard({ m }: { m: Msg }) {
@@ -15,10 +16,10 @@ export function CallCard({ m }: { m: Msg }) {
       <span className={cn('grid size-9 shrink-0 place-items-center rounded-full', missed ? 'bg-danger/12 text-danger' : 'bg-accent/12 text-accent-ink')}><Icon className="size-[18px]" /></span>
       <span className="min-w-0">
         <span className="block font-medium">{callText(c, m.out)}</span>
-        <span className="block text-xs text-muted">{c.st === 'ok' ? fmtDuration(c.dur) : missed ? 'Tap to call back' : ' '}</span>
+        <span className="block text-xs text-muted">{c.st === 'ok' ? fmtDuration(c.dur) : missed ? t('Tap to call back') : ' '}</span>
       </span>
       {!isGroup(m.peer) && (
-        <button onClick={(e) => { e.stopPropagation(); void startCall(m.peer, c.v); }} aria-label={`Call back${c.v ? ' (video)' : ''}`}
+        <button onClick={(e) => { e.stopPropagation(); void startCall(m.peer, c.v); }} aria-label={c.v ? t('Call back (video)') : t('Call back')}
           className="ml-1 grid size-9 shrink-0 place-items-center rounded-full text-accent-ink hover:bg-hover">
           {c.v ? <Video className="size-5" /> : <Phone className="size-5" />}
         </button>

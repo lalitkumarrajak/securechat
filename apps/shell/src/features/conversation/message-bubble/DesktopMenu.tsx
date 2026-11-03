@@ -5,6 +5,7 @@ import { type Msg } from '../../../lib/types';
 import { cn } from '@sanga/ui/utils';
 import { actionsFor, canReact, myReaction, reactTo, setChatUi } from '../chatUi';
 import { ActionItem } from './ActionItem';
+import { t } from '@sanga/i18n';
 
 /** Hover chevron (and right-click) menu on desktop, with quick reactions on top. */
 export function DesktopMenu({ m, album, open, onOpenChange, bare }: { m: Msg; album?: Msg[]; open: boolean; onOpenChange: (o: boolean) => void; bare: boolean }) {
@@ -12,7 +13,7 @@ export function DesktopMenu({ m, album, open, onOpenChange, bare }: { m: Msg; al
   return (
     <M.Root open={open} onOpenChange={onOpenChange} modal={false}>
       <M.Trigger asChild>
-        <button aria-label="Message options" onClick={(e) => e.stopPropagation()}
+        <button aria-label={t('Message options')} onClick={(e) => e.stopPropagation()}
           className={cn('absolute top-1 right-1 z-10 grid size-6 place-items-center rounded-full text-muted opacity-0 transition group-hover:opacity-100 data-[state=open]:opacity-100',
             bare ? 'bg-panel shadow-bubble' : m.out ? 'bg-bubble-out' : 'bg-bubble-in')}>
           <ChevronDown className="size-4" />
@@ -25,13 +26,13 @@ export function DesktopMenu({ m, album, open, onOpenChange, bare }: { m: Msg; al
           {canReact(m) && (
             <div className="flex items-center justify-between gap-0.5 border-b border-line px-1 pt-1 pb-2">
               {QUICK_REACTIONS.map((e) => (
-                <M.Item key={e} onSelect={() => reactTo(m, e)} aria-label={'React ' + e}
+                <M.Item key={e} onSelect={() => reactTo(m, e)} aria-label={t('React {emoji}', { emoji: e })}
                   className={cn('grid size-8 cursor-pointer place-items-center rounded-full text-xl outline-none transition data-[highlighted]:scale-125 data-[highlighted]:bg-hover',
                     myReaction(m) === e && 'bg-accent/15')}>
                   {e}
                 </M.Item>
               ))}
-              <M.Item onSelect={() => setChatUi({ picker: m })} aria-label="More reactions"
+              <M.Item onSelect={() => setChatUi({ picker: m })} aria-label={t('More reactions')}
                 className="grid size-8 cursor-pointer place-items-center rounded-full text-muted outline-none data-[highlighted]:bg-hover">
                 <SmilePlus className="size-5" />
               </M.Item>

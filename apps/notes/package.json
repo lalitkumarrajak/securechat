@@ -9,5 +9,10 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": { "@sanga/crypto": "*", "@sanga/sdk": "*", "@sanga/ui": "*" }
+  "dependencies": {
+    "@sanga/crypto": "*",
+    "@sanga/sdk": "*",
+    "@sanga/ui": "*",
+    "@sanga/i18n": "*"
+  }
 }

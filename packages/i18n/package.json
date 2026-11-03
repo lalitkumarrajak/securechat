@@ -1,0 +1,10 @@
+{
+  "name": "@sanga/i18n",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Sanga's translations: English in the code is the key; other languages are dictionaries loaded only when on",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "test": "vitest run" },
+  "peerDependencies": { "react": "*" }
+}

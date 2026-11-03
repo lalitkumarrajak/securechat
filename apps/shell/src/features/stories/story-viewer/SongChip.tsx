@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Music2, Volume2, VolumeX } from 'lucide-react';
 import type { Song } from '../../../lib/songs';
+import { t } from '@sanga/i18n';
 
 // Muting sticks for the stories after this one, until the viewer is closed.
 let muted = false;
@@ -29,7 +30,7 @@ export function SongChip({ song, paused }: { song: Song; paused: boolean }) {
   return (
     <div className="absolute top-24 left-3 z-10 max-w-[80%]" onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
       <audio ref={audio} src={song.src} loop preload="auto" />
-      <button onClick={toggle} aria-label={blocked || off ? `Play song ${song.title}` : `Mute song ${song.title}`}
+      <button onClick={toggle} aria-label={blocked || off ? t('Play song {title}', { title: song.title }) : t('Mute song {title}', { title: song.title })}
         className="flex max-w-full items-center gap-2 rounded-full bg-black/55 py-1.5 pr-3 pl-2 text-sm backdrop-blur">
         {song.art ? <img src={song.art} alt="" className="size-6 rounded-full object-cover" /> : <Music2 className="size-4 shrink-0" />}
         <span className="truncate font-medium">{song.title}</span>

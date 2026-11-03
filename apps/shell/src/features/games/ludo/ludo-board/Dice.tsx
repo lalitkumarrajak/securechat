@@ -11,8 +11,8 @@ export function Dice({ value, rolling, dim }: { value: number; rolling: boolean;
   const [face, setFace] = useState(value);
   useEffect(() => {
     if (!rolling) { setFace(value); return; }
-    const t = setInterval(() => setFace(1 + Math.floor(Math.random() * 6)), 70);
-    return () => clearInterval(t);
+    const iv = setInterval(() => setFace(1 + Math.floor(Math.random() * 6)), 70);
+    return () => clearInterval(iv);
   }, [rolling, value]);
   return (
     <svg viewBox="0 0 100 100" className={cn('size-10 drop-shadow-md', rolling && 'ludo-dice-roll', dim && 'opacity-40')} aria-hidden data-face={rolling ? undefined : face}>

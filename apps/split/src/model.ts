@@ -4,6 +4,8 @@
 // A group is a handful of sealed records: one 'meta' (name, people, categories) and one record per
 // expense or settlement. Everything below works on the decrypted forms.
 
+import { locale, t, tk } from '@sanga/i18n';
+
 export type Mode = 'equal' | 'exact' | 'percent' | 'shares';
 
 /** Someone in a group: a Sanga friend (`u` is their username) or just a name (not on Sanga). `gone`: left the
@@ -118,17 +120,21 @@ const C = (id: string, name: string, emoji: string, color: string): Category => 
 
 /** Ready-made categories; each group can add its own. */
 export const BUILTIN_CATS: Category[] = [
-  C('trip', 'Trip', '🧳', '#0ea5e9'), C('flight', 'Flight', '✈️', '#3b82f6'), C('train', 'Train', '🚆', '#6366f1'),
-  C('metro', 'Metro', '🚇', '#8b5cf6'), C('bus', 'Bus', '🚌', '#a855f7'), C('cab', 'Cab / Auto', '🚕', '#eab308'),
-  C('fuel', 'Fuel', '⛽', '#f59e0b'), C('parking', 'Parking & tolls', '🅿️', '#78716c'), C('stay', 'Stay', '🏨', '#c026d3'),
-  C('food', 'Food & drink', '🍽️', '#f97316'), C('cafe', 'Cafe & snacks', '☕', '#b45309'), C('groceries', 'Groceries', '🛒', '#22c55e'),
-  C('gym', 'Gym & fitness', '🏋️', '#ef4444'), C('sports', 'Sports', '⚽', '#16a34a'), C('health', 'Health', '💊', '#10b981'),
-  C('rent', 'Rent', '🏠', '#0891b2'), C('utilities', 'Utilities', '💡', '#14b8a6'), C('internet', 'Internet & phone', '📶', '#06b6d4'),
-  C('subscriptions', 'Subscriptions', '🔁', '#7c3aed'), C('cards', 'Credit card bill', '💳', '#4f46e5'), C('lent', 'Lent', '🤝', '#059669'), C('borrowed', 'Borrowed', '🙏', '#dc2626'), C('entertainment', 'Entertainment', '🎬', '#ec4899'), C('party', 'Party & events', '🎉', '#f43f5e'),
-  C('shopping', 'Shopping', '🛍️', '#e11d48'), C('gifts', 'Gifts', '🎁', '#d946ef'), C('education', 'Education', '🎓', '#2563eb'),
-  C('travelmisc', 'Tickets & entry', '🎟️', '#0d9488'), C('pets', 'Pets', '🐾', '#65a30d'), C('repairs', 'Repairs', '🔧', '#64748b'),
-  C('other', 'Other', '🧾', '#94a3b8'),
+  C('trip', tk('Trip'), '🧳', '#0ea5e9'), C('flight', tk('Flight'), '✈️', '#3b82f6'), C('train', tk('Train'), '🚆', '#6366f1'),
+  C('metro', tk('Metro'), '🚇', '#8b5cf6'), C('bus', tk('Bus'), '🚌', '#a855f7'), C('cab', tk('Cab / Auto'), '🚕', '#eab308'),
+  C('fuel', tk('Fuel'), '⛽', '#f59e0b'), C('parking', tk('Parking & tolls'), '🅿️', '#78716c'), C('stay', tk('Stay'), '🏨', '#c026d3'),
+  C('food', tk('Food & drink'), '🍽️', '#f97316'), C('cafe', tk('Cafe & snacks'), '☕', '#b45309'), C('groceries', tk('Groceries'), '🛒', '#22c55e'),
+  C('gym', tk('Gym & fitness'), '🏋️', '#ef4444'), C('sports', tk('Sports'), '⚽', '#16a34a'), C('health', tk('Health'), '💊', '#10b981'),
+  C('rent', tk('Rent'), '🏠', '#0891b2'), C('utilities', tk('Utilities'), '💡', '#14b8a6'), C('internet', tk('Internet & phone'), '📶', '#06b6d4'),
+  C('subscriptions', tk('Subscriptions'), '🔁', '#7c3aed'), C('cards', tk('Credit card bill'), '💳', '#4f46e5'), C('lent', tk('Lent'), '🤝', '#059669'), C('borrowed', tk('Borrowed'), '🙏', '#dc2626'), C('entertainment', tk('Entertainment'), '🎬', '#ec4899'), C('party', tk('Party & events'), '🎉', '#f43f5e'),
+  C('shopping', tk('Shopping'), '🛍️', '#e11d48'), C('gifts', tk('Gifts'), '🎁', '#d946ef'), C('education', tk('Education'), '🎓', '#2563eb'),
+  C('travelmisc', tk('Tickets & entry'), '🎟️', '#0d9488'), C('pets', tk('Pets'), '🐾', '#65a30d'), C('repairs', tk('Repairs'), '🔧', '#64748b'),
+  C('other', tk('Other'), '🧾', '#94a3b8'),
 ];
+
+const BUILTIN_NAMES = new Map(BUILTIN_CATS.map((c) => [c.id, c.name]));
+/** How a category is shown: a ready-made one in the language now on, a group's own just as it was typed. */
+export const catName = (c: Category) => (BUILTIN_NAMES.get(c.id) === c.name ? t(c.name) : c.name);
 
 export const CAT_COLORS = ['#0ea5e9', '#22c55e', '#f97316', '#ec4899', '#8b5cf6', '#eab308', '#14b8a6', '#ef4444', '#6366f1', '#84cc16'];
 
@@ -150,7 +156,7 @@ export function money(minor: number, cur: string, opts: { sign?: boolean; compac
   const v = Math.abs(minor) / 10 ** d;
   let s: string;
   try {
-    s = new Intl.NumberFormat(undefined, { style: 'currency', currency: cur, minimumFractionDigits: Number.isInteger(v) && opts.compact ? 0 : d, maximumFractionDigits: d }).format(v);
+    s = new Intl.NumberFormat(locale(), { style: 'currency', currency: cur, minimumFractionDigits: Number.isInteger(v) && opts.compact ? 0 : d, maximumFractionDigits: d }).format(v);
   } catch { s = `${cur} ${v.toFixed(d)}`; }
   return (minor < 0 ? '−' : opts.sign && minor > 0 ? '+' : '') + s;
 }
@@ -184,24 +190,24 @@ export function apportion(total: number, weights: number[]): number[] {
 /** What each of `ids` owes. `values` is what was typed: minor units (exact), basis points (percent, 10000
  *  = 100%) or weights (shares); ignored for equal. Returns an error message instead if it doesn't add up. */
 export function splitAmount(amount: number, mode: Mode, ids: string[], values: Record<string, number>): { owed: Record<string, number> } | { error: string } {
-  if (!ids.length) return { error: 'Pick at least one person to split with' };
-  if (!(amount > 0)) return { error: 'Enter an amount' };
+  if (!ids.length) return { error: t('Pick at least one person to split with') };
+  if (!(amount > 0)) return { error: t('Enter an amount') };
   let parts: number[];
   if (mode === 'equal') parts = apportion(amount, ids.map(() => 1));
   else if (mode === 'shares') {
     const w = ids.map((i) => values[i] ?? 0);
-    if (w.some((x) => x < 0 || !Number.isInteger(x)) || w.every((x) => x === 0)) return { error: 'Give at least one person a share' };
+    if (w.some((x) => x < 0 || !Number.isInteger(x)) || w.every((x) => x === 0)) return { error: t('Give at least one person a share') };
     parts = apportion(amount, w);
   } else if (mode === 'percent') {
     const w = ids.map((i) => values[i] ?? 0);
     const sum = w.reduce((a, b) => a + b, 0);
-    if (sum !== 10000) return { error: `Percentages add up to ${(sum / 100).toFixed(2).replace(/\.00$/, '')}%, not 100%` };
+    if (sum !== 10000) return { error: t('Percentages add up to {pct}%, not 100%', { pct: (sum / 100).toFixed(2).replace(/\.00$/, '') }) };
     parts = apportion(amount, w);
   } else {
     parts = ids.map((i) => values[i] ?? 0);
     const sum = parts.reduce((a, b) => a + b, 0);
-    if (parts.some((x) => x < 0)) return { error: 'Amounts can’t be negative' };
-    if (sum !== amount) return { error: sum < amount ? `${amount - sum} still to assign (in the smallest unit)` : 'The amounts add up to more than the total' };
+    if (parts.some((x) => x < 0)) return { error: t('Amounts can’t be negative') };
+    if (sum !== amount) return { error: sum < amount ? t('{n} still to assign (in the smallest unit)', { n: amount - sum }) : t('The amounts add up to more than the total') };
   }
   return { owed: Object.fromEntries(ids.map((id, k) => [id, parts[k]])) };
 }

@@ -10,6 +10,7 @@ import { cn } from '@sanga/ui/utils';
 import { setApp, useApp } from '../../state/app';
 import { ChatRowSkeleton } from '../../components/skeleton/ChatRowSkeleton';
 import { setChatUi, useChatUi } from './chatUi';
+import { t, tn } from '@sanga/i18n';
 
 export function ForwardDialog() {
   const msgs = useChatUi((s) => s.forward);
@@ -33,7 +34,7 @@ export function ForwardDialog() {
     setBusy(true);
     try {
       await forward(msgs, picked);
-      toast.success(`Forwarded to ${picked.length} chat${picked.length > 1 ? 's' : ''}`);
+      toast.success(tn(picked.length, 'Forwarded to {n} chat', 'Forwarded to {n} chats'));
       setChatUi({ forward: null });
       setApp({ selection: null });
     } catch (e) { toast.error((e as Error).message); }
@@ -41,10 +42,10 @@ export function ForwardDialog() {
   };
 
   return (
-    <Dialog open={!!msgs} onOpenChange={(o) => !o && setChatUi({ forward: null })} title="Forward to…" description="Choose up to 5 chats.">
+    <Dialog open={!!msgs} onOpenChange={(o) => !o && setChatUi({ forward: null })} title={t('Forward to…')} description={t('Choose up to 5 chats.')}>
       <div className="relative mb-2">
         <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search friends and groups"
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('Search friends and groups')}
           className="h-10 w-full rounded-xl bg-panel-2 pr-3 pl-9 text-sm outline-none focus:ring-2 focus:ring-accent/30" />
       </div>
       <ul className="-mx-2 max-h-72 overflow-y-auto">
@@ -63,10 +64,10 @@ export function ForwardDialog() {
           );
         })}
         {!list.length && !friendsLoaded && <ChatRowSkeleton />}
-        {!list.length && friendsLoaded && <li className="py-6 text-center text-sm text-muted">No friends to forward to.</li>}
+        {!list.length && friendsLoaded && <li className="py-6 text-center text-sm text-muted">{t('No friends to forward to.')}</li>}
       </ul>
       <Button className="mt-4 w-full" disabled={!picked.length} loading={busy} onClick={send}>
-        Send{picked.length ? ` to ${picked.length}` : ''}
+        {picked.length ? t('Send to {n}', { n: picked.length }) : t('Send')}
       </Button>
     </Dialog>
   );

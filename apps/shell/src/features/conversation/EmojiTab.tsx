@@ -1,5 +1,6 @@
 import { EMOJI_PICKER } from '../../lib/emoji';
 import { recent } from './expressionPanel';
+import { t } from '@sanga/i18n';
 
 export function EmojiTab({ onPick }: { onPick: (e: string) => void }) {
   const rec = recent('emoji');
@@ -12,8 +13,8 @@ export function EmojiTab({ onPick }: { onPick: (e: string) => void }) {
   );
   return (
     <div className="py-2">
-      {rec.length > 0 && <><h3 className="px-4 pb-1 text-xs font-semibold text-muted">Recent</h3>{grid(rec)}</>}
-      <h3 className="px-4 pt-2 pb-1 text-xs font-semibold text-muted">Smileys & more</h3>
+      {rec.length > 0 && <><h3 className="px-4 pb-1 text-xs font-semibold text-muted">{t('Recent')}</h3>{grid(rec)}</>}
+      <h3 className="px-4 pt-2 pb-1 text-xs font-semibold text-muted">{t('Smileys & more')}</h3>
       {grid(EMOJI_PICKER)}
     </div>
   );

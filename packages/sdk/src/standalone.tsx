@@ -2,7 +2,9 @@
 // device already has (the same browser storage as the main app) and its own connection to the
 // server. Not signed in yet: it points to the main app to sign in. With an app lock or "sign out when
 // I close the tab" on, it goes to the main app instead, which enforces them (see guarded()).
-import { createElement, useEffect, useState, type ComponentType } from 'react';
+import { register, t } from '@sanga/i18n';
+import { SDK_DICTS } from './locale';
+import { createElement, Suspense, useEffect, useState, type ComponentType } from 'react';
 import { createRoot } from 'react-dom/client';
 import { confirm, ConfirmHost } from '@sanga/ui/confirm';
 import { conversationKey } from '@sanga/crypto';
@@ -19,10 +21,10 @@ function db() {
     req.onerror = () => reject(req.error);
   }));
 }
-const wrap = <T,>(r: IDBRequest<T>) => new Promise<T>((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+const wrap = <T,>(r: IDBRequest<T>) => new Promise<T>((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); // i18n-ok
 async function kv(mode: IDBTransactionMode = 'readonly') {
   const d = await db();
-  if (!d.objectStoreNames.contains('kv')) throw new Error('Not signed in');
+  if (!d.objectStoreNames.contains('kv')) throw new Error('Not signed in'); // i18n-ok: caught below, never shown
   return d.transaction('kv', mode).objectStore('kv');
 }
 
@@ -69,9 +71,9 @@ function createSdk(s: Session): Sdk {
       method: body === undefined ? 'GET' : 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + s.token },
       ...(body !== undefined && { body: JSON.stringify(body) }),
-    }).catch(() => { throw new Error('No connection. Check your internet and try again.'); });
+    }).catch(() => { throw new Error(t('No connection. Check your internet and try again.')); });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || 'Something went wrong');
+    if (!res.ok) throw new Error(data.error || t('Something went wrong'));
     return data;
   };
 
@@ -139,6 +141,7 @@ function guarded() {
 
 /** Start an app on its own page. */
 export async function bootStandalone(App: ComponentType<AppProps>) {
+  await register('sdk', SDK_DICTS.sdk);
   if (guarded()) { location.replace('/'); return; }
   // Turned on in another tab while this page is open: leave too.
   window.addEventListener('storage', (e) => { if ((e.key === SETTINGS || e.key === null) && guarded()) location.replace('/'); });
@@ -148,13 +151,13 @@ export async function bootStandalone(App: ComponentType<AppProps>) {
   if (!session) {
     root.render(createElement('div', { className: 'grid h-full place-items-center p-8 text-center' },
       createElement('div', null,
-        createElement('p', { className: 'mb-4 text-muted' }, 'Sign in to Sanga first.'),
-        createElement('a', { href: '/', className: 'rounded-xl bg-accent px-5 py-2.5 font-medium text-white' }, 'Open Sanga'))));
+        createElement('p', { className: 'mb-4 text-muted' }, t('Sign in to Sanga first.')),
+        createElement('a', { href: '/', className: 'rounded-xl bg-accent px-5 py-2.5 font-medium text-white' }, t('Open Sanga')))));
     return;
   }
   provideSdk(createSdk(session));
   const params = Object.fromEntries(new URLSearchParams(location.search));
   root.render(createElement('div', { className: 'mx-auto flex h-full max-w-xl flex-col bg-bg' },
-    createElement(App, { params, onClose: () => { location.href = '/'; } }),
+    createElement(Suspense, { fallback: null }, createElement(App, { params, onClose: () => { location.href = '/'; } })),
     createElement(ConfirmHost)));
 }

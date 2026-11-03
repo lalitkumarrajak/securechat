@@ -1,0 +1,13 @@
+{
+  "Close": "बंद करें",
+  "Cancel": "रद्द करें",
+  "OK": "ठीक है",
+  "Today": "आज",
+  "Yesterday": "बीता कल",
+  "last seen today at {time}": "आख़िरी बार आज {time} पर देखा गया",
+  "last seen yesterday at {time}": "आख़िरी बार कल {time} पर देखा गया",
+  "last seen {date}": "आख़िरी बार {date} को देखा गया",
+  "just now": "अभी",
+  "{n}m": "{n} मि.",
+  "{n}h": "{n} घं."
+}

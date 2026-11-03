@@ -1,4 +1,5 @@
 import { cn } from '@sanga/ui/utils';
+import { t } from '@sanga/i18n';
 import type { Game } from '../../store';
 import { COLORS, DARK, LIGHT, poly, type Layout, type Pt } from '../geometry';
 import { LudoState, Shown } from './types';
@@ -36,7 +37,7 @@ export function Board({ L, g, shown, home, movable, meIdx, onMove }: {
 
   return (
     <svg viewBox={vb} className="ludo-board aspect-square max-h-full w-full max-w-[560px] select-none" style={{ aspectRatio: `${L.box.w + pad * 2} / ${L.box.h + pad * 2}` }}
-      role="img" aria-label="Ludo board">
+      role="img" aria-label={t('Ludo board')}>
       <defs>
         <filter id="tok-shadow" x="-50%" y="-50%" width="200%" height="200%">
           <feDropShadow dx="0" dy="0.06" stdDeviation="0.05" floodOpacity="0.45" />
@@ -118,7 +119,7 @@ export function Board({ L, g, shown, home, movable, meIdx, onMove }: {
           <g key={`${tk.i}/${tk.t}`} className="ludo-token" style={{ transform: `translate(${tk.x}px, ${tk.y}px)` }}
             data-token={`${tk.i}/${tk.t}`} data-p={shown.tokens[tk.i][tk.t]}>
             <g style={{ transform: `scale(${tk.scale})` }} className={cn(can && 'cursor-pointer')}
-              {...(can ? { role: 'button', 'aria-label': `Move token ${tk.t + 1}`, tabIndex: 0, onClick: () => onMove(tk.t),
+              {...(can ? { role: 'button', 'aria-label': t('Move token {n}', { n: tk.t + 1 }), tabIndex: 0, onClick: () => onMove(tk.t),
                 onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') onMove(tk.t); } } : {})}>
               {can && <circle r="0.7" fill="transparent" />}{/* still tap target; the token inside bounces */}
               {can && <circle r="0.62" fill="none" stroke="#fff" strokeWidth="0.08" className="ludo-ring" />}

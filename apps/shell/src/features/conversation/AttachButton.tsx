@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import * as M from '@radix-ui/react-dropdown-menu';
 import { Camera, FileText, Image as ImageIcon, MapPin, Paperclip } from 'lucide-react';
 import { IconButton } from '@sanga/ui/button';
+import { t } from '@sanga/i18n';
 
 const ITEM = 'flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm outline-none data-[highlighted]:bg-hover';
 
@@ -16,13 +17,13 @@ export function AttachButton({ onPhotos, onDocuments, onLocation }: {
   return (
     <>
       <M.Root modal={false}>
-        <M.Trigger asChild><IconButton label="Attach" className="shrink-0"><Paperclip /></IconButton></M.Trigger>
+        <M.Trigger asChild><IconButton label={t('Attach')} className="shrink-0"><Paperclip /></IconButton></M.Trigger>
         <M.Portal>
           <M.Content side="top" align="end" sideOffset={8} className="z-50 w-52 rounded-xl border border-line bg-panel p-1 shadow-xl animate-fade-in">
-            <M.Item onSelect={() => pick(doc.current)} className={ITEM}>{icon('bg-indigo-500', <FileText className="size-4" />)} Document</M.Item>
-            <M.Item onSelect={() => pick(gallery.current)} className={ITEM}>{icon('bg-violet-500', <ImageIcon className="size-4" />)} Photos</M.Item>
-            <M.Item onSelect={() => pick(camera.current)} className={ITEM}>{icon('bg-pink-500', <Camera className="size-4" />)} Camera</M.Item>
-            <M.Item onSelect={onLocation} className={ITEM}>{icon('bg-emerald-500', <MapPin className="size-4" />)} Location</M.Item>
+            <M.Item onSelect={() => pick(doc.current)} className={ITEM}>{icon('bg-indigo-500', <FileText className="size-4" />)} {t('Document')}</M.Item>
+            <M.Item onSelect={() => pick(gallery.current)} className={ITEM}>{icon('bg-violet-500', <ImageIcon className="size-4" />)} {t('Photos')}</M.Item>
+            <M.Item onSelect={() => pick(camera.current)} className={ITEM}>{icon('bg-pink-500', <Camera className="size-4" />)} {t('Camera')}</M.Item>
+            <M.Item onSelect={onLocation} className={ITEM}>{icon('bg-emerald-500', <MapPin className="size-4" />)} {t('Location')}</M.Item>
           </M.Content>
         </M.Portal>
       </M.Root>

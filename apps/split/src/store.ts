@@ -5,6 +5,7 @@
 // with whoever added them), so only members' devices can read anything. Records are saved here first
 // (marked `dirty`) and sent when there's a connection; the server hands each device what changed
 // since the last one it saw.
+import { t, tk } from '@sanga/i18n';
 import { create } from 'zustand';
 import * as C from '@sanga/crypto';
 import { sdk } from '@sanga/sdk';
@@ -45,7 +46,7 @@ const keys = new Map<string, { raw: Uint8Array; key: CryptoKey }>();
 let selfWrap: Promise<CryptoKey> | null = null;
 function selfKey() {
   const { priv, pub } = sdk().identity();
-  if (!priv) throw new Error('Not signed in');
+  if (!priv) throw new Error(t('Not signed in'));
   return (selfWrap ??= C.appKey(priv, pub, 'split'));
 }
 
@@ -60,7 +61,7 @@ async function groupKey(e: ListEntry) {
 }
 const keyFor = (gid: string) => {
   const k = keys.get(gid);
-  if (!k) throw new Error('This group’s key isn’t on this device yet. Reconnect and try again.');
+  if (!k) throw new Error(t('This group’s key isn’t on this device yet. Reconnect and try again.'));
   return k;
 };
 
@@ -186,7 +187,7 @@ export async function linkPerson(gid: string, pid: string, u: string, friendName
   const meta = g?.meta;
   if (!g || !meta) return;
   const guest = meta.people.find((p) => p.id === pid && !p.u);
-  if (!guest) throw new Error('That name is already linked.');
+  if (!guest) throw new Error(t('That name is already linked.'));
   if (!g.members.some((m) => m.u === u)) {
     const { raw } = keyFor(gid);
     await post('/api/split/add', { gid, u, wrapped: await C.wrapStoryKey(await sdk().pairKey(u), raw, me(), gid, u) });
@@ -263,7 +264,7 @@ export async function loadBill(gid: string, id: string): Promise<Bill> {
   if (saved) return saved;
   const { body } = await sdk().api<{ body: string }>(`/api/split/bill?gid=${gid}&id=${id}`);
   const bill = await C.decryptItem(keyFor(gid).key, body, gid, 'split-bill', id) as Bill;
-  if (typeof bill?.mime !== 'string' || typeof bill?.data !== 'string') throw new Error('That bill can’t be read');
+  if (typeof bill?.mime !== 'string' || typeof bill?.data !== 'string') throw new Error(t('That bill can’t be read'));
   await sdk().store.put(BILL(gid, id), bill);
   return bill;
 }
@@ -294,7 +295,7 @@ async function sync() {
   cache = groups;
   await sdk().store.put(LIST, groups);
   for (const e of groups) {
-    try { await groupKey(e); } catch { set({ error: 'Some groups can’t be opened yet. Their key needs your friend’s details; try again when you’re online.' }); continue; }
+    try { await groupKey(e); } catch { set({ error: tk('Some groups can’t be opened yet. Their key needs your friend’s details; try again when you’re online.') }); continue; } // shown with t()
     patch(e.gid, (g) => ({ ...g, members: e.members }));
     if (get().seen[e.gid] === undefined) markSeen(e.gid); // its past isn't "new"
     await syncGroup(e.gid);

@@ -2,11 +2,12 @@ import { Dialog } from '@sanga/ui/dialog';
 import { EMOJI_PICKER } from '../../lib/emoji';
 import { cn } from '@sanga/ui/utils';
 import { myReaction, reactTo, setChatUi, useChatUi } from './chatUi';
+import { t } from '@sanga/i18n';
 
 export function ReactionPicker() {
   const m = useChatUi((s) => s.picker);
   return (
-    <Dialog open={!!m} onOpenChange={(o) => !o && setChatUi({ picker: null })} title="React with an emoji">
+    <Dialog open={!!m} onOpenChange={(o) => !o && setChatUi({ picker: null })} title={t('React with an emoji')}>
       <div className="grid max-h-80 grid-cols-8 gap-1 overflow-y-auto">
         {EMOJI_PICKER.map((e) => (
           <button key={e} onClick={() => { if (m) reactTo(m, e); setChatUi({ picker: null }); }}

@@ -1,3 +1,4 @@
+import { locale } from '@sanga/i18n';
 import { parseDay, validDay, today, type Expense } from './model';
 import { blankExpense } from './blankExpense';
 
@@ -17,4 +18,4 @@ export function parseDraft(text: string | undefined): Draft | null {
 export function expenseFromDraft(d: Draft, me: string): Expense {
   return { ...blankExpense(me), desc: d.desc, amount: d.amount, cat: d.cat, date: d.date, owed: { [me]: d.amount } };
 }
-export const dayLabel = (d: string) => parseDay(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+export const dayLabel = (d: string) => parseDay(d).toLocaleDateString(locale(), { day: 'numeric', month: 'short', year: 'numeric' });

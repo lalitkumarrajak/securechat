@@ -15,7 +15,7 @@ export function UnoCard({ id, size }: { id: number; size: 'md' | 'lg' }) {
       <span className="absolute inset-[12%_6%] -rotate-[28deg] rounded-[50%] bg-white"
         style={k.c === 'w' ? { background: `conic-gradient(${HEX.r} 0 90deg, ${HEX.y} 0 180deg, ${HEX.g} 0 270deg, ${HEX.b} 0)` } : undefined} />
       <span className={cn('absolute inset-0 grid place-items-center font-black italic', big, k.c === 'w' ? 'text-white [text-shadow:0_2px_0_#000]' : '')}
-        style={k.c === 'w' ? undefined : { color: HEX[k.c], WebkitTextStroke: '1px rgba(0,0,0,0.25)' }}>
+        style={k.c === 'w' ? undefined : { color: HEX[k.c], WebkitTextStroke: '1px rgba(0,0,0,0.25)' }}>{/* i18n-ok */}
         {typeof sym('') === 'string' ? sym('') : sym(size === 'lg' ? 'size-12' : 'size-9')}
       </span>
       <span className="absolute top-0.5 left-1 text-xs font-black text-white italic [text-shadow:0_1px_0_#0006]">{typeof sym('') === 'string' ? sym('') : sym('size-3')}</span>

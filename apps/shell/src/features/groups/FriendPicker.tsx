@@ -6,6 +6,7 @@ import { ChatRowSkeleton } from '../../components/skeleton/ChatRowSkeleton';
 import { displayName } from '../../lib/types';
 import { cn } from '@sanga/ui/utils';
 import { useApp } from '../../state/app';
+import { t } from '@sanga/i18n';
 
 export function FriendPicker({ picked, onChange, max, exclude = [] }: {
   picked: string[]; onChange: (p: string[]) => void; max: number; exclude?: string[];
@@ -26,7 +27,7 @@ export function FriendPicker({ picked, onChange, max, exclude = [] }: {
       {picked.length > 0 && (
         <div className="flex gap-3 overflow-x-auto px-4 pt-1 pb-3">
           {picked.map((u) => (
-            <button key={u} type="button" onClick={() => toggle(u)} className="flex w-14 shrink-0 flex-col items-center gap-1 text-xs" aria-label={`Remove ${u}`}>
+            <button key={u} type="button" onClick={() => toggle(u)} className="flex w-14 shrink-0 flex-col items-center gap-1 text-xs" aria-label={t('Remove {name}', { name: u })}>
               <Avatar u={u} name={friends[u]?.name} size={44} />
               <span className="w-full truncate">{displayName(friends[u], u)}</span>
             </button>
@@ -35,12 +36,12 @@ export function FriendPicker({ picked, onChange, max, exclude = [] }: {
       )}
       <label className="mx-4 mb-2 flex h-10 shrink-0 items-center gap-2 rounded-xl bg-panel-2 px-3">
         <Search className="size-4 text-muted" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search friends" aria-label="Search friends"
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('Search friends')} aria-label={t('Search friends')}
           autoCapitalize="none" className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
       </label>
       <ul className="min-h-0 flex-1 overflow-y-auto">
         {!loaded && !list.length && Array.from({ length: 4 }, (_, i) => <ChatRowSkeleton key={i} i={i} />)}
-        {loaded && !list.length && <li className="px-6 py-8 text-center text-sm text-muted">{q ? 'No friends match.' : 'No friends to add.'}</li>}
+        {loaded && !list.length && <li className="px-6 py-8 text-center text-sm text-muted">{q ? t('No friends match.') : t('No friends to add.')}</li>}
         {list.map((f) => {
           const on = picked.includes(f.u);
           return (

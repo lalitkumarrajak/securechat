@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ArrowLeft, BookOpen, Flame, NotebookPen, PenLine, Plus, Search, X } from 'lucide-react';
+import { locale, t, tn } from '@sanga/i18n';
 import { IconButton } from '@sanga/ui/button';
 import { cn } from '@sanga/ui/utils';
 import { dayDate, dayKey, newNote, today, useNotes, type Note } from '../notes';
@@ -55,24 +56,24 @@ export function Browse({ day, setDay, month, setMonth, onOpen, onClose, open, cl
   const wroteToday = perDay.has(today());
 
   const create = () => onOpen(newNote(day || today(), filter ?? ''));
-  const title = filter === null ? 'Diary' : filter === '' ? 'Personal diary' : `Notes · ${chatName(filter)}`;
+  const title = filter === null ? t('Diary') : filter === '' ? t('Personal diary') : t('Notes · {name}', { name: chatName(filter) });
 
   let lastDay = '';
   return (
     <div className={cn('relative min-h-0 w-full flex-col bg-bg md:w-[420px] md:shrink-0 lg:w-[460px]', className)}>
       <header className="flex h-16 shrink-0 items-center gap-1 px-3">
-        {onClose && <IconButton label="Back" onClick={onClose}><ArrowLeft /></IconButton>}
+        {onClose && <IconButton label={t('Back')} onClick={onClose}><ArrowLeft /></IconButton>}
         <h2 className={cn('min-w-0 flex-1 truncate text-xl font-bold tracking-tight', !onClose && 'pl-2')}>{title}</h2>
-        <IconButton label={searching ? 'Close search' : 'Search notes'} onClick={() => { setSearching(!searching); setQuery(''); }}>{searching ? <X /> : <Search />}</IconButton>
+        <IconButton label={searching ? t('Close search') : t('Search notes')} onClick={() => { setSearching(!searching); setQuery(''); }}>{searching ? <X /> : <Search />}</IconButton>
         <button onClick={create} className="ml-1 hidden h-9 items-center gap-1.5 rounded-full bg-accent px-4 text-sm font-semibold text-white shadow-sm hover:brightness-110 md:inline-flex">
-          <Plus className="size-4" /> New note
+          <Plus className="size-4" /> {t('New note')}
         </button>
       </header>
       {searching && (
         <div className="px-3 pb-2">
           <div className="relative">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" />
-            <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search notes" aria-label="Search notes"
+            <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('Search notes')} aria-label={t('Search notes')}
               className="h-10 w-full rounded-xl bg-panel-2 pr-3 pl-9 text-sm outline-none placeholder:text-muted focus:ring-2 focus:ring-accent/30" />
           </div>
         </div>
@@ -83,22 +84,22 @@ export function Browse({ day, setDay, month, setMonth, onOpen, onClose, open, cl
           <section className="relative overflow-hidden rounded-3xl p-5 text-white shadow-md" style={{ background: DIARY_GRADIENT }}>
             <span aria-hidden className="absolute -top-8 -right-8 size-32 rounded-full bg-white/10" />
             <span aria-hidden className="absolute right-10 -bottom-12 size-24 rounded-full bg-white/10" />
-            <p className="text-sm font-medium text-white/80">{dayDate(today()).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-            <h3 className="mt-1 text-2xl font-bold">{wroteToday ? 'Anything else today?' : 'How was your day?'}</h3>
+            <p className="text-sm font-medium text-white/80">{dayDate(today()).toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+            <h3 className="mt-1 text-2xl font-bold">{wroteToday ? t('Anything else today?') : t('How was your day?')}</h3>
             <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
-              <span className="inline-flex items-center gap-1 rounded-full bg-black/15 px-2.5 py-1"><Flame className="size-3.5" />{inARow} day{inARow === 1 ? '' : 's'} in a row</span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-black/15 px-2.5 py-1"><NotebookPen className="size-3.5" />{thisMonth} this month</span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-black/15 px-2.5 py-1"><Flame className="size-3.5" />{tn(inARow, '{n} day in a row', '{n} days in a row')}</span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-black/15 px-2.5 py-1"><NotebookPen className="size-3.5" />{t('{n} this month', { n: thisMonth })}</span>
             </div>
             <button onClick={() => onOpen(newNote(today(), ''))}
               className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-amber-700 shadow-sm hover:bg-amber-50">
-              <PenLine className="size-4" /> Write about today
+              <PenLine className="size-4" /> {t('Write about today')}
             </button>
           </section>
         )}
 
-        <div className={cn('flex gap-2 overflow-x-auto pb-1', !searching && filter === null ? 'mt-4' : 'mt-1')} role="group" aria-label="Show notes for">
-          <Chip on={filter === null} onClick={() => useNotes.setState({ filter: null })}>All</Chip>
-          <Chip on={filter === ''} onClick={() => useNotes.setState({ filter: '' })}><NotebookPen className="size-3.5" />Personal</Chip>
+        <div className={cn('flex gap-2 overflow-x-auto pb-1', !searching && filter === null ? 'mt-4' : 'mt-1')} role="group" aria-label={t('Show notes for')}>
+          <Chip on={filter === null} onClick={() => useNotes.setState({ filter: null })}>{t('All')}</Chip>
+          <Chip on={filter === ''} onClick={() => useNotes.setState({ filter: '' })}><NotebookPen className="size-3.5" />{t('Personal')}</Chip>
           {chats.map((c) => (
             <Chip key={c} on={filter === c} onClick={() => useNotes.setState({ filter: c })}>
               <Avatar u={c} name={chatName(c)} size={18} />{chatName(c)}
@@ -111,18 +112,18 @@ export function Browse({ day, setDay, month, setMonth, onOpen, onClose, open, cl
         {day && (
           <div className="flex items-center gap-2 pt-4 pb-1">
             <h3 className="flex-1 font-semibold">{dayLabel(day)}</h3>
-            <button onClick={() => setDay(null)} className="rounded-full px-3 py-1 text-sm font-medium text-accent-ink hover:bg-hover">Show all days</button>
+            <button onClick={() => setDay(null)} className="rounded-full px-3 py-1 text-sm font-medium text-accent-ink hover:bg-hover">{t('Show all days')}</button>
           </div>
         )}
         {!loaded ? null : shown.length === 0 ? (
           <div className="mx-auto max-w-xs py-10 text-center">
             <div className="mx-auto mb-3 grid size-14 place-items-center rounded-2xl bg-amber-500/12 text-amber-600"><BookOpen className="size-7" /></div>
             <p className="text-sm text-muted">
-              {query ? 'No notes match your search.'
-                : day ? 'Nothing written on this day yet.'
-                : 'Write about your day, or keep notes about a chat. Only you can read them: they’re end-to-end encrypted like your messages.'}
+              {query ? t('No notes match your search.')
+                : day ? t('Nothing written on this day yet.')
+                : t('Write about your day, or keep notes about a chat. Only you can read them: they’re end-to-end encrypted like your messages.')}
             </p>
-            {!query && <button onClick={create} className="mt-4 inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-white"><PenLine className="size-4" />Write a note</button>}
+            {!query && <button onClick={create} className="mt-4 inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-white"><PenLine className="size-4" />{t('Write a note')}</button>}
           </div>
         ) : (
           <ul className="pt-1">
@@ -140,7 +141,7 @@ export function Browse({ day, setDay, month, setMonth, onOpen, onClose, open, cl
         )}
       </div>
 
-      <button onClick={create} aria-label="New note"
+      <button onClick={create} aria-label={t('New note')}
         className="absolute right-4 bottom-4 grid size-14 place-items-center rounded-2xl bg-accent text-white shadow-lg active:scale-95 md:hidden">
         <Plus className="size-6" />
       </button>

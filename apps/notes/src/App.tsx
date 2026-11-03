@@ -2,6 +2,9 @@
 // days you wrote something; pick one to see (and add to) that day, or browse everything by day.
 // A separate Sanga app: the shell loads it only when the diary is opened (the Diary tab, or
 // "Notes about this chat"), and it also runs on its own at /apps/notes/.
+import { useI18n } from '@sanga/i18n';
+import { UI_DICTS } from '@sanga/ui/locale';
+import { NOTES_DICTS } from './locale';
 import { useState } from 'react';
 import type { AppProps } from '@sanga/sdk';
 import { newNote, startNotes, today, useNotes, type Note } from './notes';
@@ -11,7 +14,7 @@ import { Editor } from './app/Editor';
 
 /** The diary. `params.chat` opens one chat's notes ('' for the personal diary). On a wide screen the
  *  list and the open note sit side by side; on a phone the note takes the screen. */
-export default function NotesApp({ onClose, params, tab }: AppProps) {
+function NotesAppInner({ onClose, params, tab }: AppProps) {
   const [editing, setEditing] = useState<Note | null>(null);
   const [day, setDay] = useState<string | null>(null); // null: every day
   const [month, setMonth] = useState(() => today().slice(0, 7));
@@ -28,4 +31,10 @@ export default function NotesApp({ onClose, params, tab }: AppProps) {
         : <Blank onNew={() => setEditing(newNote(day || today(), useNotes.getState().filter ?? ''))} />}
     </div>
   );
+}
+
+/** Its words (and the UI kit's) for the language now on come first: until then the shell shows its placeholder. */
+export default function NotesApp(props: AppProps) {
+  useI18n({ ...NOTES_DICTS, ...UI_DICTS });
+  return <NotesAppInner {...props} />;
 }

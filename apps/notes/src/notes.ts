@@ -87,7 +87,7 @@ const soon = () => { clearTimeout(timer); timer = window.setTimeout(() => void s
 let key: Promise<CryptoKey> | null = null;
 function notesKey() {
   const { priv, pub } = sdk().identity();
-  if (!priv) throw new Error('Not signed in');
+  if (!priv) throw new Error('Not signed in'); // i18n-ok: never shown, sync fails quietly
   return (key ??= C.notesKey(priv, pub));
 }
 

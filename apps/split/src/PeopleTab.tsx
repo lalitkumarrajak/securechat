@@ -1,3 +1,4 @@
+import { t } from '@sanga/i18n';
 import { useState } from 'react';
 import { Archive, ArchiveRestore, Pencil, UserMinus, UserPlus } from 'lucide-react';
 import { sdk } from '@sanga/sdk';
@@ -24,12 +25,12 @@ export function PeopleTab({ g }: { g: GroupData }) {
 
   const remove = async (id: string, u?: string) => {
     if (!meta) return;
-    if (!(await sdk().confirm({ title: `Remove ${name({ id, name: people.find((p) => p.id === id)?.name ?? id, u })}?`, description: u ? 'They lose access to the group. What they owe or are owed stays on the books.' : 'Their name goes from the group.', confirmText: 'Remove', destructive: true }))) return;
+    if (!(await sdk().confirm({ title: t('Remove {name}?', { name: name({ id, name: people.find((p) => p.id === id)?.name ?? id, u }) }), description: u ? t('They lose access to the group. What they owe or are owed stays on the books.') : t('Their name goes from the group.'), confirmText: t('Remove'), destructive: true }))) return;
     setError('');
     try {
       if (u) await removeFriend(g.gid, u);
       else save(g.gid, { ...meta, people: meta.people.filter((p) => p.id !== id) });
-    } catch (e) { setError(e instanceof Error ? e.message : 'Couldn’t remove them'); }
+    } catch (e) { setError(e instanceof Error ? e.message : t('Couldn’t remove them')); }
   };
 
   return (
@@ -40,22 +41,22 @@ export function PeopleTab({ g }: { g: GroupData }) {
             <PersonDot p={p} name={name(p)} size={40} />
             <span className="min-w-0 flex-1">
               <span className="block truncate font-medium">{name(p)}</span>
-              <span className="block text-xs text-muted">{p.gone ? (p.u ? 'Left the group' : 'Archived') : p.u ? (p.u === owner ? 'Made the group' : 'On Sanga') : 'Not on Sanga'}</span>
+              <span className="block text-xs text-muted">{p.gone ? (p.u ? t('Left the group') : t('Archived')) : p.u ? (p.u === owner ? t('Made the group') : t('On Sanga')) : t('Not on Sanga')}</span>
             </span>
             {me === owner && !p.u && (<>
-              <button type="button" aria-label={`Edit ${name(p)}`} onClick={() => setEditing(p)} className="rounded-full p-2 text-muted hover:bg-hover"><Pencil className="size-4" /></button>
-              <button type="button" aria-label={`${p.gone ? 'Restore' : 'Archive'} ${name(p)}`} onClick={() => archivePerson(g.gid, p.id, !p.gone)} className="rounded-full p-2 text-muted hover:bg-hover">
+              <button type="button" aria-label={t('Edit {name}', { name: name(p) })} onClick={() => setEditing(p)} className="rounded-full p-2 text-muted hover:bg-hover"><Pencil className="size-4" /></button>
+              <button type="button" aria-label={p.gone ? t('Restore {name}', { name: name(p) }) : t('Archive {name}', { name: name(p) })} onClick={() => archivePerson(g.gid, p.id, !p.gone)} className="rounded-full p-2 text-muted hover:bg-hover">
                 {p.gone ? <ArchiveRestore className="size-4" /> : <Archive className="size-4" />}
               </button>
             </>)}
             {me === owner && p.id !== me && !p.gone && (p.u || !involved(p.id) || net[p.id] === 0) && (
-              <button type="button" aria-label={`Remove ${name(p)}`} onClick={() => void remove(p.id, p.u)} className="rounded-full p-2 text-muted hover:bg-hover hover:text-danger"><UserMinus className="size-4" /></button>
+              <button type="button" aria-label={t('Remove {name}', { name: name(p) })} onClick={() => void remove(p.id, p.u)} className="rounded-full p-2 text-muted hover:bg-hover hover:text-danger"><UserMinus className="size-4" /></button>
             )}
           </li>
         ))}
       </ul>
       {error && <p className="text-sm text-danger" role="alert">{error}</p>}
-      <Button variant="outline" className="w-full" onClick={() => setAdding(true)}><UserPlus className="size-4" />Add people</Button>
+      <Button variant="outline" className="w-full" onClick={() => setAdding(true)}><UserPlus className="size-4" />{t('Add people')}</Button>
       <AddPeopleDialog g={g} open={adding} onClose={() => setAdding(false)} />
       <GuestDialog g={g} p={editing} onClose={() => setEditing(null)} />
     </div>

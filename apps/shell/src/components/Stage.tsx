@@ -3,6 +3,7 @@ import { Minus, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Crop } from '../lib/image';
 import { Button } from '@sanga/ui/button';
+import { t } from '@sanga/i18n';
 
 const MAX_ZOOM = 5;
 
@@ -67,9 +68,9 @@ export function Stage({ file, onCancel, onDone }: { file: File; onCancel: () => 
       <div className="relative touch-none overflow-hidden rounded-2xl bg-black select-none" style={{ width: size, height: size }}
         onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
         onWheel={(e) => zoomTo(view.z * (e.deltaY < 0 ? 1.1 : 1 / 1.1))}
-        aria-label="Photo to crop" role="img">
+        aria-label={t('Photo to crop')} role="img">
         <img src={url} alt="" draggable={false}
-          onError={() => { toast.error('Couldn’t open that photo', { description: 'Try a JPEG or PNG, or take a screenshot of it and use that.' }); onCancel(); }}
+          onError={() => { toast.error(t('Couldn’t open that photo'), { description: t('Try a JPEG or PNG, or take a screenshot of it and use that.') }); onCancel(); }}
           onLoad={(e) => setNat({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
           className="pointer-events-none absolute top-1/2 left-1/2 max-w-none"
           style={nat ? { width: nat.w * scale, height: nat.h * scale, transform: `translate(calc(-50% + ${view.x}px), calc(-50% + ${view.y}px))` } : { opacity: 0 }} />
@@ -77,14 +78,14 @@ export function Stage({ file, onCancel, onDone }: { file: File; onCancel: () => 
         <div className="pointer-events-none absolute inset-0 rounded-full shadow-[0_0_0_9999px_rgb(0_0_0/0.55)] ring-2 ring-white/80" />
       </div>
       <div className="flex w-full max-w-[380px] items-center gap-3">
-        <button onClick={() => zoomTo(view.z / 1.25)} aria-label="Zoom out" className="grid size-9 place-items-center rounded-full hover:bg-white/15"><Minus className="size-5" /></button>
+        <button onClick={() => zoomTo(view.z / 1.25)} aria-label={t('Zoom out')} className="grid size-9 place-items-center rounded-full hover:bg-white/15"><Minus className="size-5" /></button>
         <input type="range" min={1} max={MAX_ZOOM} step={0.01} value={view.z} onChange={(e) => zoomTo(Number(e.target.value))}
-          aria-label="Zoom" className="flex-1 accent-[var(--accent)]" />
-        <button onClick={() => zoomTo(view.z * 1.25)} aria-label="Zoom in" className="grid size-9 place-items-center rounded-full hover:bg-white/15"><Plus className="size-5" /></button>
+          aria-label={t('Zoom')} className="flex-1 accent-[var(--accent)]" />
+        <button onClick={() => zoomTo(view.z * 1.25)} aria-label={t('Zoom in')} className="grid size-9 place-items-center rounded-full hover:bg-white/15"><Plus className="size-5" /></button>
       </div>
       <div className="flex w-full max-w-[380px] gap-3">
-        <Button variant="ghost" className="flex-1 text-white hover:bg-white/15" onClick={onCancel}>Cancel</Button>
-        <Button className="flex-1" onClick={done} disabled={!nat}>Use photo</Button>
+        <Button variant="ghost" className="flex-1 text-white hover:bg-white/15" onClick={onCancel}>{t('Cancel')}</Button>
+        <Button className="flex-1" onClick={done} disabled={!nat}>{t('Use photo')}</Button>
       </div>
     </>
   );

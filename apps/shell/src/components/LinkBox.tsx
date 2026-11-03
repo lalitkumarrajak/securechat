@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Check, Copy, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { t } from '@sanga/i18n';
 import { cn } from '@sanga/ui/utils';
 
 export function LinkBox({ url, title, text, onUse, dark, className }: {
@@ -17,10 +18,10 @@ export function LinkBox({ url, title, text, onUse, dark, className }: {
     try { await navigator.clipboard.writeText(url); }
     catch { // older browsers: select the text so it can be copied by hand
       (document.getElementById('linkbox-' + url) as HTMLInputElement | null)?.select();
-      return toast('Select the link and copy it');
+      return toast(t('Select the link and copy it'));
     }
     setCopied(true);
-    toast.success('Link copied', { description: 'Paste it anywhere: WhatsApp, SMS, email…' });
+    toast.success(t('Link copied'), { description: t('Paste it anywhere: WhatsApp, SMS, email…') });
     setTimeout(() => setCopied(false), 2000);
   }
 
@@ -35,16 +36,16 @@ export function LinkBox({ url, title, text, onUse, dark, className }: {
   return (
     <div className={cn('w-full space-y-2', className)}>
       <div className={cn('flex items-center gap-2 rounded-full p-1 pl-4', dark ? 'bg-white/10' : 'bg-hover')}>
-        <input id={'linkbox-' + url} readOnly value={url} aria-label="Invite link" onFocus={(e) => e.target.select()}
+        <input id={'linkbox-' + url} readOnly value={url} aria-label={t('Invite link')} onFocus={(e) => e.target.select()}
           className={cn('min-w-0 flex-1 truncate bg-transparent text-sm outline-none', dark ? 'text-white/85' : 'text-ink')} />
-        <button type="button" onClick={copy} className={btn} aria-label="Copy link">
-          {copied ? <Check className="size-4" /> : <Copy className="size-4" />} {copied ? 'Copied' : 'Copy'}
+        <button type="button" onClick={copy} className={btn} aria-label={t('Copy link')}>
+          {copied ? <Check className="size-4" /> : <Copy className="size-4" />} {copied ? t('Copied') : t('Copy')}
         </button>
       </div>
       {canShare && (
         <button type="button" onClick={share} className={cn('flex h-11 w-full items-center justify-center gap-2 rounded-full text-sm font-semibold',
           dark ? 'border border-white/25 text-white hover:bg-white/10' : 'border border-line hover:bg-hover')}>
-          <Share2 className="size-4" /> Share…
+          <Share2 className="size-4" /> {t('Share…')}
         </button>
       )}
     </div>

@@ -3,6 +3,7 @@ import { Mic } from 'lucide-react';
 import { sendTyping } from '../../lib/engine';
 import { VoiceRecorder } from '../../lib/voice';
 import { hold, voice } from './voiceHold';
+import { t } from '@sanga/i18n';
 
 export function MicButton({ peer, onStart }: { peer: string; onStart: () => void }) {
   async function down(e: React.PointerEvent) {
@@ -21,14 +22,14 @@ export function MicButton({ peer, onStart }: { peer: string; onStart: () => void
     } catch {
       voice.recorder = null;
       hold.active = false;
-      toast.error('Microphone not available', { description: 'Allow microphone access for this site in your browser settings.' });
+      toast.error(t('Microphone not available'), { description: t('Allow microphone access for this site in your browser settings.') });
       return;
     }
     sendTyping(peer, true);
     onStart();
   }
   return (
-    <button type="button" aria-label="Hold to record a voice message" onPointerDown={down}
+    <button type="button" aria-label={t('Hold to record a voice message')} onPointerDown={down}
       onContextMenu={(e) => e.preventDefault()}
       className="grid size-11 shrink-0 touch-none place-items-center rounded-full bg-accent text-white shadow-sm transition select-none active:scale-110">
       <Mic className="size-5" />

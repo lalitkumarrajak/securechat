@@ -1,3 +1,4 @@
+import { t, tx } from '@sanga/i18n';
 import { useState } from 'react';
 import { Button } from '@sanga/ui/button';
 import { Dialog } from '@sanga/ui/dialog';
@@ -9,7 +10,7 @@ import { newId, save, type GroupData } from './store';
 /** Record that one person paid another back (cash, UPI…): it's counted against what they owe. */
 export function SettleDialog({ g, transfer, onClose }: { g: GroupData; transfer: Transfer | null; onClose: () => void }) {
   return (
-    <Dialog open={!!transfer} onOpenChange={(o) => { if (!o) onClose(); }} title="Record a payment" description="Marks money as paid back outside the app.">
+    <Dialog open={!!transfer} onOpenChange={(o) => { if (!o) onClose(); }} title={t('Record a payment')} description={t('Marks money as paid back outside the app.')}>
       {transfer && <Form g={g} transfer={transfer} onClose={onClose} />}
     </Dialog>
   );
@@ -26,6 +27,7 @@ function Form({ g, transfer, onClose }: { g: GroupData; transfer: Transfer; onCl
   const amount = parseAmount(amountText, currency);
   const ok = !!amount && validDay(date);
   const to = person(transfer.to);
+  const bold = (s: string) => <b>{s}</b>;
   const confirm = needsConfirm(g.meta?.people.find((p) => p.id === transfer.to) ?? to, me);
   return (
     <form className="space-y-4" onSubmit={(e) => {
@@ -35,16 +37,16 @@ function Form({ g, transfer, onClose }: { g: GroupData; transfer: Transfer; onCl
       onClose();
     }}>
       <p className="rounded-xl bg-panel-2 p-3 text-center text-sm">
-        <b>{name(person(transfer.from))}</b> paid <b>{name(person(transfer.to))}</b>
+        {tx('{from} paid {to}', { from: bold(name(person(transfer.from))), to: bold(name(person(transfer.to))) })}
         <span className="mt-1 block text-2xl font-bold tabular-nums">{money(amount ?? 0, currency)}</span>
       </p>
-      <div><Label htmlFor="sa">Amount ({currency})</Label><Input id="sa" inputMode="decimal" value={amountText} onChange={(e) => setAmountText(e.target.value)} /></div>
+      <div><Label htmlFor="sa">{t('Amount ({currency})', { currency })}</Label><Input id="sa" inputMode="decimal" value={amountText} onChange={(e) => setAmountText(e.target.value)} /></div>
       <div className="grid grid-cols-2 gap-3">
-        <div><Label htmlFor="sd">Date</Label><Input id="sd" type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value)} /></div>
-        <div><Label htmlFor="sn" hint="optional">Note</Label><Input id="sn" maxLength={100} placeholder="UPI, cash…" value={note} onChange={(e) => setNote(e.target.value)} /></div>
+        <div><Label htmlFor="sd">{t('Date')}</Label><Input id="sd" type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value)} /></div>
+        <div><Label htmlFor="sn" hint={t('optional')}>{t('Note')}</Label><Input id="sn" maxLength={100} placeholder={t('UPI, cash…')} value={note} onChange={(e) => setNote(e.target.value)} /></div>
       </div>
-      {confirm && <p className="rounded-xl bg-warn-bg p-3 text-sm">{name(to)} will be asked to confirm they got it. It counts once they do.</p>}
-      <Button type="submit" className="w-full" disabled={!ok}>{confirm ? 'Send for confirmation' : 'Save payment'}</Button>
+      {confirm && <p className="rounded-xl bg-warn-bg p-3 text-sm">{t('{name} will be asked to confirm they got it. It counts once they do.', { name: name(to) })}</p>}
+      <Button type="submit" className="w-full" disabled={!ok}>{confirm ? t('Send for confirmation') : t('Save payment')}</Button>
     </form>
   );
 }

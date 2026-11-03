@@ -4,6 +4,7 @@ import { fmtListTime } from '@sanga/ui/format';
 import { cn } from '@sanga/ui/utils';
 import { deviceName, osVersion, parseDevice, placeName } from '../../../lib/device';
 import type { Session } from '../../../lib/types';
+import { locale, t } from '@sanga/i18n';
 
 export function SessionRow({ s, children }: { s: Session; children?: ReactNode }) {
   const d = parseDevice(s.ua);
@@ -17,7 +18,7 @@ export function SessionRow({ s, children }: { s: Session; children?: ReactNode }
       <span className="min-w-0 flex-1">
         <span className="block truncate font-medium">{deviceName(s.ua, s.device)}</span>
         <span className={cn('block truncate text-sm', active ? 'text-accent-ink' : 'text-muted')}>
-          {s.current ? 'This device · active now' : s.online ? 'Active now' : s.lastSeen ? `Last active ${fmtListTime(s.lastSeen).toLowerCase()}` : 'Last active: unknown'}
+          {s.current ? t('This device · active now') : s.online ? t('Active now') : s.lastSeen ? t('Last active {time}', { time: fmtListTime(s.lastSeen).toLowerCase() }) : t('Last active: unknown')}
         </span>
         {(place || detail) && (
           <span className="mt-0.5 flex items-center gap-1 truncate text-sm">
@@ -26,7 +27,7 @@ export function SessionRow({ s, children }: { s: Session; children?: ReactNode }
           </span>
         )}
         <span className="block truncate text-xs text-muted">
-          {s.created ? `Signed in ${new Date(s.created).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}` : 'Signed in before session details were recorded'}
+          {s.created ? t('Signed in {when}', { when: new Date(s.created).toLocaleString(locale() ?? [], { dateStyle: 'medium', timeStyle: 'short' }) }) : t('Signed in before session details were recorded')}
           {s.ip && ` · IP ${s.ip}`}{s.loc?.isp && ` · ${s.loc.isp}`}
         </span>
       </span>

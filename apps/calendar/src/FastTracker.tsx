@@ -4,7 +4,8 @@ import { useMemo } from 'react';
 import { Flame } from 'lucide-react';
 import { Button } from '@sanga/ui/button';
 import { cn } from '@sanga/ui/utils';
-import { addDays, GROUPS, observances, type Group, type Observance } from './panchang';
+import { t, tn } from '@sanga/i18n';
+import { addDays, GROUPS, obsName, observances, type Group, type Observance } from './panchang';
 import { newFast, save, today, useCal, type FastLog } from './model';
 import { FAST_TYPES, STATUS } from './fasts';
 import { inWords, daysUntil, shortDay, useObservances } from './util';
@@ -46,23 +47,23 @@ export function FastTracker({ onOpen }: { onOpen: (f: FastLog) => void }) {
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <div className="col-span-2 flex items-center gap-4 rounded-3xl p-4 text-white shadow-md sm:col-span-1" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706 60%, #b45309)' }}>
           <Flame className="size-9 shrink-0" />
-          <div><p className="text-3xl font-bold tabular-nums">{streak}</p><p className="text-sm text-white/85">Ekadashi{streak === 1 ? '' : 's'} kept in a row</p></div>
+          <div><p className="text-3xl font-bold tabular-nums">{streak}</p><p className="text-sm text-white/85">{tn(streak, 'Ekadashi kept in a row', 'Ekadashis kept in a row')}</p></div>
         </div>
         {stats.slice(0, 5).map((s) => (
           <div key={s.g} className="rounded-3xl border border-line/70 bg-panel p-4 shadow-sm">
-            <p className="text-sm text-muted">{GROUPS.find((x) => x.id === s.g)?.label ?? s.g} · {year}</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums">{s.kept}<span className="text-base font-medium text-muted"> of {s.total}</span></p>
+            <p className="text-sm text-muted">{t(GROUPS.find((x) => x.id === s.g)?.label ?? s.g)} · {year}</p>
+            <p className="mt-1 text-2xl font-bold tabular-nums">{s.kept}<span className="text-base font-medium text-muted"> {t('of {total}', { total: s.total })}</span></p>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-panel-2" aria-hidden>
               <div className="h-full rounded-full bg-green-500" style={{ width: `${(s.kept / s.total) * 100}%` }} />
             </div>
-            {s.partial > 0 && <p className="mt-1 text-xs text-muted">and {s.partial} partly</p>}
+            {s.partial > 0 && <p className="mt-1 text-xs text-muted">{t('and {n} partly', { n: s.partial })}</p>}
           </div>
         ))}
       </section>
 
       <section>
-        <h3 className="mb-2 px-1 font-semibold">Coming up</h3>
-        {!upcoming.length ? <p className="px-1 text-sm text-muted">No fasts in the next 30 days among the kinds you follow (Settings).</p> : (
+        <h3 className="mb-2 px-1 font-semibold">{t('Coming up')}</h3>
+        {!upcoming.length ? <p className="px-1 text-sm text-muted">{t('No fasts in the next 30 days among the kinds you follow (Settings).')}</p> : (
           <ul className="space-y-2">
             {upcoming.map((o) => {
               const log = byRef.get(o.id);
@@ -70,11 +71,11 @@ export function FastTracker({ onOpen }: { onOpen: (f: FastLog) => void }) {
                 <li key={o.id} className="flex items-center gap-3 rounded-2xl border border-line/70 bg-panel p-3 shadow-sm">
                   <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-amber-500/12 text-xl" aria-hidden>{o.emoji}</span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-semibold">{o.name}</span>
+                    <span className="block truncate font-semibold">{obsName(o)}</span>
                     <span className="text-sm text-muted">{shortDay(o.day)} · {inWords(daysUntil(o.day, now))}</span>
                   </span>
-                  {log ? <button onClick={() => onOpen(log)} className={cn('rounded-full px-3 py-1 text-sm font-medium', STATUS[log.status].tone)}>{STATUS[log.status].label}</button>
-                    : <Button size="sm" variant="outline" onClick={() => save(newFast(o.day, o.name, o.id))}>Plan it</Button>}
+                  {log ? <button onClick={() => onOpen(log)} className={cn('rounded-full px-3 py-1 text-sm font-medium', STATUS[log.status].tone)}>{t(STATUS[log.status].label)}</button>
+                    : <Button size="sm" variant="outline" onClick={() => save(newFast(o.day, obsName(o), o.id))}>{t('Plan it')}</Button>}
                 </li>
               );
             })}
@@ -84,20 +85,20 @@ export function FastTracker({ onOpen }: { onOpen: (f: FastLog) => void }) {
 
       <section>
         <div className="mb-2 flex items-center px-1">
-          <h3 className="flex-1 font-semibold">Your fasts</h3>
-          <Button size="sm" variant="ghost" onClick={() => onOpen(newFast(now, ''))}>+ Log a fast</Button>
+          <h3 className="flex-1 font-semibold">{t('Your fasts')}</h3>
+          <Button size="sm" variant="ghost" onClick={() => onOpen(newFast(now, ''))}>{t('+ Log a fast')}</Button>
         </div>
-        {!logs.length ? <p className="px-1 text-sm text-muted">Fasts you track show here, with how each one went.</p> : (
+        {!logs.length ? <p className="px-1 text-sm text-muted">{t('Fasts you track show here, with how each one went.')}</p> : (
           <ul className="space-y-2">
             {logs.map((f) => (
               <li key={f.id}>
                 <button onClick={() => onOpen(f)} className="flex w-full items-center gap-3 rounded-2xl border border-line/70 bg-panel p-3 text-left shadow-sm hover:bg-hover">
                   <span className="text-xl" aria-hidden>{STATUS[f.status].emoji}</span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-semibold">{f.name || 'Fast'}</span>
-                    <span className="block truncate text-sm text-muted">{shortDay(f.day)} · {FAST_TYPES[f.fastType]}{f.brokeAt ? ` · broke at ${f.brokeAt}` : ''}{f.notes ? ` · ${f.notes}` : ''}</span>
+                    <span className="block truncate font-semibold">{f.name || t('Fast')}</span>
+                    <span className="block truncate text-sm text-muted">{shortDay(f.day)} · {t(FAST_TYPES[f.fastType])}{f.brokeAt ? ` · ${t('broke at {time}', { time: f.brokeAt })}` : ''}{f.notes ? ` · ${f.notes}` : ''}</span>
                   </span>
-                  <span className={cn('shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold', STATUS[f.status].tone)}>{STATUS[f.status].label}</span>
+                  <span className={cn('shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold', STATUS[f.status].tone)}>{t(STATUS[f.status].label)}</span>
                 </button>
               </li>
             ))}

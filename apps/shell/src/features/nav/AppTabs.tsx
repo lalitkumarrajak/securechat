@@ -9,6 +9,7 @@ import { useStories } from '../../lib/stories';
 import { setApp, useApp, type Section } from '../../state/app';
 import { listed, useGames } from '../games/store';
 import { Count } from './Count';
+import { t, tk } from '@sanga/i18n';
 
 export function AppTabs() {
   const section = useApp((s) => s.section);
@@ -25,19 +26,19 @@ export function AppTabs() {
       <span className={cn('relative grid h-7 w-14 place-items-center rounded-full transition [&_svg]:size-5', selected && 'bg-accent/15')}>
         {icon}{badge}
       </span>
-      {label}
+      {t(label)}
     </button>
   );
   const to = (s: Section) => () => go(s);
   return (
     <nav role="tablist" aria-label="Sanga" className="flex shrink-0 justify-center border-t border-line bg-panel pb-[env(safe-area-inset-bottom)] [&>*]:max-w-40">
-      {tab('Chats', <MessageCircle />, section === 'chat', to('chat'), unread > 0 && <Count n={unread} />)}
-      {tab('Stories', <CircleDashed />, section === 'stories', to('stories'),
-        fresh && <span className="absolute top-0 right-3 size-2.5 rounded-full border-2 border-panel bg-accent" aria-label="New stories" />)}
-      {tab('Games', <Gamepad2 />, section === 'games', to('games'), gamesDue > 0 && <Count n={gamesDue} />)}
-      {tab('Diary', <NotebookPen />, section === 'diary', () => { setApp({ notesChat: null }); go('diary'); })}
-      {tab('Calendar', <CalendarDays />, section === 'calendar', to('calendar'))}
-      {tab('Split', <Wallet />, section === 'split', to('split'))}
+      {tab(tk('Chats'), <MessageCircle />, section === 'chat', to('chat'), unread > 0 && <Count n={unread} />)}
+      {tab(tk('Stories'), <CircleDashed />, section === 'stories', to('stories'),
+        fresh && <span className="absolute top-0 right-3 size-2.5 rounded-full border-2 border-panel bg-accent" aria-label={t('New stories')} />)}
+      {tab(tk('Games'), <Gamepad2 />, section === 'games', to('games'), gamesDue > 0 && <Count n={gamesDue} />)}
+      {tab(tk('Diary'), <NotebookPen />, section === 'diary', () => { setApp({ notesChat: null }); go('diary'); })}
+      {tab(tk('Calendar'), <CalendarDays />, section === 'calendar', to('calendar'))}
+      {tab(tk('Split'), <Wallet />, section === 'split', to('split'))}
     </nav>
   );
 }

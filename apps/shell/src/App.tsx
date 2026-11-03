@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { Fragment, useEffect } from 'react';
+import { useLang } from '@sanga/i18n';
 import { Toaster } from 'sonner';
 import { ConfirmHost } from '@sanga/ui/confirm';
 import { ShellSkeleton } from './components/skeleton/ShellSkeleton';
@@ -18,6 +19,7 @@ export function App() {
   const status = useApp((s) => s.status);
   const theme = useSettings((s) => s.theme);
   const locked = useLock((s) => s.locked); // app lock: only the PIN screen is on the page
+  const lang = useLang(); // a new language redraws everything in it
 
   useEffect(() => {
     if (booted) return; // StrictMode runs effects twice in development
@@ -42,13 +44,13 @@ export function App() {
   }, []);
 
   return (
-    <>
+    <Fragment key={lang}>
       {status === 'loading' && <ShellSkeleton />}
       {status === 'auth' && <Landing />}
       {status === 'app' && (locked ? <LockScreen /> : <Main />)}
       <ConfirmHost />
       {!(status === 'app' && locked) && <Toaster position="top-center" theme={theme === 'system' ? 'system' : theme} richColors closeButton
         toastOptions={{ className: 'rounded-xl!' }} />}
-    </>
+    </Fragment>
   );
 }

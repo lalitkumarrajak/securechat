@@ -3,6 +3,7 @@
 // (amount, due date, whether you've paid it). Only the last four digits are ever kept, and only if you
 // type them: never a full number or a CVV. Everything here is plain arithmetic on dates, so it's
 // tested on its own (cards.test.ts); model.ts stores the records and reminders.ts hands the reminders on.
+import { locale, t } from '@sanga/i18n';
 import { addDays } from './panchang';
 
 export interface CreditCard {
@@ -43,7 +44,7 @@ export const CURRENCIES = ['INR', 'USD', 'EUR', 'GBP', 'AED', 'SGD', 'AUD', 'CAD
 const digits = (cur: string) => (ZERO_DECIMAL.has(cur) ? 0 : 2);
 export function money(minor: number, cur: string) {
   const d = digits(cur), v = minor / 10 ** d;
-  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur, minimumFractionDigits: d, maximumFractionDigits: d }).format(v); }
+  try { return new Intl.NumberFormat(locale(), { style: 'currency', currency: cur, minimumFractionDigits: d, maximumFractionDigits: d }).format(v); }
   catch { return `${cur} ${v.toFixed(d)}`; }
 }
 /** "1,234.5" → 123450. Null if it isn't an amount. */
@@ -104,7 +105,7 @@ export const unpaid = (bills: CardBill[]) => liveBills(bills).filter((b) => !b.p
 export const suggestedDue = (card: CreditCard, month: string) => addDays(statementDate(month, card.statementDay), card.dueAfter);
 
 // ---------- reminders ----------
-const dayName = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+const dayName = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString(locale(), { weekday: 'short', day: 'numeric', month: 'short' });
 
 /** What to remind you of: on each statement day (and two days later) while the bill isn't entered, and before,
  *  on and after the due date of each unpaid bill. Reminders already in the past are left for the caller to drop. */
@@ -117,21 +118,21 @@ export function cardReminders(cards: CreditCard[], bills: CardBill[], now: strin
     for (let k = -1; k <= 2; k++) {
       const month = addMonths(monthOf(now), k), date = statementDate(month, card.statementDay);
       if (mine.some((b) => b.month === month)) continue; // already entered
-      out.push({ key: `c|${card.id}|${month}|s`, at: atTime(date, card.time), title: `💳 ${card.name}: is your bill ready?`, body: 'Your statement is generated today. Open to add the amount and due date.' });
-      out.push({ key: `c|${card.id}|${month}|s2`, at: atTime(addDays(date, 2), card.time), title: `💳 ${card.name}: still need your bill`, body: 'Add the amount and due date, and I’ll remind you before it’s due.' });
+      out.push({ key: `c|${card.id}|${month}|s`, at: atTime(date, card.time), title: t('💳 {card}: is your bill ready?', { card: card.name }), body: t('Your statement is generated today. Open to add the amount and due date.') });
+      out.push({ key: `c|${card.id}|${month}|s2`, at: atTime(addDays(date, 2), card.time), title: t('💳 {card}: still need your bill', { card: card.name }), body: t('Add the amount and due date, and I’ll remind you before it’s due.') });
     }
     for (const b of mine) {
       if (b.paid) continue;
       const amt = money(b.amount, card.currency);
-      const min = b.minDue ? ` · Minimum ${money(b.minDue, card.currency)}` : '';
       for (const d of [...new Set(card.remind)].filter((n) => n >= 0 && n <= 30)) {
         out.push({
           key: `c|${card.id}|${b.month}|d${d}`, at: atTime(addDays(b.due, -d), card.time),
-          title: d === 0 ? `💳 ${card.name}: pay ${amt} today` : `💳 ${card.name}: ${amt} due ${d === 1 ? 'tomorrow' : `in ${d} days`}`,
-          body: `Due ${dayName(b.due)}${min}`,
+          title: d === 0 ? t('💳 {card}: pay {amount} today', { card: card.name, amount: amt })
+            : d === 1 ? t('💳 {card}: {amount} due tomorrow', { card: card.name, amount: amt }) : t('💳 {card}: {amount} due in {n} days', { card: card.name, amount: amt, n: d }),
+          body: b.minDue ? t('Due {date} · Minimum {amount}', { date: dayName(b.due), amount: money(b.minDue, card.currency) }) : t('Due {date}', { date: dayName(b.due) }),
         });
       }
-      out.push({ key: `c|${card.id}|${b.month}|od`, at: atTime(addDays(b.due, 1), card.time), title: `⚠️ ${card.name} bill is overdue`, body: `${amt} was due ${dayName(b.due)}. Pay it now to avoid late fees.` });
+      out.push({ key: `c|${card.id}|${b.month}|od`, at: atTime(addDays(b.due, 1), card.time), title: t('⚠️ {card} bill is overdue', { card: card.name }), body: t('{amount} was due {date}. Pay it now to avoid late fees.', { amount: amt, date: dayName(b.due) }) });
     }
   }
   return out;

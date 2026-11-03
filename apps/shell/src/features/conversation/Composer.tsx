@@ -22,6 +22,7 @@ import { groupIdOf, isGroup } from '../../lib/types';
 import { Avatar } from '../../components/Avatar';
 import { useMemberName } from './useMemberName';
 import { useSettings } from '../../state/settings';
+import { t } from '@sanga/i18n';
 
 export function Composer({ peer, peerName }: { peer: string; peerName: string }) {
   const replyTo = useApp((s) => s.replyTo);
@@ -79,12 +80,12 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
   }
 
   function submit() {
-    const t = text.trim();
-    if (!t) return;
+    const body = text.trim();
+    if (!body) return;
     // Focus again inside the same tap, so phone keyboards stay open after every message.
     input.current?.focus();
     if (editing) {
-      editMessage(editing, t).catch((e) => toast.error(e.message));
+      editMessage(editing, body).catch((e) => toast.error(e.message));
       setApp({ editing: null });
       setText(getApp().chats.find((c) => c.peer === peer)?.draft || '');
       return;
@@ -94,18 +95,18 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
     setApp({ replyTo: null });
     const lp = link.preview; // only set while the text still contains that link
     link.clear();
-    const mn = group ? mentioned(t, others.map((m) => m.u)) : undefined;
+    const mn = group ? mentioned(body, others.map((m) => m.u)) : undefined;
     setTag(null);
-    sendText(peer, t, replyTo, lp, mn).catch((e) => toast.error(e.message));
+    sendText(peer, body, replyTo, lp, mn).catch((e) => toast.error(e.message));
   }
 
   // Picked or pasted photos open the review screen first (several at once, captions, add more).
   async function photos(files: File[]) {
     const ok: File[] = [];
     for (const f of files) if (await isPhoto(f)) ok.push(f);
-    if (ok.length < files.length) toast.error(ok.length ? 'Some of those aren’t photos, so they were left out.' : 'Only photos can be sent here.');
+    if (ok.length < files.length) toast.error(ok.length ? t('Some of those aren’t photos, so they were left out.') : t('Only photos can be sent here.'));
     if (!ok.length) return;
-    if (ok.length + (review?.length || 0) > MAX_PHOTOS) toast(`You can send up to ${MAX_PHOTOS} photos at a time.`);
+    if (ok.length + (review?.length || 0) > MAX_PHOTOS) toast(t('You can send up to {max} photos at a time.', { max: MAX_PHOTOS }));
     setReview((r) => [...(r || []), ...toItems(ok)].slice(0, MAX_PHOTOS));
   }
 
@@ -114,17 +115,17 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
     setReview(null);
     let re = getApp().replyTo;
     setApp({ replyTo: null });
-    const t = items.length > 1 ? toast.loading(`Sending ${items.length} photos…`) : undefined;
+    const tid = items.length > 1 ? toast.loading(t('Sending {n} photos…', { n: items.length })) : undefined;
     let failed = 0;
     const album = items.length > 1 ? crypto.randomUUID().replace(/-/g, '').slice(0, 16) : undefined; // shown together as one grid
     for (const [n, x] of items.entries()) {
-      if (t) toast.loading(`Sending photo ${n + 1} of ${items.length}…`, { id: t });
+      if (tid) toast.loading(t('Sending photo {n} of {total}…', { n: n + 1, total: items.length }), { id: tid });
       try { await sendPhoto(peer, x.file, re, x.caption, album); re = null; }
-      catch (e) { failed++; if (!t) toast.error((e as Error).message || 'Couldn’t send that photo'); }
+      catch (e) { failed++; if (!tid) toast.error((e as Error).message || t('Couldn’t send that photo')); }
     }
-    if (t) {
-      if (failed) toast.error(`${failed} of ${items.length} photos couldn’t be sent`, { id: t });
-      else toast.dismiss(t);
+    if (tid) {
+      if (failed) toast.error(t('{failed} of {total} photos couldn’t be sent', { failed, total: items.length }), { id: tid });
+      else toast.dismiss(tid);
     }
   }
 
@@ -136,16 +137,16 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
     let re = pics.length ? null : getApp().replyTo;
     if (rest.length && !pics.length) setApp({ replyTo: null });
     for (const [n, file] of rest.entries()) {
-      const t = toast.loading(rest.length > 1 ? `Sending ${file.name} (${n + 1} of ${rest.length})…` : `Sending ${file.name}…`);
-      try { await sendFile(peer, file, re); re = null; toast.dismiss(t); } catch (e) { toast.error((e as Error).message || `Couldn’t send ${file.name}`, { id: t }); }
+      const tid = toast.loading(rest.length > 1 ? t('Sending {file} ({n} of {total})…', { file: file.name, n: n + 1, total: rest.length }) : t('Sending {file}…', { file: file.name }));
+      try { await sendFile(peer, file, re); re = null; toast.dismiss(tid); } catch (e) { toast.error((e as Error).message || t('Couldn’t send {file}', { file: file.name }), { id: tid }); }
     }
   }
 
   async function location() {
     let loc;
-    const t = toast.loading('Finding your location…');
-    try { loc = await currentLocation(); toast.dismiss(t); } catch (e) { toast.error((e as Error).message, { id: t }); return; }
-    if (!(await confirm({ title: 'Send your current location?', description: `Accurate to about ${loc.acc} m. ${peerName} will see it on a map.`, confirmText: 'Send location' }))) return;
+    const tid = toast.loading(t('Finding your location…'));
+    try { loc = await currentLocation(); toast.dismiss(tid); } catch (e) { toast.error((e as Error).message, { id: tid }); return; }
+    if (!(await confirm({ title: t('Send your current location?'), description: t('Accurate to about {acc} m. {name} will see it on a map.', { acc: loc.acc, name: peerName }), confirmText: t('Send location') }))) return;
     const re = getApp().replyTo;
     setApp({ replyTo: null });
     sendLocation(peer, loc, re).catch((e) => toast.error(e.message));
@@ -169,9 +170,9 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
     caret.current = null;
   }
 
-  function sendExpression(fn: () => Promise<void>) {
+  function sendExpression(fn: () => Promise<void>) { // i18n-ok
     setApp({ replyTo: null });
-    fn().catch((e) => toast.error(e.message || 'Couldn’t send that'));
+    fn().catch((e) => toast.error(e.message || t('Couldn’t send that')));
   }
   const pickGif = (g: GifItem) => { const re = getApp().replyTo; sendExpression(() => sendGif(peer, g, re)); };
   const pickSticker = (s: string | GifItem) => { const re = getApp().replyTo; sendExpression(() => sendSticker(peer, s, re)); };
@@ -190,7 +191,7 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
   return (
     <div className={cn('relative shrink-0 border-t border-line bg-panel', !panel && 'pb-[max(0.5rem,env(safe-area-inset-bottom))]')}>
       {suggestions.length > 0 && (
-        <ul className="absolute bottom-full left-2 z-20 mb-1 w-[min(22rem,calc(100%-1rem))] overflow-hidden rounded-2xl border border-line bg-panel shadow-xl" role="listbox" aria-label="Mention someone">
+        <ul className="absolute bottom-full left-2 z-20 mb-1 w-[min(22rem,calc(100%-1rem))] overflow-hidden rounded-2xl border border-line bg-panel shadow-xl" role="listbox" aria-label={t('Mention someone')}>
           {suggestions.map((m, i) => (
             <li key={m.u} role="option" aria-selected={i === pick}>
               <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => chooseMention(m.u)}
@@ -210,7 +211,7 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
         {/* Emoji, attach and camera sit inside the message box, like WhatsApp */}
         <div className="flex min-h-11 min-w-0 flex-1 items-end rounded-3xl bg-panel-2 focus-within:ring-2 focus-within:ring-accent/25">
           {!editing && (
-            <IconButton label={panel ? 'Keyboard' : 'Emoji, GIFs and stickers'} className="ml-0.5 shrink-0" onMouseDown={(e) => e.preventDefault()} onClick={togglePanel}>
+            <IconButton label={panel ? t('Keyboard') : t('Emoji, GIFs and stickers')} className="ml-0.5 shrink-0" onMouseDown={(e) => e.preventDefault()} onClick={togglePanel}>
               {panel ? <Keyboard /> : <Smile />}
             </IconButton>
           )}
@@ -235,13 +236,13 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
           onFocus={() => { if (isTouch()) setPanel(null); }} // typing again: keyboard replaces the panel
           rows={1}
           maxLength={8000}
-          placeholder={editing ? 'Edit message' : group ? 'Message · @ to mention' : 'Message'}
-          aria-label="Message"
+          placeholder={editing ? t('Edit message') : group ? t('Message · @ to mention') : t('Message')}
+          aria-label={t('Message')}
           className={cn('max-h-40 min-h-11 min-w-0 flex-1 resize-none bg-transparent py-2.5 text-[0.95rem] leading-snug outline-none placeholder:text-muted', editing && 'pl-4')}
         />
           {!editing && <AttachButton onPhotos={photos} onDocuments={documents} onLocation={location} />}
           {!editing && empty && (
-            <IconButton label="Camera" className="mr-0.5 shrink-0" onClick={() => camera.current?.click()}><Camera /></IconButton>
+            <IconButton label={t('Camera')} className="mr-0.5 shrink-0" onClick={() => camera.current?.click()}><Camera /></IconButton>
           )}
           <input ref={camera} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { photos([...(e.target.files || [])]); e.target.value = ''; }} />
         </div>
@@ -250,7 +251,7 @@ export function Composer({ peer, peerName }: { peer: string; peerName: string })
         ) : (
           <button
             type="button"
-            aria-label={editing ? 'Save edit' : 'Send'}
+            aria-label={editing ? t('Save edit') : t('Send')}
             // Don't take focus from the text box (that closes the keyboard on phones).
             onMouseDown={(e) => e.preventDefault()}
             onClick={submit}
@@ -278,8 +279,8 @@ function useLinkPreview(text: string) {
   const [dismissed, setDismissed] = useState('');
   useEffect(() => {
     if (!url || url === state.url || url === dismissed) return;
-    const t = setTimeout(() => { fetchLinkPreview(url).then((preview) => setState({ url, preview })); }, 600);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => { fetchLinkPreview(url).then((preview) => setState({ url, preview })); }, 600);
+    return () => clearTimeout(timer);
   }, [url]); // fetch when the link changes
   return {
     preview: url && url === state.url && url !== dismissed ? state.preview : null,

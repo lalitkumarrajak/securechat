@@ -3,6 +3,7 @@
 // capture…) which are played back in order before the next update is shown.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { homeAt } from '@sanga/game-rules/ludo.js';
+import { t, tn } from '@sanga/i18n';
 import { playSound } from '../sounds';
 import type { Game, GameEvent } from '../store';
 import { useApp } from '../../../state/app';
@@ -106,8 +107,8 @@ export default function LudoBoard({ g: game, me, act, bubble }: GameBoardProps) 
   const roll = () => { if (act({ a: 'roll' }) !== false) setAsked(g.v); };
   useEffect(() => { // no reply: stop spinning
     if (!asked) return;
-    const t = setTimeout(() => setAsked(0), 3000);
-    return () => clearTimeout(t);
+    const tm = setTimeout(() => setAsked(0), 3000);
+    return () => clearTimeout(tm);
   }, [asked]);
   // The connection dropped with a roll pending: no reply is coming on this connection, so stop
   // spinning; the game is refreshed when it's back and shows what really happened.
@@ -137,9 +138,9 @@ export default function LudoBoard({ g: game, me, act, bubble }: GameBoardProps) 
       {meIdx >= 0 && g.players[meIdx].state === 'playing' && (g.players[meIdx].missed || 0) > 0 && (
         <div className="pointer-events-none absolute top-1/2 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-black/75 px-4 py-2 text-center text-sm font-medium text-white shadow-xl"
           role="status">
-          You missed {g.players[meIdx].missed} turn{g.players[meIdx].missed === 1 ? '' : 's'} ·{' '}
-          <span className="text-amber-300">{MISSES_OUT - (g.players[meIdx].missed || 0)} chance{MISSES_OUT - (g.players[meIdx].missed || 0) === 1 ? '' : 's'} left</span>
-          <div className="text-xs text-white/70">Roll the dice to stay in the game</div>
+          {tn(g.players[meIdx].missed || 0, 'You missed {n} turn', 'You missed {n} turns')} ·{' '}
+          <span className="text-amber-300">{tn(MISSES_OUT - (g.players[meIdx].missed || 0), '{n} chance left', '{n} chances left')}</span>
+          <div className="text-xs text-white/70">{t('Roll the dice to stay in the game')}</div>
         </div>
       )}
       <div className="flex w-full max-w-[560px] items-start justify-between gap-1">{row(true).map(panel)}</div>

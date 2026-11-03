@@ -3,6 +3,9 @@
 // the money went by day, month or any period, with charts. Groups are end-to-end encrypted (store.ts).
 // A separate Sanga app: the shell loads it when the Split tab is opened, and it also runs on its own
 // at /apps/split/.
+import { t, tx, useI18n } from '@sanga/i18n';
+import { UI_DICTS } from '@sanga/ui/locale';
+import { SPLIT_DICTS } from './locale';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, BarChart3, Plus, WifiOff } from 'lucide-react';
 import { sdk, type AppProps } from '@sanga/sdk';
@@ -20,7 +23,7 @@ import type { Expense } from './model';
 
 type Pane = { kind: 'none' } | { kind: 'group'; gid: string; start?: Expense } | { kind: 'insights' };
 
-export default function SplitApp({ onClose, tab, params }: AppProps) {
+function SplitAppInner({ onClose, tab, params }: AppProps) {
   const [pane, setPane] = useState<Pane>({ kind: 'none' });
   const [creating, setCreating] = useState(false);
   const me = sdk().identity().me;
@@ -36,13 +39,13 @@ export default function SplitApp({ onClose, tab, params }: AppProps) {
     <div className="flex min-h-0 flex-1 bg-bg">
       <aside className={cn('min-h-0 w-full flex-col border-line md:flex md:w-[380px] md:shrink-0 md:border-r', open ? 'hidden' : 'flex')}>
         <header className="flex h-16 shrink-0 items-center gap-1 px-3">
-          {!tab && <IconButton label="Back" onClick={onClose}><ArrowLeft /></IconButton>}
-          <h1 className={cn('min-w-0 flex-1 truncate text-xl font-bold tracking-tight', tab && 'pl-2')}>Split</h1>
-          <Button variant="ghost" size="sm" onClick={() => setPane({ kind: 'insights' })}><BarChart3 className="size-4" />My spending</Button>
-          <IconButton label="New group" variant="primary" onClick={() => setCreating(true)} className="ml-1 text-white"><Plus /></IconButton>
+          {!tab && <IconButton label={t('Back')} onClick={onClose}><ArrowLeft /></IconButton>}
+          <h1 className={cn('min-w-0 flex-1 truncate text-xl font-bold tracking-tight', tab && 'pl-2')}>{t('Split')}</h1>
+          <Button variant="ghost" size="sm" onClick={() => setPane({ kind: 'insights' })}><BarChart3 className="size-4" />{t('My spending')}</Button>
+          <IconButton label={t('New group')} variant="primary" onClick={() => setCreating(true)} className="ml-1 text-white"><Plus /></IconButton>
         </header>
-        {!online && <p className="mx-3 mb-2 flex items-center gap-2 rounded-xl bg-warn-bg px-3 py-2 text-sm"><WifiOff className="size-4" />Offline. Changes are saved and sent when you’re back.</p>}
-        {error && <p className="mx-3 mb-2 rounded-xl bg-warn-bg px-3 py-2 text-sm" role="status">{error}</p>}
+        {!online && <p className="mx-3 mb-2 flex items-center gap-2 rounded-xl bg-warn-bg px-3 py-2 text-sm"><WifiOff className="size-4" />{t('Offline. Changes are saved and sent when you’re back.')}</p>}
+        {error && <p className="mx-3 mb-2 rounded-xl bg-warn-bg px-3 py-2 text-sm" role="status">{t(error)}</p>}
         <div className="min-h-0 flex-1 overflow-y-auto pb-6">
           <GroupList active={pane.kind === 'group' ? pane.gid : null} onOpen={(gid) => setPane({ kind: 'group', gid })} onNew={() => setCreating(true)} />
         </div>
@@ -53,14 +56,14 @@ export default function SplitApp({ onClose, tab, params }: AppProps) {
         {pane.kind === 'insights' && (
           <>
             <header className="flex h-16 shrink-0 items-center gap-1 px-2">
-              <IconButton label="Back to groups" onClick={back} className="md:hidden"><ArrowLeft /></IconButton>
-              <h2 className="px-2 text-lg font-bold tracking-tight">My spending</h2>
-              <span className="text-sm text-muted">your share, all groups</span>
+              <IconButton label={t('Back to groups')} onClick={back} className="md:hidden"><ArrowLeft /></IconButton>
+              <h2 className="px-2 text-lg font-bold tracking-tight">{t('My spending')}</h2>
+              <span className="text-sm text-muted">{t('your share, all groups')}</span>
             </header>
             <div className="min-h-0 flex-1 overflow-y-auto"><InsightsTab scope={{ kind: 'all' }} /></div>
           </>
         )}
-        {pane.kind === 'none' && <Empty emoji="🧾" title="Pick a group">Or tap <b>My spending</b> to see where your money goes across all of them.</Empty>}
+        {pane.kind === 'none' && <Empty emoji="🧾" title={t('Pick a group')}>{tx('Or tap {link} to see where your money goes across all of them.', { link: <b>{t('My spending')}</b> })}</Empty>}
       </main>
 
       <DraftDialog draft={creating ? null : draft} onClose={() => setDraft(null)} onNew={() => setCreating(true)}
@@ -69,4 +72,10 @@ export default function SplitApp({ onClose, tab, params }: AppProps) {
         onCreated={(gid) => { setCreating(false); setPane({ kind: 'group', gid, ...(draft && { start: expenseFromDraft(draft, me) }) }); setDraft(null); }} />
     </div>
   );
+}
+
+/** Its words (and the UI kit's) for the language now on come first: until then the shell shows its placeholder. */
+export default function SplitApp(props: AppProps) {
+  useI18n({ ...SPLIT_DICTS, ...UI_DICTS });
+  return <SplitAppInner {...props} />;
 }

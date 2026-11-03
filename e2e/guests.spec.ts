@@ -51,7 +51,7 @@ test('a name-only person is in the group and an expense; renamed, archived and r
 
   await split(A).getByRole('tab', { name: 'Balances' }).click();
   await expect(split(A).getByText('Rohan').first()).toBeVisible();
-  await expect(split(A).getByText('owes $450.00')).toBeVisible();
+  await expect(split(A).getByText('owes ₹450.00')).toBeVisible();
 });
 
 test('linking the name to a friend: they get the group and the same balance', async () => {
@@ -65,13 +65,13 @@ test('linking the name to a friend: they get the group and the same balance', as
   await expect(split(A).getByText('On Sanga')).toBeVisible();
 
   await split(A).getByRole('tab', { name: 'Balances' }).click();
-  await expect(split(A).getByText('owes $450.00')).toBeVisible();
+  await expect(split(A).getByText('owes ₹450.00')).toBeVisible();
 
   await tab(B, 'Split').click();
   await split(B).getByRole('button', { name: /Lunch club/ }).click({ timeout: 20_000 });
   await expect(split(B).getByText('Lunch', { exact: true })).toBeVisible({ timeout: 20_000 });
   await split(B).getByRole('tab', { name: 'Balances' }).click();
-  await expect(split(B).getByText('owes $450.00')).toBeVisible();
+  await expect(split(B).getByText('owes ₹450.00')).toBeVisible();
   await split(B).getByRole('tab', { name: /Activity/ }).click();
   await expect(split(B).getByText(new RegExp(`${A.u} linked Rohan to`))).toBeVisible();
   expect(A.errors).toEqual([]);
@@ -82,11 +82,11 @@ test('the list shows what you will get and owe over all groups, and with whom', 
   await split(A).getByRole('button', { name: 'Back to groups' }).click().catch(() => {}); // wide screens have no back button
   const o = split(A).getByRole('region', { name: 'Your balance' });
   await expect(o.getByText('You’ll get')).toBeVisible();
-  await expect(o.getByText('$450.00').first()).toBeVisible();
+  await expect(o.getByText('₹450.00').first()).toBeVisible();
   await o.getByRole('button', { name: 'By person' }).click();
-  await expect(o.getByText(`owes you $450.00`)).toBeVisible();
+  await expect(o.getByText(`owes you ₹450.00`)).toBeVisible();
   await expect(o.getByText(B.u)).toBeVisible();
   await tab(B, 'Split').click();
   const ob = split(B).getByRole('region', { name: 'Your balance' });
-  await expect(ob.getByText('You owe').locator('..').getByText('$450.00')).toBeVisible();
+  await expect(ob.getByText('You owe').locator('..').getByText('₹450.00')).toBeVisible();
 });

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Hand, RotateCcw, RotateCw } from 'lucide-react';
 import { Avatar } from '../../../components/Avatar';
 import { cn } from '@sanga/ui/utils';
+import { t, tn } from '@sanga/i18n';
 import { card, COLORS, fits } from '@sanga/game-rules/uno.js';
 import { playSound } from '../sounds';
 import type { Game, GameEvent } from '../store';
@@ -51,23 +52,23 @@ export default function UnoBoard({ g: game, me, act, bubble }: GameBoardProps) {
       <div className="relative flex min-h-0 flex-1 items-center justify-center gap-6">
         <div className={cn('pointer-events-none absolute size-56 rounded-full border-4 border-dashed opacity-40', s.dir === 1 ? 'uno-spin' : 'uno-spin-rev')}
           style={{ borderColor: HEX[s.color] }} aria-hidden />
-        <button type="button" onClick={() => canDraw && act({ a: 'draw' })} disabled={!canDraw} aria-label={`Draw a card (${s.deck} left)`}
+        <button type="button" onClick={() => canDraw && act({ a: 'draw' })} disabled={!canDraw} aria-label={t('Draw a card ({n} left)', { n: s.deck })}
           className={cn('relative', canDraw && 'uno-nudge')}>
           <span className="absolute top-1 left-1"><CardBack size="lg" /></span>
           <span className="absolute top-0.5 left-0.5"><CardBack size="lg" /></span>
           <span className="relative block"><CardBack size="lg" /></span>
-          {canDraw && <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs font-semibold whitespace-nowrap text-white/90">Tap to draw</span>}
+          {canDraw && <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs font-semibold whitespace-nowrap text-white/90">{t('Tap to draw')}</span>}
         </button>
-        <div className="relative" aria-label={`Top card: ${describe(s.pile[s.pile.length - 1], s.color)}`} role="img">
+        <div className="relative" aria-label={t('Top card: {card}', { card: describe(s.pile[s.pile.length - 1], s.color) })} role="img">
           {s.pile.slice(-4, -1).map((id, k) => (
             <span key={id} className="absolute inset-0" style={{ rotate: `${(k - 1) * 12}deg` }}><UnoCard id={id} size="lg" /></span>
           ))}
           <span key={s.pile[s.pile.length - 1]} className="uno-land relative block"><UnoCard id={s.pile[s.pile.length - 1]} size="lg" /></span>
           <span className="absolute -right-3 -bottom-3 size-8 rounded-full border-4 border-white shadow-lg" style={{ background: HEX[s.color] }}
-            title={`Colour: ${NAME[s.color]}`} />
+            title={t('Colour: {color}', { color: NAME[s.color] ? t(NAME[s.color]) : '' })} />
         </div>
         <div className="absolute top-1 right-2 flex items-center gap-1 rounded-full bg-black/30 px-2 py-0.5 text-[11px] text-white/80">
-          {s.dir === 1 ? <RotateCw className="size-3.5" /> : <RotateCcw className="size-3.5" />} {s.dir === 1 ? 'Clockwise' : 'Anticlockwise'}
+          {s.dir === 1 ? <RotateCw className="size-3.5" /> : <RotateCcw className="size-3.5" />} {s.dir === 1 ? t('Clockwise') : t('Anticlockwise')}
         </div>
         {banner && (
           <div key={banner.key} className="uno-banner pointer-events-none absolute top-1/2 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-2xl px-5 py-2 text-center text-xl font-black text-white shadow-2xl"
@@ -84,21 +85,21 @@ export default function UnoBoard({ g: game, me, act, bubble }: GameBoardProps) {
                 <div className="rounded-xl bg-white p-0.5"><Avatar u={me} name={g.players[meIdx].n} size={34} className="[&>*]:rounded-lg" /></div>
               </TurnRing>
               <div className="text-xs leading-tight text-white">
-                <div className="font-semibold">{myTurn ? (s.drawn !== null ? 'Play it or keep it' : 'Your turn') : g.status === 'play' ? `${nameOf(g, g.turn)}’s turn` : ''}</div>
-                <div className="text-white/70">{s.hand.length} card{s.hand.length === 1 ? '' : 's'}</div>
+                <div className="font-semibold">{myTurn ? (s.drawn !== null ? t('Play it or keep it') : t('Your turn')) : g.status === 'play' ? t('{name}’s turn', { name: nameOf(g, g.turn) }) : ''}</div>
+                <div className="text-white/70">{tn(s.hand.length, '{n} card', '{n} cards')}</div>
                 {g.players[meIdx].state === 'playing' && <Chances missed={g.players[meIdx].missed || 0} />}
               </div>
             </div>
             <div className="flex items-center gap-2">
               {myTurn && s.drawn !== null && (
                 <button type="button" onClick={() => act({ a: 'keep' })} className="flex items-center gap-1 rounded-full bg-white/15 px-3 py-2 text-sm font-semibold text-white hover:bg-white/25">
-                  <Hand className="size-4" /> Keep
+                  <Hand className="size-4" /> {t('Keep')}
                 </button>
               )}
               {canCallUno && (
-                <button type="button" onClick={() => { act({ a: 'uno' }); playSound('uno'); }} aria-label="Call UNO"
+                <button type="button" onClick={() => { act({ a: 'uno' }); playSound('uno'); }} aria-label={t('Call UNO')}
                   className="uno-pulse grid size-14 place-items-center rounded-full border-4 border-yellow-300 bg-red-600 text-sm font-black text-yellow-300 italic shadow-xl">
-                  UNO!
+                  UNO!{/* i18n-ok */}
                 </button>
               )}
             </div>
@@ -108,16 +109,16 @@ export default function UnoBoard({ g: game, me, act, bubble }: GameBoardProps) {
       )}
 
       {wild !== null && (
-        <div className="absolute inset-0 z-30 grid place-items-center bg-black/60" role="dialog" aria-label="Choose a colour">
+        <div className="absolute inset-0 z-30 grid place-items-center bg-black/60" role="dialog" aria-label={t('Choose a colour')}>
           <div className="rounded-3xl bg-white p-5 text-center shadow-2xl">
-            <p className="mb-3 font-semibold text-slate-900">Choose a colour</p>
+            <p className="mb-3 font-semibold text-slate-900">{t('Choose a colour')}</p>
             <div className="grid grid-cols-2 gap-3">
               {COLORS.map((c) => (
-                <button key={c} type="button" aria-label={NAME[c]} onClick={() => { act({ a: 'play', id: wild, color: c }); setWild(null); }}
+                <button key={c} type="button" aria-label={t(NAME[c])} onClick={() => { act({ a: 'play', id: wild, color: c }); setWild(null); }}
                   className="size-20 rounded-2xl shadow-lg ring-white transition hover:scale-105 focus:ring-4" style={{ background: HEX[c] }} />
               ))}
             </div>
-            <button type="button" onClick={() => setWild(null)} className="mt-3 text-sm text-slate-500 underline">Cancel</button>
+            <button type="button" onClick={() => setWild(null)} className="mt-3 text-sm text-slate-500 underline">{t('Cancel')}</button>
           </div>
         </div>
       )}
@@ -134,19 +135,19 @@ function useBanner(g: Game<UnoView>, me: number) {
     if (g.v <= lastV.current) return;
     lastV.current = g.v;
     const items: { text: string; color: string; sound: Parameters<typeof playSound>[0] }[] = [];
-    const who = (j?: number) => (j === me ? 'You' : nameOf(g, j ?? -1));
+    const who = (j?: number) => nameOf(g, j ?? -1);
     for (const e of g.ev as GameEvent[]) {
       if (e.k === 'play') {
         const k = card(e.id);
         playSound('card');
-        if (k.c === 'w') items.push({ text: `${NAME[e.color]}!`, color: HEX[e.color], sound: 'skip' });
+        if (k.c === 'w') items.push({ text: t('{color}!', { color: t(NAME[e.color]) }), color: HEX[e.color], sound: 'skip' });
       } else if (e.k === 'draw') {
         playSound('draw');
         const n = e.ids?.length ?? e.n;
-        if (e.why === 'd2' || e.why === 'w4') items.push({ text: `+${n} for ${who(e.s)}`, color: '#7c2d12', sound: 'plus' });
-        if (e.why === 'caught') items.push({ text: `${who(e.s)} forgot UNO! +2`, color: '#7c2d12', sound: 'plus' });
-      } else if (e.k === 'skip') items.push({ text: `${who(e.s)} ${e.s === me ? 'are' : 'is'} skipped`, color: '#334155', sound: 'skip' });
-      else if (e.k === 'reverse') items.push({ text: 'Reverse!', color: '#334155', sound: 'skip' });
+        if (e.why === 'd2' || e.why === 'w4') items.push({ text: e.s === me ? t('+{n} for You', { n }) : t('+{n} for {who}', { n, who: who(e.s) }), color: '#7c2d12', sound: 'plus' });
+        if (e.why === 'caught') items.push({ text: e.s === me ? t('You forgot UNO! +2') : t('{who} forgot UNO! +2', { who: who(e.s) }), color: '#7c2d12', sound: 'plus' });
+      } else if (e.k === 'skip') items.push({ text: e.s === me ? t('You are skipped') : t('{who} is skipped', { who: who(e.s) }), color: '#334155', sound: 'skip' });
+      else if (e.k === 'reverse') items.push({ text: t('Reverse!'), color: '#334155', sound: 'skip' });
       else if (e.k === 'uno' && e.s !== me) items.push({ text: `${who(e.s)}: UNO!`, color: '#dc2626', sound: 'uno' });
       else if (e.k === 'turn' && e.s === me) { playSound('turn'); navigator.vibrate?.(30); }
       else if (e.k === 'start') playSound('shuffle');

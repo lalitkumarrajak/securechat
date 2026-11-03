@@ -3,8 +3,15 @@ import { Button } from '@sanga/ui/button';
 import { useApp } from '../../../state/app';
 import { createGame, dismiss, type Game } from '../store';
 import { Confetti } from './Confetti';
+import { t } from '@sanga/i18n';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
+
+// 'You came 2nd': the English suffix picks the key, as before (1st is a win; 11th–13th are 'th').
+const cameIn = (n: number) => {
+  const sfx = ['th', 'st', 'nd', 'rd'][n] || 'th';
+  return sfx === 'st' ? t('You came {n}st', { n }) : sfx === 'nd' ? t('You came {n}nd', { n }) : sfx === 'rd' ? t('You came {n}rd', { n }) : t('You came {n}th', { n });
+};
 
 export function Results({ g, me }: { g: Game; me: string }) {
   const friends = useApp((s) => s.friends);
@@ -18,27 +25,27 @@ export function Results({ g, me }: { g: Game; me: string }) {
       {mine?.rank === 1 && !cancelled && !draw && <Confetti />}
       <div className="relative w-full max-w-sm rounded-3xl bg-white p-6 text-center text-slate-900 shadow-2xl">
         {cancelled ? (
-          <><div className="text-5xl">🕓</div><h2 className="mt-2 text-xl font-bold">Game called off</h2>
-            <p className="mt-1 text-sm text-slate-500">Not enough players joined.</p></>
+          <><div className="text-5xl">🕓</div><h2 className="mt-2 text-xl font-bold">{t('Game called off')}</h2>
+            <p className="mt-1 text-sm text-slate-500">{t('Not enough players joined.')}</p></>
         ) : (
           <>
             <div className="text-5xl">{draw ? '🤝' : mine?.rank === 1 ? '🏆' : '🎲'}</div>
-            <h2 className="mt-2 text-xl font-bold">{draw ? 'It’s a draw!' : mine?.rank === 1 ? 'You won!' : mine?.rank ? `You came ${mine.rank}${['th', 'st', 'nd', 'rd'][mine.rank] || 'th'}` : 'Game over'}</h2>
+            <h2 className="mt-2 text-xl font-bold">{draw ? t('It’s a draw!') : mine?.rank === 1 ? t('You won!') : mine?.rank ? cameIn(mine.rank) : t('Game over')}</h2>
             <ol className="mt-4 space-y-2 text-left">
               {ranked.map((p) => (
                 <li key={p.u} className="flex items-center gap-3 rounded-xl bg-slate-100 px-3 py-2">
                   <span className="w-7 text-center text-xl">{p.rank ? MEDALS[p.rank - 1] || p.rank : '–'}</span>
                   <Avatar u={p.u} name={p.n} size={32} />
-                  <span className="min-w-0 flex-1 truncate font-medium">{p.u === me ? 'You' : p.n || p.u}</span>
-                  <span className="text-xs text-slate-500">{p.state === 'left' ? 'left' : p.state === 'out' ? 'removed' : ''}</span>
+                  <span className="min-w-0 flex-1 truncate font-medium">{p.u === me ? t('You') : p.n || p.u}</span>
+                  <span className="text-xs text-slate-500">{p.state === 'left' ? t('left') : p.state === 'out' ? t('removed') : ''}</span>
                 </li>
               ))}
             </ol>
           </>
         )}
         <div className="mt-5 flex gap-3">
-          <Button variant="secondary" className="flex-1" onClick={() => dismiss(g.id)}>Close</Button>
-          {again.length > 0 && <Button className="flex-1" onClick={() => { dismiss(g.id); createGame(g.type, again); }}>Play again</Button>}
+          <Button variant="secondary" className="flex-1" onClick={() => dismiss(g.id)}>{t('Close')}</Button>
+          {again.length > 0 && <Button className="flex-1" onClick={() => { dismiss(g.id); createGame(g.type, again); }}>{t('Play again')}</Button>}
         </div>
       </div>
     </div>

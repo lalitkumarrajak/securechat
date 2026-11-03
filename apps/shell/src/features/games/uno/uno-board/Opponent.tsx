@@ -1,5 +1,6 @@
 import { Avatar } from '../../../../components/Avatar';
 import { cn } from '@sanga/ui/utils';
+import { t } from '@sanga/i18n';
 import type { Game } from '../../store';
 import { TurnRing } from '../../TurnRing';
 import { Chances } from '../../Chances';
@@ -25,12 +26,12 @@ export function Opponent({ g, j, me, bubble, onCatch }: { g: Game<UnoView>; j: n
             <CardBack size="xs" />
           </span>
         ))}
-        <span className="absolute -right-1 -bottom-1 grid min-w-5 place-items-center rounded-full bg-white px-1 text-[11px] font-bold text-slate-900 shadow" aria-label={`${count} cards`}>{count}</span>
+        <span className="absolute -right-1 -bottom-1 grid min-w-5 place-items-center rounded-full bg-white px-1 text-[11px] font-bold text-slate-900 shadow" aria-label={t('{n} cards', { n: count })}>{count}</span>
       </div>
-      {pl.rank ? <span className="text-[10px] font-semibold text-amber-300">{pl.rank === 1 ? 'Winner!' : `#${pl.rank}`}</span>
+      {pl.rank ? <span className="text-[10px] font-semibold text-amber-300">{pl.rank === 1 ? t('Winner!') : `#${pl.rank}`}</span>
         : s.uno === j && j !== me ? (
-          <button type="button" onClick={onCatch} className="uno-pulse rounded-full bg-yellow-300 px-2 py-0.5 text-[11px] font-black text-red-700 shadow" aria-label={`Catch ${pl.n}: they didn't say UNO`}>Catch!</button>
-        ) : count === 1 ? <span className="rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-black text-yellow-300 italic">UNO</span>
+          <button type="button" onClick={onCatch} className="uno-pulse rounded-full bg-yellow-300 px-2 py-0.5 text-[11px] font-black text-red-700 shadow" aria-label={t("Catch {name}: they didn't say UNO", { name: pl.n })}>{t('Catch!')}</button>
+        ) : count === 1 ? <span className="rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-black text-yellow-300 italic">UNO{/* i18n-ok */}</span>
         : pl.state === 'playing' && !pl.bot ? <Chances missed={pl.missed || 0} /> : null}
       {bubble && (
         <div className="ludo-bubble absolute top-full z-20 mt-1 max-w-[150px] rounded-2xl bg-white px-3 py-1.5 text-sm font-medium text-slate-900 shadow-lg">{bubble}</div>

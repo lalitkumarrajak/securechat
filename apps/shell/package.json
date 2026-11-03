@@ -13,6 +13,7 @@
   "dependencies": {
     "@sanga/crypto": "*",
     "@sanga/game-rules": "*",
-    "@sanga/ui": "*"
+    "@sanga/ui": "*",
+    "@sanga/i18n": "*"
   }
 }

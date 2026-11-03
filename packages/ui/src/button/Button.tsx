@@ -44,4 +44,4 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     </button>
   ),
 );
-Button.displayName = 'Button';
+Button.displayName = 'Button'; // i18n-ok

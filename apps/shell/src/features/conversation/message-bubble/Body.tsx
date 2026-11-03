@@ -12,15 +12,16 @@ import { openGallery } from '../chatUi';
 import { Linkify } from './Linkify';
 import { Marked } from './Marked';
 import { CallCard } from './CallCard';
+import { t } from '@sanga/i18n';
 
 export function Body({ m, emoji, me, members }: { m: Msg; emoji: string[] | null; me: string; members?: string[] }) {
   if (m.type === 'deleted') {
-    return <span className="flex items-center gap-1.5 pr-14 text-muted italic"><Ban className="size-4" /> {m.out ? 'You deleted this message' : 'This message was deleted'}</span>;
+    return <span className="flex items-center gap-1.5 pr-14 text-muted italic"><Ban className="size-4" /> {m.out ? t('You deleted this message') : t('This message was deleted')}</span>;
   }
   if (m.type === 'err') {
     return (
       <span className="flex items-center gap-1.5 pr-14 text-muted italic"><Lock className="size-4" />
-        {m.pending ? 'Waiting for this message. It appears once the sender’s phone is online.' : 'This message couldn’t be decrypted'}
+        {m.pending ? t('Waiting for this message. It appears once the sender’s phone is online.') : t('This message couldn’t be decrypted')}
       </span>
     );
   }
@@ -28,8 +29,8 @@ export function Body({ m, emoji, me, members }: { m: Msg; emoji: string[] | null
   if (m.type === 'img') {
     return (
       <>
-        <button className="block" onClick={(e) => { e.stopPropagation(); openGallery(m); }} aria-label="View photo">
-          <img src={m.src} alt="Photo" loading="lazy" width={m.w || undefined} height={m.h || undefined}
+        <button className="block" onClick={(e) => { e.stopPropagation(); openGallery(m); }} aria-label={t('View photo')}>
+          <img src={m.src} alt={t('Photo')} loading="lazy" width={m.w || undefined} height={m.h || undefined}
             className="block h-auto max-h-80 w-auto max-w-[min(300px,70vw)] rounded-xl object-cover" />
         </button>
         {m.text && <p className="px-1.5 pt-1 whitespace-pre-wrap [overflow-wrap:anywhere]"><Marked text={m.text} /></p>}
@@ -39,14 +40,14 @@ export function Body({ m, emoji, me, members }: { m: Msg; emoji: string[] | null
   if (m.type === 'sticker') {
     // Built-in stickers animate once (tap to replay); KLIPY stickers are animated images.
     if (m.src!.startsWith('noto:')) return <Emoji e={m.src!.slice(5)} size={128} />;
-    return <img src={m.src} alt="Sticker" loading="lazy" referrerPolicy="no-referrer" className="block size-36 object-contain" />;
+    return <img src={m.src} alt={t('Sticker')} loading="lazy" referrerPolicy="no-referrer" className="block size-36 object-contain" />;
   }
   if (m.type === 'gif') {
     return (
       <span className="relative block">
         <img src={m.src} alt="GIF" loading="lazy" referrerPolicy="no-referrer" width={m.w || undefined} height={m.h || undefined}
           className="block h-auto max-h-72 w-auto max-w-[min(260px,65vw)] rounded-xl bg-panel-2 object-cover" />
-        <span className="absolute top-1.5 left-1.5 rounded bg-black/50 px-1 text-[10px] font-bold text-white">GIF</span>
+        <span className="absolute top-1.5 left-1.5 rounded bg-black/50 px-1 text-[10px] font-bold text-white">GIF</span>{/* i18n-ok */}
       </span>
     );
   }

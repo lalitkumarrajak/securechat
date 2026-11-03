@@ -9,6 +9,7 @@ import { deleteComment, storyActivity, useStories, type StoryActivity, type Stor
 import { displayName } from '../../../lib/types';
 import { useApp } from '../../../state/app';
 import { CommentText } from './CommentText';
+import { t } from '@sanga/i18n';
 
 /** Your story: who viewed it (a heart if they liked it) and the comments. */
 export function ActivitySheet({ s, onClose }: { s: StoryMeta; onClose: () => void }) {
@@ -23,12 +24,12 @@ export function ActivitySheet({ s, onClose }: { s: StoryMeta; onClose: () => voi
     catch (e) { toast.error((e as Error).message); }
   };
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()} title="Story activity">
+    <Dialog open onOpenChange={(o) => !o && onClose()} title={t('Story activity')}>
       {!a ? <div className="grid place-items-center py-8">{err ? <p className="text-sm text-muted">{err}</p> : <Spinner />}</div> : (
         <div className="space-y-5">
           <section>
-            <h3 className="mb-1 text-sm font-semibold text-muted">Viewed by {a.views?.length ?? 0}</h3>
-            {!a.views?.length ? <p className="py-2 text-sm text-muted">No one has seen it yet.</p> : (
+            <h3 className="mb-1 text-sm font-semibold text-muted">{t('Viewed by {n}', { n: a.views?.length ?? 0 })}</h3>
+            {!a.views?.length ? <p className="py-2 text-sm text-muted">{t('No one has seen it yet.')}</p> : (
               <ul>
                 {a.views.map((v) => (
                   <li key={v.u} className="flex items-center gap-3 py-1.5">
@@ -37,15 +38,15 @@ export function ActivitySheet({ s, onClose }: { s: StoryMeta; onClose: () => voi
                       <span className="block truncate text-sm font-medium">{nameOf(v.u)}</span>
                       <span className="block text-xs text-muted">{fmtAgo(v.ts)}</span>
                     </span>
-                    {v.liked && <Heart className="size-5 fill-rose-500 text-rose-500" aria-label="Liked" />}
+                    {v.liked && <Heart className="size-5 fill-rose-500 text-rose-500" aria-label={t('Liked')} />}
                   </li>
                 ))}
               </ul>
             )}
           </section>
           <section>
-            <h3 className="mb-1 text-sm font-semibold text-muted">Comments {a.comments.length ? `(${a.comments.length})` : ''}</h3>
-            {!a.comments.length ? <p className="py-2 text-sm text-muted">No comments yet. Only you see the comments on your story.</p> : (
+            <h3 className="mb-1 text-sm font-semibold text-muted">{a.comments.length ? t('Comments ({n})', { n: a.comments.length }) : t('Comments')}</h3>
+            {!a.comments.length ? <p className="py-2 text-sm text-muted">{t('No comments yet. Only you see the comments on your story.')}</p> : (
               <ul>
                 {a.comments.map((c) => (
                   <li key={c.id} className="flex items-start gap-3 py-1.5">
@@ -54,7 +55,7 @@ export function ActivitySheet({ s, onClose }: { s: StoryMeta; onClose: () => voi
                       <span className="block text-sm"><b className="font-semibold">{nameOf(c.u)}</b> <span className="text-xs text-muted">{fmtAgo(c.ts)}</span></span>
                       <CommentText text={c.text} />
                     </span>
-                    <button onClick={() => remove(c.id)} aria-label="Delete comment" className="rounded-full p-1.5 text-muted hover:bg-hover hover:text-danger">
+                    <button onClick={() => remove(c.id)} aria-label={t('Delete comment')} className="rounded-full p-1.5 text-muted hover:bg-hover hover:text-danger">
                       <Trash2 className="size-4" />
                     </button>
                   </li>

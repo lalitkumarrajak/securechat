@@ -4,6 +4,7 @@ import { IconButton } from '@sanga/ui/button';
 import { findMessage, preview, togglePin } from '../../../lib/engine';
 import { type Msg } from '../../../lib/types';
 import { setApp, useApp } from '../../../state/app';
+import { t } from '@sanga/i18n';
 
 export function PinnedBar({ peer }: { peer: string }) {
   const pins = useApp((s) => s.chats.find((c) => c.peer === peer)?.pins);
@@ -23,10 +24,10 @@ export function PinnedBar({ peer }: { peer: string }) {
         {list.map((_, j) => <span key={j} className={`w-0.5 flex-1 rounded-full ${j === i % list.length ? 'bg-accent' : 'bg-line'}`} />)}
       </div>
       <button className="priv-scope min-w-0 flex-1 text-left" onClick={() => { setApp({ highlight: cur.k }); setI((n) => n + 1); }}>
-        <span className="flex items-center gap-1 text-xs font-semibold text-accent-ink"><Pin className="size-3" /> Pinned message{list.length > 1 ? ` ${(i % list.length) + 1} of ${list.length}` : ''}</span>
+        <span className="flex items-center gap-1 text-xs font-semibold text-accent-ink"><Pin className="size-3" /> {list.length > 1 ? t('Pinned message {n} of {total}', { n: (i % list.length) + 1, total: list.length }) : t('Pinned message')}</span>
         <span className="priv block truncate text-sm text-muted">{preview(cur)}</span>
       </button>
-      <IconButton label="Unpin" size="icon-sm" onClick={() => togglePin(cur)}><X /></IconButton>
+      <IconButton label={t('Unpin')} size="icon-sm" onClick={() => togglePin(cur)}><X /></IconButton>
     </div>
   );
 }

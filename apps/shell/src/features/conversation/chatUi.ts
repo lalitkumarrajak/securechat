@@ -7,6 +7,7 @@ import { savePhotos } from '../../lib/files';
 import { copyMessages, deleteForEveryone, deleteForMe, me, react, retry, togglePin } from '../../lib/engine';
 import type { Msg } from '../../lib/types';
 import { getApp, setApp } from '../../state/app';
+import { t, tn } from '@sanga/i18n';
 
 interface ChatUi {
   forward: Msg[] | null;   // forward dialog
@@ -51,11 +52,11 @@ export async function deleteFlow(msgs: Msg[]) {
   const n = msgs.length;
   const someMine = msgs.some((m) => m.out && m.type !== 'deleted');
   const v = await choose({
-    title: n > 1 ? `Delete ${n} messages?` : 'Delete message?',
-    description: everyone ? undefined : someMine ? 'Messages can be deleted for everyone only within 5 minutes of sending.' : undefined,
+    title: tn(n, 'Delete message?', 'Delete {n} messages?'),
+    description: everyone ? undefined : someMine ? t('Messages can be deleted for everyone only within 5 minutes of sending.') : undefined,
     actions: [
-      ...(everyone ? [{ label: 'Delete for everyone', value: 'all', variant: 'danger' as const }] : []),
-      { label: 'Delete for me', value: 'me', variant: everyone ? 'secondary' as const : 'danger' as const },
+      ...(everyone ? [{ label: t('Delete for everyone'), value: 'all', variant: 'danger' as const }] : []),
+      { label: t('Delete for me'), value: 'me', variant: everyone ? 'secondary' as const : 'danger' as const },
     ],
   });
   if (v === 'all') {
@@ -74,19 +75,19 @@ export function actionsFor(m: Msg, album?: Msg[] | null): Action[] {
   const live = m.type !== 'deleted' && m.type !== 'err' && m.type !== 'call'; // a call's entry can only be deleted
   const pinned = !!getApp().chats.find((c) => c.peer === m.peer)?.pins?.some((p) => p.k === m.k);
   const list: Action[] = [];
-  if (m.s === -2) list.push({ key: 'retry', label: 'Send again', run: () => retry(m) });
-  if (live && m.s !== -2) list.push({ key: 'reply', label: 'Reply', run: () => startReply(m) });
-  if (live && m.text && !album) list.push({ key: 'copy', label: 'Copy', run: () => copyMessages([m]).then(() => toast.success('Copied')) });
+  if (m.s === -2) list.push({ key: 'retry', label: t('Send again'), run: () => retry(m) });
+  if (live && m.s !== -2) list.push({ key: 'reply', label: t('Reply'), run: () => startReply(m) });
+  if (live && m.text && !album) list.push({ key: 'copy', label: t('Copy'), run: () => copyMessages([m]).then(() => toast.success(t('Copied'))) });
   const photos = all.filter((x) => x.type === 'img' && x.src);
-  if (live && photos.length) list.push({ key: 'save', label: photos.length > 1 ? `Save ${photos.length} photos` : 'Save photo', run: () => void savePhotos(photos.map((x) => ({ src: x.src!, ts: x.ts }))) });
-  if (live && m.s !== -2) list.push({ key: 'forward', label: 'Forward', run: () => setChatUi({ forward: all }) });
-  if (live && m.id != null) list.push({ key: 'pin', label: pinned ? 'Unpin' : 'Pin', run: () => togglePin(m) });
-  if (canEdit(m)) list.push({ key: 'edit', label: 'Edit', run: () => startEdit(m) });
+  if (live && photos.length) list.push({ key: 'save', label: photos.length > 1 ? t('Save {n} photos', { n: photos.length }) : t('Save photo'), run: () => void savePhotos(photos.map((x) => ({ src: x.src!, ts: x.ts }))) });
+  if (live && m.s !== -2) list.push({ key: 'forward', label: t('Forward'), run: () => setChatUi({ forward: all }) });
+  if (live && m.id != null) list.push({ key: 'pin', label: pinned ? t('Unpin') : t('Pin'), run: () => togglePin(m) });
+  if (canEdit(m)) list.push({ key: 'edit', label: t('Edit'), run: () => startEdit(m) });
   // Shown but greyed out once the time limit has passed, so it's clear why you can't edit.
-  else if (isEditable(m)) list.push({ key: 'edit', label: 'Edit', disabled: true, hint: 'Only within 15 minutes of sending', run: () => {} });
-  list.push({ key: 'select', label: 'Select', run: () => setApp({ selection: all.map((x) => x.k) }) });
-  if (m.out && live) list.push({ key: 'info', label: 'Info', run: () => setChatUi({ info: m }) });
-  list.push({ key: 'delete', label: 'Delete', danger: true, run: () => deleteFlow(all) });
+  else if (isEditable(m)) list.push({ key: 'edit', label: t('Edit'), disabled: true, hint: t('Only within 15 minutes of sending'), run: () => {} });
+  list.push({ key: 'select', label: t('Select'), run: () => setApp({ selection: all.map((x) => x.k) }) });
+  if (m.out && live) list.push({ key: 'info', label: t('Info'), run: () => setChatUi({ info: m }) });
+  list.push({ key: 'delete', label: t('Delete'), danger: true, run: () => deleteFlow(all) });
   return list;
 }
 

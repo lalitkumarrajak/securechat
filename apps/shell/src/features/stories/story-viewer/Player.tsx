@@ -16,10 +16,11 @@ import { showProfile } from '../../friends/ProfileCard';
 import { ReplyBar } from './ReplyBar';
 import { ActivitySheet } from './ActivitySheet';
 import { SongChip } from './SongChip';
+import { t } from '@sanga/i18n';
 
 const PHOTO_MS = 6000;
 
-const textMs = (t: string) => Math.min(12000, 4000 + t.length * 40);
+const textMs = (txt: string) => Math.min(12000, 4000 + txt.length * 40);
 
 export function Player() {
   const v = useStories((s) => s.viewer)!;
@@ -32,7 +33,7 @@ export function Player() {
   const s: StoryMeta | undefined = stories[si];
   const content = useStories((st) => (s ? st.content[s.id] : undefined));
   const mine = owner === me;
-  const name = mine ? 'Your story' : displayName(friends[owner], owner);
+  const name = mine ? t('Your story') : displayName(friends[owner], owner);
 
   const [held, setHeld] = useState(false);
   const [stopped, setStopped] = useState(false); // the pause button
@@ -85,9 +86,9 @@ export function Player() {
     if (paused) return;
     let last = performance.now();
     let raf = 0;
-    const tick = (t: number) => {
-      elapsed.current += t - last;
-      last = t;
+    const tick = (now: number) => {
+      elapsed.current += now - last;
+      last = now;
       if (bar.current) bar.current.style.transform = `scaleX(${Math.min(1, elapsed.current / duration)})`;
       if (elapsed.current >= duration) { go(1); return; }
       raf = requestAnimationFrame(tick);
@@ -141,35 +142,35 @@ export function Player() {
           ))}
         </div>
         <div className="mt-2 flex items-center gap-2.5">
-          <button onClick={() => !mine && showProfile(owner)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left" aria-label={`${name}’s profile`}>
+          <button onClick={() => !mine && showProfile(owner)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left" aria-label={t('{name}’s profile', { name })}>
             <Avatar u={owner} name={name} size={36} />
             <span className="min-w-0">
               <span className="block truncate text-sm font-semibold">{name}</span>
               <span className="block truncate text-xs text-white/75">
-                {fmtAgo(s.ts)}{c?.via ? ` · from ${c.via === me ? 'your story' : displayName(friends[c.via], c.via) + '’s story'}` : ''}
+                {!c?.via ? fmtAgo(s.ts) : c.via === me ? t('{ago} · from your story', { ago: fmtAgo(s.ts) }) : t('{ago} · from {name}’s story', { ago: fmtAgo(s.ts), name: displayName(friends[c.via], c.via) })}
               </span>
             </span>
           </button>
-          {held && <span className="text-xs text-white/75">Paused</span>}
-          <button onClick={() => setStopped(!stopped)} aria-label={stopped ? 'Play' : 'Pause'} className="grid size-10 place-items-center rounded-full hover:bg-white/10">
+          {held && <span className="text-xs text-white/75">{t('Paused')}</span>}
+          <button onClick={() => setStopped(!stopped)} aria-label={stopped ? t('Play') : t('Pause')} className="grid size-10 place-items-center rounded-full hover:bg-white/10">
             {stopped ? <Play className="size-5" /> : <Pause className="size-5" />}
           </button>
           {mine && (
             <Menu onOpenChange={setMenu}>
               <MenuTrigger asChild>
-                <button aria-label="Story options" className="grid size-10 place-items-center rounded-full hover:bg-white/10"><MoreVertical className="size-5" /></button>
+                <button aria-label={t('Story options')} className="grid size-10 place-items-center rounded-full hover:bg-white/10"><MoreVertical className="size-5" /></button>
               </MenuTrigger>
               <MenuContent>
                 <MenuItem icon={<Trash2 />} danger onSelect={async () => {
                   setMenu(true);
-                  const ok = await confirm({ title: 'Delete this story?', description: 'It’s removed for everyone who could see it, with its likes and comments.', confirmText: 'Delete', destructive: true });
+                  const ok = await confirm({ title: t('Delete this story?'), description: t('It’s removed for everyone who could see it, with its likes and comments.'), confirmText: t('Delete'), destructive: true });
                   setMenu(false);
-                  if (ok) deleteStory(s.id).then(() => toast('Story deleted')).catch((e) => toast.error(e.message));
-                }}>Delete story</MenuItem>
+                  if (ok) deleteStory(s.id).then(() => toast(t('Story deleted'))).catch((e) => toast.error(e.message));
+                }}>{t('Delete story')}</MenuItem>
               </MenuContent>
             </Menu>
           )}
-          <D.Close aria-label="Close stories" className="grid size-10 place-items-center rounded-full hover:bg-white/10"><X className="size-6" /></D.Close>
+          <D.Close aria-label={t('Close stories')} className="grid size-10 place-items-center rounded-full hover:bg-white/10"><X className="size-6" /></D.Close>
         </div>
       </div>
 
@@ -178,12 +179,12 @@ export function Player() {
         onContextMenu={(e) => e.preventDefault()} data-testid="story">
         {c?.song && <SongChip key={s.id} song={c.song} paused={paused} />}
         {!content ? (
-          <div className="grid h-full place-items-center">{failed ? <p className="text-sm text-white/75">No connection. Tap to try the next one.</p> : <Spinner />}</div>
+          <div className="grid h-full place-items-center">{failed ? <p className="text-sm text-white/75">{t('No connection. Tap to try the next one.')}</p> : <Spinner />}</div>
         ) : content === 'err' ? (
-          <div className="grid h-full place-items-center px-8 text-center text-sm text-white/75">This story can’t be opened on this device.</div>
+          <div className="grid h-full place-items-center px-8 text-center text-sm text-white/75">{t('This story can’t be opened on this device.')}</div>
         ) : content.type === 'img' ? (
           <div className="grid h-full place-items-center">
-            <img src={content.src} alt={content.text || `${name}’s photo`} className="absolute inset-0 size-full object-contain" draggable={false} />
+            <img src={content.src} alt={content.text || t('{name}’s photo', { name })} className="absolute inset-0 size-full object-contain" draggable={false} />
             {content.text && (
               <p className="absolute inset-x-0 bottom-4 mx-auto w-fit max-w-[90%] rounded-xl bg-black/55 px-3 py-2 text-center text-[15px] whitespace-pre-wrap">{content.text}</p>
             )}
@@ -200,16 +201,16 @@ export function Player() {
       {/* tags */}
       {c?.tags?.length ? (
         <div className="flex flex-wrap items-center gap-1.5 px-3 pt-2 text-sm">
-          <span className="text-white/75">with</span>
-          {c.tags.map((t) => (
-            <button key={t} onClick={() => t !== me && showProfile(t)} className="rounded-full bg-white/15 px-2.5 py-0.5 font-medium">
-              {t === me ? 'you' : displayName(friends[t], t)}
+          <span className="text-white/75">{t('with')}</span>
+          {c.tags.map((tg) => (
+            <button key={tg} onClick={() => tg !== me && showProfile(tg)} className="rounded-full bg-white/15 px-2.5 py-0.5 font-medium">
+              {tg === me ? t('you') : displayName(friends[tg], tg)}
             </button>
           ))}
           {tagged && (
             <button onClick={() => { closeStories(); openComposer({ ...c, tags: [], via: owner }); }}
               className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 font-semibold text-black">
-              <ImagePlus className="size-4" /> Add to your story
+              <ImagePlus className="size-4" /> {t('Add to your story')}
             </button>
           )}
         </div>
@@ -217,10 +218,10 @@ export function Player() {
 
       <footer className="px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {mine ? (
-          <button onClick={() => setSheet(true)} className="flex items-center gap-4 rounded-full px-3 py-2 text-sm hover:bg-white/10" aria-label="Viewers, likes and comments">
+          <button onClick={() => setSheet(true)} className="flex items-center gap-4 rounded-full px-3 py-2 text-sm hover:bg-white/10" aria-label={t('Viewers, likes and comments')}>
             <span className="inline-flex items-center gap-1.5"><Eye className="size-5" />{s.views ?? 0}</span>
             <span className="inline-flex items-center gap-1.5"><Heart className="size-5" />{s.likes ?? 0}</span>
-            <span className="text-white/75">Activity</span>
+            <span className="text-white/75">{t('Activity')}</span>
           </button>
         ) : (
           <ReplyBar s={s} name={name} onTyping={setTyping} />

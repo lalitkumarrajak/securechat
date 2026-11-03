@@ -7,6 +7,7 @@ import { ChatListSkeleton } from '../../../components/skeleton/ChatListSkeleton'
 import { setApp, useApp } from '../../../state/app';
 import { Row } from './Row';
 import { SearchBox } from './SearchBox';
+import { t } from '@sanga/i18n';
 
 export function FriendsList() {
   const friends = useApp((s) => s.friends);
@@ -20,19 +21,19 @@ export function FriendsList() {
   if (!Object.keys(friends).length) {
     return (
       <div className="px-8 py-12 text-center">
-        <p className="font-medium">No friends yet</p>
-        <p className="mt-1 text-sm text-muted">Send a request to someone by their username.</p>
-        <Button className="mt-4" onClick={() => setApp({ friendsTab: 'add' })}><UserPlus className="size-4" /> Add a friend</Button>
+        <p className="font-medium">{t('No friends yet')}</p>
+        <p className="mt-1 text-sm text-muted">{t('Send a request to someone by their username.')}</p>
+        <Button className="mt-4" onClick={() => setApp({ friendsTab: 'add' })}><UserPlus className="size-4" /> {t('Add a friend')}</Button>
       </div>
     );
   }
   return (
     <>
-      <div className="px-4 pt-3"><SearchBox value={q} onChange={setQ} placeholder="Search friends" /></div>
+      <div className="px-4 pt-3"><SearchBox value={q} onChange={setQ} placeholder={t('Search friends')} /></div>
       <ul className="py-2">
         {list.map((f) => (
           <Row key={f.u} p={f} onClick={() => openChat(f.u)}>
-            <IconButton label={`Message ${displayName(f, f.u)}`} onClick={() => openChat(f.u)}><MessageCircle /></IconButton>
+            <IconButton label={t('Message {name}', { name: displayName(f, f.u) })} onClick={() => openChat(f.u)}><MessageCircle /></IconButton>
           </Row>
         ))}
       </ul>

@@ -5,12 +5,19 @@ import { initSettings } from './state/settings';
 import { initPrivacy } from './lib/privacy';
 import { toast } from 'sonner';
 import { App } from './App';
+import { register, t } from '@sanga/i18n';
+import { SHELL_DICTS } from './locale';
+import { UI_DICTS } from '@sanga/ui/locale';
+import { SDK_DICTS } from '@sanga/sdk/locale';
 import { useCall } from './lib/calls';
 import './lib/reminders'; // reminders that come due while Sanga is open
 
 initSettings();
 initPrivacy();
-createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>);
+// In another language, its words come first (English needs none): the first screen is already in it.
+const dicts = { ...SHELL_DICTS, ...UI_DICTS, ...SDK_DICTS };
+void Promise.all(Object.entries(dicts).map(([ns, l]) => register(ns, l)))
+  .finally(() => createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>));
 
 // The app opens from the copy saved on the device (sw.js). After an update, a part of the old copy
 // that was never loaded before (a game, say) may be gone from the server: reload once to get the
@@ -24,7 +31,7 @@ navigator.serviceWorker?.addEventListener('message', (e) => {
   let again = false;
   try { again = Date.now() - Number(sessionStorage.getItem('sanga-updated') || 0) < 60_000; sessionStorage.setItem('sanga-updated', String(Date.now())); } catch { /* no storage */ }
   if (!again && performance.now() < 10_000 && !useCall.getState().call) { location.reload(); return; }
-  toast('A new version of Sanga is ready', { id: 'update', duration: Infinity, action: { label: 'Reload', onClick: () => location.reload() } });
+  toast(t('A new version of Sanga is ready'), { id: 'update', duration: Infinity, action: { label: t('Reload'), onClick: () => location.reload() } });
 });
 if (myBuild) navigator.serviceWorker?.ready.then((r) => r.active?.postMessage({ t: 'build', build: myBuild })).catch(() => {});
 

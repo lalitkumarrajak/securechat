@@ -14,6 +14,10 @@
     "./switch": "./src/switch.tsx",
     "./tabs": "./src/tabs.tsx",
     "./format": "./src/format.ts",
-    "./utils": "./src/utils.ts"
+    "./utils": "./src/utils.ts",
+    "./locale": "./src/locale.ts"
+  },
+  "dependencies": {
+    "@sanga/i18n": "*"
   }
 }

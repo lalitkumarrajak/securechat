@@ -1,3 +1,4 @@
+import { t } from '@sanga/i18n';
 import { useMemo, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@sanga/ui/utils';
@@ -22,15 +23,15 @@ export function Overview() {
   const people = rows.flatMap((r) => r.people.map((p) => ({ ...p, cur: r.cur })));
 
   return (
-    <section aria-label="Your balance" className="mx-3 mb-3 rounded-2xl border border-line bg-panel p-3">
-      {settled ? <p className="px-1 py-1 text-center text-sm text-muted">You’re all settled up 🎉</p> : rows.filter((r) => r.get || r.owe).map((r) => (
+    <section aria-label={t('Your balance')} className="mx-3 mb-3 rounded-2xl border border-line bg-panel p-3">
+      {settled ? <p className="px-1 py-1 text-center text-sm text-muted">{t('You’re all settled up 🎉')}</p> : rows.filter((r) => r.get || r.owe).map((r) => (
         <div key={r.cur} className={cn('grid grid-cols-2 gap-2', shown > 1 && 'mb-2 last:mb-0')}>
           <div className="rounded-xl bg-emerald-500/15 px-3 py-2">
-            <p className="text-xs text-muted">You’ll get{shown > 1 && ` · ${r.cur}`}</p>
+            <p className="text-xs text-muted">{t('You’ll get')}{shown > 1 && ` · ${r.cur}`}</p>
             <p className="truncate text-lg font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{money(r.get, r.cur)}</p>
           </div>
           <div className="rounded-xl bg-danger/12 px-3 py-2">
-            <p className="text-xs text-muted">You owe{shown > 1 && ` · ${r.cur}`}</p>
+            <p className="text-xs text-muted">{t('You owe')}{shown > 1 && ` · ${r.cur}`}</p>
             <p className="truncate text-lg font-bold tabular-nums text-danger">{money(r.owe, r.cur)}</p>
           </div>
         </div>
@@ -38,7 +39,7 @@ export function Overview() {
       {people.length > 0 && (
         <>
           <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="mt-2 flex w-full items-center justify-between rounded-lg px-1 py-1.5 text-sm font-medium text-accent">
-            By person<ChevronDown className={cn('size-4 transition', open && 'rotate-180')} aria-hidden />
+            {t('By person')}<ChevronDown className={cn('size-4 transition', open && 'rotate-180')} aria-hidden />
           </button>
           {open && (
             <ul className="divide-y divide-line">
@@ -47,7 +48,7 @@ export function Overview() {
                   <PersonDot p={{ id: p.key, name: p.name, u: p.u }} name={name({ id: p.key, name: p.name, u: p.u })} size={32} />
                   <span className="min-w-0 flex-1 truncate text-sm font-medium">{name({ id: p.key, name: p.name, u: p.u })}</span>
                   <span className={cn('text-sm font-semibold tabular-nums', p.amount > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-danger')}>
-                    {p.amount > 0 ? 'owes you ' : 'you owe '}{money(Math.abs(p.amount), p.cur)}
+                    {p.amount > 0 ? t('owes you {amount}', { amount: money(Math.abs(p.amount), p.cur) }) : t('you owe {amount}', { amount: money(Math.abs(p.amount), p.cur) })}
                   </span>
                 </li>
               ))}

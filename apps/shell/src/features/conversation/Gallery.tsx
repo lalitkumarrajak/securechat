@@ -10,6 +10,7 @@ import { useSwipe } from '../../lib/swipe';
 import { displayName, groupIdOf, isGroup, type Msg } from '../../lib/types';
 import { useApp } from '../../state/app';
 import { useMemberName } from './useMemberName';
+import { t } from '@sanga/i18n';
 
 export function Gallery({ peer, start }: { peer: string; start: string }) {
   const [keys, setKeys] = useState<string[]>([start]);
@@ -45,19 +46,19 @@ export function Gallery({ peer, start }: { peer: string; start: string }) {
   const group = useApp((s) => (isGroup(peer) ? s.groups[groupIdOf(peer)] : undefined));
   const friend = useApp((s) => s.friends[peer]);
   const memberName = useMemberName();
-  const who = !cur ? '' : cur.out ? 'You' : group ? memberName(senderOf(cur), group) : displayName(friend, peer);
+  const who = !cur ? '' : cur.out ? t('You') : group ? memberName(senderOf(cur), group) : displayName(friend, peer);
 
   return (
     <>
       <header className="flex h-14 shrink-0 items-center gap-2 px-2">
-        <D.Close className="grid size-10 place-items-center rounded-full hover:bg-white/15" aria-label="Close"><X className="size-5" /></D.Close>
+        <D.Close className="grid size-10 place-items-center rounded-full hover:bg-white/15" aria-label={t('Close')}><X className="size-5" /></D.Close>
         <span className="min-w-0 flex-1">
-          <D.Title className="block truncate font-semibold">{who || 'Photo'}</D.Title>
+          <D.Title className="block truncate font-semibold">{who || t('Photo')}</D.Title>
           {cur && <span className="block truncate text-xs text-white/70">{fmtDay(cur.ts)}, {fmtClock(cur.ts)}</span>}
         </span>
-        {keys.length > 1 && <span className="px-2 text-sm text-white/80 tabular-nums" aria-live="polite">{i + 1} of {keys.length}</span>}
+        {keys.length > 1 && <span className="px-2 text-sm text-white/80 tabular-nums" aria-live="polite">{t('{n} of {total}', { n: i + 1, total: keys.length })}</span>}
         {cur?.src && (
-          <button onClick={() => savePhotos([{ src: cur.src!, ts: cur.ts }])} aria-label="Save photo" className="grid size-10 place-items-center rounded-full hover:bg-white/15">
+          <button onClick={() => savePhotos([{ src: cur.src!, ts: cur.ts }])} aria-label={t('Save photo')} className="grid size-10 place-items-center rounded-full hover:bg-white/15">
             <Download className="size-5" />
           </button>
         )}
@@ -70,18 +71,18 @@ export function Gallery({ peer, start }: { peer: string; start: string }) {
           {keys.map((k, n) => (
             <div key={k} className="grid h-full w-full shrink-0 place-items-center p-2" aria-hidden={n !== i}>
               {Math.abs(n - i) <= 2 && (msgs[k]
-                ? <img src={msgs[k].src} alt={n === i ? `Photo ${i + 1} of ${keys.length}` : ''} draggable={false} className="max-h-full max-w-full object-contain" />
+                ? <img src={msgs[k].src} alt={n === i ? t('Photo {n} of {total}', { n: i + 1, total: keys.length }) : ''} draggable={false} className="max-h-full max-w-full object-contain" />
                 : <Spinner className="size-8" />)}
             </div>
           ))}
         </div>
         {prev && (
-          <button onClick={prev} aria-label="Previous photo" className="absolute top-1/2 left-3 hidden size-11 -translate-y-1/2 place-items-center rounded-full bg-white/15 hover:bg-white/25 md:grid">
+          <button onClick={prev} aria-label={t('Previous photo')} className="absolute top-1/2 left-3 hidden size-11 -translate-y-1/2 place-items-center rounded-full bg-white/15 hover:bg-white/25 md:grid">
             <ChevronLeft className="size-6" />
           </button>
         )}
         {next && (
-          <button onClick={next} aria-label="Next photo" className="absolute top-1/2 right-3 hidden size-11 -translate-y-1/2 place-items-center rounded-full bg-white/15 hover:bg-white/25 md:grid">
+          <button onClick={next} aria-label={t('Next photo')} className="absolute top-1/2 right-3 hidden size-11 -translate-y-1/2 place-items-center rounded-full bg-white/15 hover:bg-white/25 md:grid">
             <ChevronRight className="size-6" />
           </button>
         )}

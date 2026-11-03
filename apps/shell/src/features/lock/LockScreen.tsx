@@ -5,6 +5,7 @@ import { confirm } from '@sanga/ui/confirm';
 import { cn } from '@sanga/ui/utils';
 import { failedTries, forgetAndSignOut, MAX_TRIES, unlock, waitLeft } from '../../lib/applock';
 import { useSettings } from '../../state/settings';
+import { t, tn } from '@sanga/i18n';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'forgot', '0', 'del'];
 
@@ -18,8 +19,8 @@ export function LockScreen() {
 
   useEffect(() => { // count down a forced wait
     if (!wait) return;
-    const t = setInterval(() => setWait(waitLeft()), 500);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setWait(waitLeft()), 500);
+    return () => clearInterval(timer);
   }, [wait]);
 
   const submit = useCallback(async (p: string) => {
@@ -30,9 +31,9 @@ export function LockScreen() {
     setPin('');
     setShake((n) => n + 1);
     navigator.vibrate?.([40, 60, 40]);
-    if (r === 'wait' || waitLeft()) { setWait(waitLeft()); setError('Too many wrong PINs'); return; }
+    if (r === 'wait' || waitLeft()) { setWait(waitLeft()); setError(t('Too many wrong PINs')); return; }
     const left = MAX_TRIES - failedTries();
-    setError(left <= 5 ? `Wrong PIN. ${left} ${left === 1 ? 'try' : 'tries'} left before this device is signed out.` : 'Wrong PIN');
+    setError(left <= 5 ? tn(left, 'Wrong PIN. {n} try left before this device is signed out.', 'Wrong PIN. {n} tries left before this device is signed out.') : t('Wrong PIN'));
   }, []);
 
   const press = useCallback((k: string) => {
@@ -49,9 +50,9 @@ export function LockScreen() {
 
   const forgot = async () => {
     const ok = await confirm({
-      title: 'Forgot your PIN?',
-      description: 'Sign out of Sanga on this device. Chats saved here are erased; sign in with your password to get them back.',
-      confirmText: 'Sign out', destructive: true,
+      title: t('Forgot your PIN?'),
+      description: t('Sign out of Sanga on this device. Chats saved here are erased; sign in with your password to get them back.'),
+      confirmText: t('Sign out'), destructive: true,
     });
     if (ok) await forgetAndSignOut();
   };
@@ -69,24 +70,24 @@ export function LockScreen() {
   const secs = Math.ceil(wait / 1000);
   return (
     <div className="fixed inset-0 z-[45] flex flex-col items-center justify-center gap-7 bg-gradient-to-b from-[#0b1240] to-[#040828] px-6 pb-[env(safe-area-inset-bottom)] text-white"
-      role="dialog" aria-label="Sanga is locked">
+      role="dialog" aria-label={t('Sanga is locked')}>
       <img src="/logo.svg" alt="" className="size-16 rounded-2xl shadow-lg" />
       <div className="text-center">
-        <h1 className="text-xl font-semibold">Enter your PIN</h1>
+        <h1 className="text-xl font-semibold">{t('Enter your PIN')}</h1>
         <p className={cn('mt-1 h-10 max-w-xs text-sm', error ? 'text-red-300' : 'text-white/60')} role="alert">
-          {wait ? `Too many wrong PINs. Try again in ${secs} s.` : error || 'Sanga is locked'}
+          {wait ? t('Too many wrong PINs. Try again in {secs} s.', { secs }) : error || t('Sanga is locked')}
         </p>
       </div>
-      <div key={shake} className={cn('flex gap-4', shake && 'animate-shake')} aria-label={`${pin.length} of ${len} digits entered`}>
+      <div key={shake} className={cn('flex gap-4', shake && 'animate-shake')} aria-label={t('{done} of {len} digits entered', { done: pin.length, len })}>
         {Array.from({ length: len }, (_, i) => (
           <span key={i} className={cn('size-3.5 rounded-full border-2 border-white/70 transition', i < pin.length && 'scale-110 bg-white')} />
         ))}
       </div>
       <div className="grid grid-cols-3 gap-x-7 gap-y-4">
         {KEYS.map((k) => k === 'forgot' ? (
-          <button key={k} type="button" onClick={forgot} className="size-[72px] rounded-full text-sm text-white/70 hover:text-white">Forgot PIN?</button>
+          <button key={k} type="button" onClick={forgot} className="size-[72px] rounded-full text-sm text-white/70 hover:text-white">{t('Forgot PIN?')}</button>
         ) : k === 'del' ? (
-          <button key={k} type="button" onClick={() => press('del')} aria-label="Delete digit"
+          <button key={k} type="button" onClick={() => press('del')} aria-label={t('Delete digit')}
             className="grid size-[72px] place-items-center rounded-full text-white/80 hover:bg-white/10 active:bg-white/20"><Delete className="size-6" /></button>
         ) : (
           <button key={k} type="button" onClick={() => press(k)} disabled={!!wait} aria-label={k}

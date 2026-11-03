@@ -5,6 +5,7 @@ import { IconButton } from '@sanga/ui/button';
 import { Dialog } from '@sanga/ui/dialog';
 import { myName } from '../../../lib/engine';
 import { cn } from '@sanga/ui/utils';
+import { t } from '@sanga/i18n';
 import { insertMention, mentionQuery } from '../../../lib/mentions';
 import { MentionText } from '../MentionText';
 import { nameOf, say, useGames, type ChatLine, type Game } from '../store';
@@ -35,16 +36,16 @@ export function ChatSheet({ g, open, onOpenChange }: { g: Game; open: boolean; o
     requestAnimationFrame(() => { box.current?.focus(); box.current?.setSelectionRange(r.cursor, r.cursor); });
   };
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} title="Game chat"
-      description="Seen by everyone in this game. Not end-to-end encrypted; deleted when the game ends.">
+    <Dialog open={open} onOpenChange={onOpenChange} title={t('Game chat')}
+      description={t('Seen by everyone in this game. Not end-to-end encrypted; deleted when the game ends.')}>
       <div className="mb-2 flex gap-1 overflow-x-auto pb-1">
-        {QUICK_EMOJI.map((e) => <button key={e} type="button" onClick={() => send(e)} className="shrink-0 rounded-xl px-1.5 py-1 text-2xl hover:bg-hover" aria-label={'Send ' + e}>{e}</button>)}
+        {QUICK_EMOJI.map((e) => <button key={e} type="button" onClick={() => send(e)} className="shrink-0 rounded-xl px-1.5 py-1 text-2xl hover:bg-hover" aria-label={t('Send {emoji}', { emoji: e })}>{e}</button>)}
       </div>
       <div className="mb-3 flex flex-wrap gap-1.5">
-        {PHRASES.slice(0, 6).map((p) => <button key={p} type="button" onClick={() => send(p)} className="rounded-full border border-line px-3 py-1 text-sm hover:bg-hover">{p}</button>)}
+        {PHRASES.slice(0, 6).map((p) => <button key={p} type="button" onClick={() => send(t(p))} className="rounded-full border border-line px-3 py-1 text-sm hover:bg-hover">{t(p)}</button>)}
       </div>
       <div className="h-[38dvh] space-y-1.5 overflow-y-auto rounded-xl bg-hover/40 p-2" aria-live="polite">
-        {lines.length === 0 && <p className="py-8 text-center text-sm text-muted">No messages yet. Say hi!</p>}
+        {lines.length === 0 && <p className="py-8 text-center text-sm text-muted">{t('No messages yet. Say hi!')}</p>}
         {lines.map((l, k) => (
           <div key={k} className={cn('flex', l.f === me ? 'justify-end' : 'justify-start')}>
             <div className={cn('max-w-[80%] rounded-2xl px-3 py-1.5 text-sm', l.f === me ? 'bg-accent text-accent-ink' : 'bg-panel shadow-bubble')}>
@@ -57,7 +58,7 @@ export function ChatSheet({ g, open, onOpenChange }: { g: Game; open: boolean; o
       </div>
       <form className="relative mt-3 flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); if (matches.length) choose(matches[pick].u); else send(text); }}>
         {matches.length > 0 && (
-          <ul className="absolute bottom-full left-0 z-10 mb-2 w-full overflow-hidden rounded-2xl border border-line bg-panel shadow-xl" role="listbox" aria-label="Mention a player">
+          <ul className="absolute bottom-full left-0 z-10 mb-2 w-full overflow-hidden rounded-2xl border border-line bg-panel shadow-xl" role="listbox" aria-label={t('Mention a player')}>
             {matches.map((p, i) => (
               <li key={p.u} role="option" aria-selected={i === pick}>
                 <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => choose(p.u)}
@@ -70,7 +71,7 @@ export function ChatSheet({ g, open, onOpenChange }: { g: Game; open: boolean; o
             ))}
           </ul>
         )}
-        <input ref={box} value={text} maxLength={200} placeholder="Message everyone · @ to tag" aria-label="Game message"
+        <input ref={box} value={text} maxLength={200} placeholder={t('Message everyone · @ to tag')} aria-label={t('Game message')}
           onChange={(e) => typed(e.target.value, e.target.selectionStart ?? e.target.value.length)}
           onKeyDown={(e) => {
             if (!matches.length) return;
@@ -80,7 +81,7 @@ export function ChatSheet({ g, open, onOpenChange }: { g: Game; open: boolean; o
             else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setTag(null); }
           }}
           className="h-11 min-w-0 flex-1 rounded-full border border-line bg-panel px-4 outline-none focus:border-accent" />
-        <IconButton label="Send" type="submit" variant="primary" disabled={!text.trim()}><SendHorizontal /></IconButton>
+        <IconButton label={t('Send')} type="submit" variant="primary" disabled={!text.trim()}><SendHorizontal /></IconButton>
       </form>
     </Dialog>
   );

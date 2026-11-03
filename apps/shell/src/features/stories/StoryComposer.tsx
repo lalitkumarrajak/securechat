@@ -3,6 +3,7 @@
 import * as D from '@radix-ui/react-dialog';
 import { useStories } from '../../lib/stories';
 import { Composer } from './story-composer/Composer';
+import { t } from '@sanga/i18n';
 
 export function StoryComposer() {
   const c = useStories((s) => s.composer);
@@ -13,7 +14,7 @@ export function StoryComposer() {
         <D.Overlay className="fixed inset-0 z-50 bg-black animate-fade-in" />
         <D.Content className="fixed inset-0 z-50 flex justify-center bg-black text-white outline-none" aria-describedby={undefined}
           onPointerDownOutside={(e) => e.preventDefault()} /* e.g. answering a call: keep the story being made */>
-          <D.Title className="sr-only">New story</D.Title>
+          <D.Title className="sr-only">{t('New story')}</D.Title>
           {c && <Composer prefill={c.prefill} onClose={close} />}
         </D.Content>
       </D.Portal>

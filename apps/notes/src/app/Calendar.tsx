@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { locale, t, tn } from '@sanga/i18n';
 import { IconButton } from '@sanga/ui/button';
 import { cn } from '@sanga/ui/utils';
 import { dayDate, dayKey, today } from '../notes';
@@ -12,21 +13,22 @@ export function Calendar({ month, setMonth, day, setDay, perDay }: {
   const cells = [...Array(first.getDay()).fill(null), ...Array.from({ length: days }, (_, i) => dayKey(new Date(y, m - 1, i + 1)))];
   const shift = (by: number) => setMonth(dayKey(new Date(y, m - 1 + by, 1)).slice(0, 7));
   const now = today();
-  const weekdays = Array.from({ length: 7 }, (_, i) => new Date(2023, 0, 1 + i).toLocaleDateString([], { weekday: 'narrow' })); // 1 Jan 2023 was a Sunday
+  const weekdays = Array.from({ length: 7 }, (_, i) => new Date(2023, 0, 1 + i).toLocaleDateString(locale(), { weekday: 'narrow' })); // 1 Jan 2023 was a Sunday
 
   return (
     <div className="mt-3 rounded-3xl border border-line/70 bg-panel p-3 shadow-sm">
       <div className="mb-2 flex items-center gap-1">
-        <IconButton label="Previous month" onClick={() => shift(-1)}><ChevronLeft /></IconButton>
-        <h3 className="flex-1 text-center font-semibold" aria-live="polite">{first.toLocaleDateString([], { month: 'long', year: 'numeric' })}</h3>
-        <IconButton label="Next month" onClick={() => shift(1)}><ChevronRight /></IconButton>
+        <IconButton label={t('Previous month')} onClick={() => shift(-1)}><ChevronLeft /></IconButton>
+        <h3 className="flex-1 text-center font-semibold" aria-live="polite">{first.toLocaleDateString(locale(), { month: 'long', year: 'numeric' })}</h3>
+        <IconButton label={t('Next month')} onClick={() => shift(1)}><ChevronRight /></IconButton>
       </div>
-      <div className="grid grid-cols-7 gap-y-1 text-center text-sm" role="group" aria-label="Calendar">
+      <div className="grid grid-cols-7 gap-y-1 text-center text-sm" role="group" aria-label={t('Calendar')}>
         {weekdays.map((w, i) => <span key={i} className="pb-1 text-xs font-medium text-muted" aria-hidden>{w}</span>)}
         {cells.map((d, i) => {
           if (!d) return <span key={'x' + i} />;
           const count = perDay.get(d) || 0;
-          const label = dayDate(d).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' }) + (count ? `, ${count} note${count > 1 ? 's' : ''}` : '');
+          const date = dayDate(d).toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' });
+          const label = count ? tn(count, '{date}, {n} note', '{date}, {n} notes', { date }) : date;
           return (
             <button key={d} onClick={() => setDay(day === d ? null : d)} aria-label={label} aria-pressed={day === d}
               className={cn('relative mx-auto grid size-9 place-items-center rounded-full',
@@ -38,7 +40,7 @@ export function Calendar({ month, setMonth, day, setDay, perDay }: {
         })}
       </div>
       {month !== now.slice(0, 7) && (
-        <button onClick={() => { setMonth(now.slice(0, 7)); setDay(now); }} className="mt-2 w-full rounded-lg py-1.5 text-sm text-accent-ink hover:bg-hover">Today</button>
+        <button onClick={() => { setMonth(now.slice(0, 7)); setDay(now); }} className="mt-2 w-full rounded-lg py-1.5 text-sm text-accent-ink hover:bg-hover">{t('Today')}</button>
       )}
     </div>
   );

@@ -7,16 +7,18 @@ import { About } from './settings-panel/About';
 import { Account } from './settings-panel/Account';
 import { Appearance } from './settings-panel/Appearance';
 import { Chats } from './settings-panel/Chats';
+import { Language } from './settings-panel/Language';
 import { Main } from './settings-panel/Main';
 import { Notifications } from './settings-panel/Notifications';
 import { Privacy } from './settings-panel/Privacy';
 import { Profile } from './settings-panel/Profile';
 import { Sessions } from './settings-panel/Sessions';
 import type { Page } from './settings-panel/types';
+import { t, tk } from '@sanga/i18n';
 
 const TITLES: Record<Page, string> = {
-  main: 'Settings', profile: 'Profile', appearance: 'Appearance', privacy: 'Privacy', notifications: 'Notifications',
-  chats: 'Chats', account: 'Account', sessions: 'Active sessions', about: 'About Sanga',
+  main: tk('Settings'), profile: tk('Profile'), appearance: tk('Appearance'), privacy: tk('Privacy'), notifications: tk('Notifications'),
+  chats: tk('Chats'), account: tk('Account'), sessions: tk('Active sessions'), about: tk('About Sanga'), language: tk('Language'),
 };
 
 export function SettingsPanel() {
@@ -30,10 +32,10 @@ export function SettingsPanel() {
   const close = () => setApp({ panel: null });
 
   return (
-    <Panel open={open} onOpenChange={(o) => !o && close()} title="Settings">
+    <Panel open={open} onOpenChange={(o) => !o && close()} title={t('Settings')}>
       <header className="flex h-16 shrink-0 items-center gap-2 bg-panel px-3">
-        <IconButton label="Back" onClick={() => (page === 'main' ? close() : setPage(page === 'sessions' ? 'account' : 'main'))}><ArrowLeft /></IconButton>
-        <h2 className="text-lg font-semibold">{TITLES[page]}</h2>
+        <IconButton label={t('Back')} onClick={() => (page === 'main' ? close() : setPage(page === 'sessions' ? 'account' : 'main'))}><ArrowLeft /></IconButton>
+        <h2 className="text-lg font-semibold">{t(TITLES[page])}</h2>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">
         {page === 'main' && <Main go={setPage} />}
@@ -45,6 +47,7 @@ export function SettingsPanel() {
         {page === 'account' && <Account go={setPage} />}
         {page === 'sessions' && <Sessions />}
         {page === 'about' && <About />}
+        {page === 'language' && <Language />}
       </div>
     </Panel>
   );

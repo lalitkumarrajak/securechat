@@ -1,5 +1,6 @@
 import { cn } from '@sanga/ui/utils';
-import type { Observance } from './panchang';
+import { locale, t } from '@sanga/i18n';
+import { obsName, timeLabel, type Observance } from './panchang';
 import type { FastLog } from './model';
 import { clock } from './util';
 import { STATUS } from './fasts';
@@ -12,13 +13,13 @@ export function ObservanceCard({ o, logged, onLog, onEditFast }: { o: Observance
       <div className="flex items-start gap-3">
         <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-white/70 text-2xl shadow-sm dark:bg-white/10" aria-hidden>{o.emoji}</span>
         <div className="min-w-0 flex-1">
-          <h3 className="font-bold">{o.name}</h3>
-          {o.about && <p className="mt-0.5 text-sm text-muted">{o.about}</p>}
+          <h3 className="font-bold">{obsName(o)}</h3>
+          {o.about && <p className="mt-0.5 text-sm text-muted">{t(o.about)}</p>}
           {o.times && o.times.length > 0 && (
             <ul className="mt-2 space-y-1 text-sm">
-              {o.times.map((t) => (
-                <li key={t.label} className="flex gap-2"><span className="text-muted">{t.label}</span><b className="font-semibold">{clock(t.at)}{t.to ? ` – ${clock(t.to)}` : ''}</b>
-                  {t.to && new Date(t.to).toDateString() !== new Date(t.at).toDateString() && <span className="text-xs text-muted">({new Date(t.to).toLocaleDateString([], { day: 'numeric', month: 'short' })})</span>}
+              {o.times.map((x) => (
+                <li key={x.label} className="flex gap-2"><span className="text-muted">{timeLabel(x)}</span><b className="font-semibold">{clock(x.at)}{x.to ? ` – ${clock(x.to)}` : ''}</b>
+                  {x.to && new Date(x.to).toDateString() !== new Date(x.at).toDateString() && <span className="text-xs text-muted">({new Date(x.to).toLocaleDateString(locale(), { day: 'numeric', month: 'short' })})</span>}
                 </li>
               ))}
             </ul>
@@ -26,11 +27,11 @@ export function ObservanceCard({ o, logged, onLog, onEditFast }: { o: Observance
           {o.fast && (
             logged ? (
               <button onClick={() => onEditFast(logged)} className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1.5 text-sm font-semibold shadow-sm dark:bg-white/10">
-                {STATUS[logged.status].emoji} {STATUS[logged.status].label}
+                {STATUS[logged.status].emoji} {t(STATUS[logged.status].label)}
               </button>
             ) : (
               <button onClick={onLog} className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-amber-500 px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm hover:brightness-110">
-                🙏 Track this fast
+                🙏 {t('Track this fast')}
               </button>
             )
           )}

@@ -6,7 +6,12 @@
   "description": "The contract between the Sanga shell and its apps: session, server, live updates, storage, people",
   "exports": {
     ".": "./src/index.ts",
-    "./standalone": "./src/standalone.tsx"
+    "./standalone": "./src/standalone.tsx",
+    "./locale": "./src/locale.ts"
   },
-  "dependencies": { "@sanga/crypto": "*", "@sanga/ui": "*" }
+  "dependencies": {
+    "@sanga/crypto": "*",
+    "@sanga/ui": "*",
+    "@sanga/i18n": "*"
+  }
 }

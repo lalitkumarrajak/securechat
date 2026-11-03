@@ -1,4 +1,5 @@
 import { cn } from '@sanga/ui/utils';
+import { t } from '@sanga/i18n';
 
 export function Tab({ selected, count, onClick, label, children }: { selected: boolean; count: number; onClick: () => void; label: string; children: React.ReactNode }) {
   return (
@@ -7,7 +8,7 @@ export function Tab({ selected, count, onClick, label, children }: { selected: b
         selected ? 'bg-accent/15 text-accent-ink' : 'bg-panel-2 text-muted hover:text-ink')}>
       {children}<span className="max-w-32 truncate">{label}</span>
       {count > 0 && !selected && (
-        <span className="grid min-w-[18px] place-items-center rounded-full bg-accent px-1 text-[11px] leading-[18px] font-bold text-white" aria-label={`${count} unread`}>{count}</span>
+        <span className="grid min-w-[18px] place-items-center rounded-full bg-accent px-1 text-[11px] leading-[18px] font-bold text-white" aria-label={t('{n} unread', { n: count })}>{count}</span>
       )}
     </button>
   );

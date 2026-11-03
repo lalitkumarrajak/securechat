@@ -4,6 +4,7 @@ import { downloadDataUrl, fileExt, fmtSize } from '../../lib/files';
 import type { Msg } from '../../lib/types';
 import { setChatUi } from './chatUi';
 import { stop } from './attachments';
+import { t, tn } from '@sanga/i18n';
 
 export function FileCard({ m }: { m: Msg }) {
   const f = m.file!;
@@ -14,7 +15,7 @@ export function FileCard({ m }: { m: Msg }) {
       {video ? (
         <video src={m.src} poster={f.thumb} controls playsInline preload="none" className="mb-1 block max-h-72 w-full rounded-xl bg-black" />
       ) : f.thumb ? (
-        <button onClick={() => setChatUi({ viewer: f.thumb! })} className="mb-1 block w-full overflow-hidden rounded-xl border border-line bg-white" aria-label="Preview">
+        <button onClick={() => setChatUi({ viewer: f.thumb! })} className="mb-1 block w-full overflow-hidden rounded-xl border border-line bg-white" aria-label={t('Preview')}>
           <img src={f.thumb} alt="" className="block max-h-56 w-full object-cover object-top" />
         </button>
       ) : f.text ? (
@@ -27,9 +28,9 @@ export function FileCard({ m }: { m: Msg }) {
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium">{f.name}</span>
-          <span className="block text-xs text-muted">{[f.pages && `${f.pages} page${f.pages > 1 ? 's' : ''}`, fmtSize(f.size), fileExt(f.name, f.mime)].filter(Boolean).join(' · ')}</span>
+          <span className="block text-xs text-muted">{[f.pages && tn(f.pages, '{n} page', '{n} pages'), fmtSize(f.size), fileExt(f.name, f.mime)].filter(Boolean).join(' · ')}</span>
         </span>
-        <button onClick={save} aria-label={`Download ${f.name}`} className="grid size-9 shrink-0 place-items-center rounded-full border border-line text-muted hover:text-ink">
+        <button onClick={save} aria-label={t('Download {name}', { name: f.name })} className="grid size-9 shrink-0 place-items-center rounded-full border border-line text-muted hover:text-ink">
           <Download className="size-4" />
         </button>
       </div>

@@ -6,6 +6,7 @@ import { copyMessages, togglePin } from '../../../lib/engine';
 import { setApp, useApp } from '../../../state/app';
 import { canEdit } from '../../../lib/controls';
 import { deleteFlow, setChatUi, startEdit, startReply } from '../chatUi';
+import { t } from '@sanga/i18n';
 
 export function SelectionBar() {
   const selection = useApp((s) => s.selection)!;
@@ -18,16 +19,16 @@ export function SelectionBar() {
 
   return (
     <header className="flex h-16 shrink-0 items-center gap-1 border-b border-line bg-panel px-2">
-      <IconButton label="Cancel selection" onClick={() => setApp({ selection: null })}><X /></IconButton>
-      <span className="flex-1 pl-1 font-semibold">{picked.length ? `${picked.length} selected` : 'Select messages'}</span>
-      {single && <IconButton label="Reply" onClick={() => { setApp({ selection: null }); startReply(single); }}><Reply /></IconButton>}
-      {single && canEdit(single) && <IconButton label="Edit" onClick={() => { setApp({ selection: null }); startEdit(single); }}><Pencil /></IconButton>}
-      {allText && <IconButton label="Copy" onClick={() => copyMessages(picked).then(() => { toast.success('Copied'); setApp({ selection: null }); })}><Copy /></IconButton>}
-      {single && <IconButton label={pinned ? 'Unpin' : 'Pin'} onClick={() => { togglePin(single); setApp({ selection: null }); }}><Pin /></IconButton>}
+      <IconButton label={t('Cancel selection')} onClick={() => setApp({ selection: null })}><X /></IconButton>
+      <span className="flex-1 pl-1 font-semibold">{picked.length ? t('{n} selected', { n: picked.length }) : t('Select messages')}</span>
+      {single && <IconButton label={t('Reply')} onClick={() => { setApp({ selection: null }); startReply(single); }}><Reply /></IconButton>}
+      {single && canEdit(single) && <IconButton label={t('Edit')} onClick={() => { setApp({ selection: null }); startEdit(single); }}><Pencil /></IconButton>}
+      {allText && <IconButton label={t('Copy')} onClick={() => copyMessages(picked).then(() => { toast.success(t('Copied')); setApp({ selection: null }); })}><Copy /></IconButton>}
+      {single && <IconButton label={pinned ? t('Unpin') : t('Pin')} onClick={() => { togglePin(single); setApp({ selection: null }); }}><Pin /></IconButton>}
       {content.length > 0 && content.length === picked.length && (
-        <IconButton label="Forward" onClick={() => setChatUi({ forward: picked })}><Forward /></IconButton>
+        <IconButton label={t('Forward')} onClick={() => setChatUi({ forward: picked })}><Forward /></IconButton>
       )}
-      {picked.length > 0 && <IconButton label="Delete" onClick={() => deleteFlow(picked)}><Trash2 /></IconButton>}
+      {picked.length > 0 && <IconButton label={t('Delete')} onClick={() => deleteFlow(picked)}><Trash2 /></IconButton>}
     </header>
   );
 }

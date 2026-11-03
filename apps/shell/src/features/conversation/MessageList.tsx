@@ -9,6 +9,7 @@ import { useSettings } from '../../state/settings';
 import { MessageBubble } from './MessageBubble';
 import { cn } from '@sanga/ui/utils';
 import type { Msg } from '../../lib/types';
+import { t, tn } from '@sanga/i18n';
 
 const GROUP_MS = 5 * 60e3;
 
@@ -134,7 +135,7 @@ export function MessageList({ peer, peerName, unreadAtOpen }: { peer: string; pe
     if (flash(highlight)) return;
     loadUntil(highlight).then((ok) => {
       if (ok) requestAnimationFrame(() => flash(highlight));
-      else toast('That message isn’t on this device anymore.');
+      else toast(t('That message isn’t on this device anymore.'));
     });
   }, [highlight]);
 
@@ -155,12 +156,12 @@ export function MessageList({ peer, peerName, unreadAtOpen }: { peer: string; pe
       <div ref={box} onScroll={onScroll} className={`wallpaper wp-${wallpaper} h-full overflow-x-hidden overflow-y-auto overscroll-contain py-3`} role="log" aria-live="polite">
         {!messages.length && (
           <div className="mx-auto mt-10 max-w-xs rounded-xl bg-panel/90 px-4 py-3 text-center text-sm text-muted shadow-bubble">
-            🔒 Messages are end-to-end encrypted. Say hi to {peerName}!
+            {t('🔒 Messages are end-to-end encrypted. Say hi to {name}!', { name: peerName })}
           </div>
         )}
         <div ref={content}>
         {olderLeft && (
-          <div className="flex h-10 items-center justify-center" role="status" aria-label="Loading older messages">
+          <div className="flex h-10 items-center justify-center" role="status" aria-label={t('Loading older messages')}>
             <span className="size-5 animate-spin rounded-full border-2 border-muted/40 border-t-accent" />
           </div>
         )}
@@ -182,7 +183,7 @@ export function MessageList({ peer, peerName, unreadAtOpen }: { peer: string; pe
               {m.k === dividerK && (
                 <div data-divider className="my-3 flex justify-center bg-panel/60 py-1">
                   <span className="rounded-full bg-panel px-3 py-0.5 text-xs font-semibold text-accent-ink shadow-bubble">
-                    {unreadAtOpen} unread message{unreadAtOpen > 1 ? 's' : ''}
+                    {tn(unreadAtOpen, '{n} unread message', '{n} unread messages')}
                   </span>
                 </div>
               )}
@@ -201,7 +202,7 @@ export function MessageList({ peer, peerName, unreadAtOpen }: { peer: string; pe
         </div>
       </div>
       {!atBottom && (
-        <button onClick={toBottom} aria-label="Scroll to latest messages"
+        <button onClick={toBottom} aria-label={t('Scroll to latest messages')}
           className="absolute right-4 bottom-4 grid size-11 place-items-center rounded-full bg-panel text-muted shadow-lg hover:text-ink">
           <ChevronDown className="size-6" />
           {newCount > 0 && (

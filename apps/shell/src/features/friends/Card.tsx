@@ -8,6 +8,7 @@ import { setApp, useApp } from '../../state/app';
 import { setChatUi } from '../conversation/chatUi';
 import { openPicker } from '../games/store';
 import { CardButton } from './CardButton';
+import { t } from '@sanga/i18n';
 
 export function Card({ u, close }: { u: string; close: () => void }) {
   const friend = useApp((s) => s.friends[u]);
@@ -15,7 +16,7 @@ export function Card({ u, close }: { u: string; close: () => void }) {
   const photo = useApp((s) => s.avatars[u]);
   const presence = useApp((s) => s.presence[u]);
   const name = group ? group.name : displayName(friend, u);
-  const status = group ? `Group · ${group.members.length} members` : presence?.on ? 'online' : presence?.ls ? fmtLastSeen(presence.ls) : '';
+  const status = group ? t('Group · {n} members', { n: group.members.length }) : presence?.on ? t('online') : presence?.ls ? fmtLastSeen(presence.ls) : '';
   const about = group ? group.about : friend?.about;
 
   const message = () => { close(); openChat(u); };
@@ -23,7 +24,7 @@ export function Card({ u, close }: { u: string; close: () => void }) {
 
   return (
     <>
-      <button onClick={() => photo && setChatUi({ viewer: photo })} aria-label={photo ? `View ${name}’s photo` : name}
+      <button onClick={() => photo && setChatUi({ viewer: photo })} aria-label={photo ? t('View {name}’s photo', { name }) : name}
         className="relative block aspect-square w-full bg-panel-2">
         {photo ? <img src={photo} alt="" className="size-full object-cover" />
           : <span className="grid size-full place-items-center"><Avatar u={u} name={name} size={160} /></span>}
@@ -39,9 +40,9 @@ export function Card({ u, close }: { u: string; close: () => void }) {
         </div>
       )}
       <div className="flex justify-around py-1.5 text-accent-ink [&_svg]:size-5">
-        <CardButton label="Message" onClick={message}><MessageCircle /></CardButton>
-        {!group && friend && <CardButton label="Play" onClick={() => { close(); openPicker([u]); }}><Gamepad2 /></CardButton>}
-        <CardButton label="Info" onClick={info}><Info /></CardButton>
+        <CardButton label={t('Message')} onClick={message}><MessageCircle /></CardButton>
+        {!group && friend && <CardButton label={t('Play')} onClick={() => { close(); openPicker([u]); }}><Gamepad2 /></CardButton>}
+        <CardButton label={t('Info')} onClick={info}><Info /></CardButton>
       </div>
     </>
   );

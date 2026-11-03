@@ -1,4 +1,5 @@
 import { flushSync } from 'react-dom';
+import { t, tn } from '@sanga/i18n';
 import { SmilePlus } from 'lucide-react';
 import { Dialog } from '@sanga/ui/dialog';
 import { QUICK_REACTIONS } from '../../lib/emoji';
@@ -13,19 +14,19 @@ export function ActionSheet() {
   const album = useChatUi((s) => s.sheetAlbum);
   const close = () => setChatUi({ sheet: null, sheetAlbum: null });
   return (
-    <Dialog open={!!m} onOpenChange={(o) => !o && close()} title="Message options" hideTitle keepFocus className="md:max-w-sm">
+    <Dialog open={!!m} onOpenChange={(o) => !o && close()} title={t('Message options')} hideTitle keepFocus className="md:max-w-sm">
       {m && (
         <>
-          <p className="mb-3 line-clamp-2 rounded-xl bg-panel-2 px-3 py-2 text-sm text-muted">{album ? `📷 ${album.length} photos` : preview(m)}</p>
+          <p className="mb-3 line-clamp-2 rounded-xl bg-panel-2 px-3 py-2 text-sm text-muted">{album ? tn(album.length, '📷 {n} photo', '📷 {n} photos') : preview(m)}</p>
           {canReact(m) && (
             <div className="mb-3 flex items-center justify-between rounded-2xl bg-panel-2 px-2 py-1.5">
               {QUICK_REACTIONS.map((e) => (
-                <button key={e} onClick={() => { reactTo(m, e); close(); }} aria-label={'React ' + e}
+                <button key={e} onClick={() => { reactTo(m, e); close(); }} aria-label={t('React {emoji}', { emoji: e })}
                   className={cn('grid size-11 place-items-center rounded-full text-2xl transition active:scale-125', myReaction(m) === e && 'bg-accent/20')}>
                   {e}
                 </button>
               ))}
-              <button onClick={() => setChatUi({ sheet: null, picker: m })} aria-label="More reactions" className="grid size-11 place-items-center rounded-full text-muted">
+              <button onClick={() => setChatUi({ sheet: null, picker: m })} aria-label={t('More reactions')} className="grid size-11 place-items-center rounded-full text-muted">
                 <SmilePlus className="size-6" />
               </button>
             </div>

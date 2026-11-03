@@ -1,6 +1,7 @@
 // Songs on stories: a 30-second preview found by search (played from Apple's CDN), or the first
 // seconds of a file from your phone, made into a small clip that travels inside the sealed story.
 import { api } from './engine';
+import { t } from '@sanga/i18n';
 
 export interface Song { title: string; artist: string; src: string; art?: string }
 export interface SongHit extends Song { id: string }
@@ -32,7 +33,7 @@ export async function clipFromFile(file: File): Promise<Song> {
   const ctx = new AC();
   let decoded: AudioBuffer;
   try { decoded = await ctx.decodeAudioData(await file.arrayBuffer()); }
-  catch { throw new Error('That file can’t be played. Try an MP3, M4A or WAV.'); }
+  catch { throw new Error(t('That file can’t be played. Try an MP3, M4A or WAV.')); }
   finally { void ctx.close(); }
 
   const seconds = Math.min(CLIP_SECONDS, decoded.duration);
@@ -43,7 +44,7 @@ export async function clipFromFile(file: File): Promise<Song> {
   src.start();
   const pcm = (await off.startRendering()).getChannelData(0);
 
-  const title = file.name.replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ').trim().slice(0, 100) || 'My song';
+  const title = file.name.replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ').trim().slice(0, 100) || t('My song');
   return { title, artist: '', src: wavDataUrl(pcm) };
 }
 

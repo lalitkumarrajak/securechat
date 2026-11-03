@@ -16,7 +16,7 @@ function float(emoji: string, size: number) {
   const d = document.createElement('div');
   d.textContent = emoji;
   d.setAttribute('aria-hidden', 'true');
-  Object.assign(d.style, { position: 'fixed', left: '0', top: '0', zIndex: '70', pointerEvents: 'none', fontSize: size + 'px', lineHeight: '1', willChange: 'transform, opacity' });
+  Object.assign(d.style, { position: 'fixed', left: '0', top: '0', zIndex: '70', pointerEvents: 'none', fontSize: size + 'px', lineHeight: '1', willChange: 'transform, opacity' }); // i18n-ok
   document.body.appendChild(d);
   return d;
 }
@@ -35,7 +35,7 @@ function fly(f: string, to: string, k: string) {
       { transform: `translate(${end.x - 32}px, ${end.y - 44}px) scale(1.5)`, opacity: 1, offset: 0.35 },
       { transform: `translate(${end.x - 32}px, ${end.y - 90}px) scale(1.1)`, opacity: 0 },
     ], { duration: 1100, easing: 'ease-out' }).onfinish = () => pop.remove();
-    if (t.shake) end.el.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-7px) rotate(-2deg)' }, { transform: 'translateX(7px) rotate(2deg)' }, { transform: 'translateX(-4px)' }, { transform: 'translateX(0)' }], { duration: 420 });
+    if (t.shake) end.el.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-7px) rotate(-2deg)' }, { transform: 'translateX(7px) rotate(2deg)' }, { transform: 'translateX(-4px)' }, { transform: 'translateX(0)' }], { duration: 420 }); // i18n-ok
     playSound('chat');
     navigator.vibrate?.(25);
   };

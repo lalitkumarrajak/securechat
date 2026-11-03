@@ -4,6 +4,7 @@ import { IconButton } from '@sanga/ui/button';
 import { messageTexts } from '../../../lib/engine';
 import { type Msg } from '../../../lib/types';
 import { setApp, useApp } from '../../../state/app';
+import { t } from '@sanga/i18n';
 
 export function SearchBar() {
   const messages = useApp((s) => s.messages);
@@ -30,24 +31,24 @@ export function SearchBar() {
   // Typing jumps to the newest match after a moment; Enter and the arrows go through the rest.
   useEffect(() => {
     if (index !== -1 || !hits.length) return;
-    const t = setTimeout(() => go(0), 400);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => go(0), 400);
+    return () => clearTimeout(timer);
   }, [query, hits.length]);
 
   return (
     <div className="flex shrink-0 items-center gap-1 border-b border-line bg-panel px-2 py-1.5">
       <Search className="ml-2 size-4 text-muted" />
-      <input autoFocus value={query} placeholder="Search messages"
+      <input autoFocus value={query} placeholder={t('Search messages')}
         onChange={(e) => { setApp({ searchQuery: e.target.value }); setIndex(-1); }}
         onKeyDown={(e) => {
           if (e.key === 'Enter') go(e.shiftKey ? index - 1 : index + 1); // Enter: next older match
           if (e.key === 'Escape') { e.preventDefault(); setApp({ searchOpen: false, searchQuery: '' }); }
         }}
         className="h-9 min-w-0 flex-1 bg-transparent px-2 text-sm outline-none" />
-      <span className="text-xs text-muted tabular-nums">{query ? (hits.length ? `${Math.max(index, 0) + 1}/${hits.length}` : '0 results') : ''}</span>
-      <IconButton label="Newer match" size="icon-sm" disabled={!hits.length} onClick={() => go(index - 1)}><ChevronDown /></IconButton>
-      <IconButton label="Older match" size="icon-sm" disabled={!hits.length} onClick={() => go(index + 1)}><ChevronUp /></IconButton>
-      <IconButton label="Close search" size="icon-sm" onClick={() => setApp({ searchOpen: false, searchQuery: '' })}><X /></IconButton>
+      <span className="text-xs text-muted tabular-nums">{query ? (hits.length ? `${Math.max(index, 0) + 1}/${hits.length}` : t('0 results')) : ''}</span>
+      <IconButton label={t('Newer match')} size="icon-sm" disabled={!hits.length} onClick={() => go(index - 1)}><ChevronDown /></IconButton>
+      <IconButton label={t('Older match')} size="icon-sm" disabled={!hits.length} onClick={() => go(index + 1)}><ChevronUp /></IconButton>
+      <IconButton label={t('Close search')} size="icon-sm" onClick={() => setApp({ searchOpen: false, searchQuery: '' })}><X /></IconButton>
     </div>
   );
 }

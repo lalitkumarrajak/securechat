@@ -7,11 +7,13 @@
 // column, and their yard sits on the clockwise side of their arm. The whole board is turned so
 // your own yard is bottom-left, like in Ludo King.
 import { ARM, START, STAR, homeAt, loopLen, trackSquare } from '@sanga/game-rules/ludo.js';
+import { tk } from '@sanga/i18n';
 
 export const COLORS = ['#e8322f', '#2fa24a', '#f5c518', '#1f7fe0', '#9b3fd1', '#f5821f'];
 export const DARK = ['#a51d1b', '#1c6e31', '#b38c00', '#14569c', '#6a2391', '#b35a0c'];
 export const LIGHT = ['#ff7a6e', '#62d37c', '#ffe066', '#5cb3ff', '#c77bf0', '#ffad5c'];
-export const COLOR_NAMES = ['Red', 'Green', 'Yellow', 'Blue', 'Purple', 'Orange'];
+/** English: show with t(). */
+export const COLOR_NAMES = [tk('Red'), tk('Green'), tk('Yellow'), tk('Blue'), tk('Purple'), tk('Orange')];
 
 export interface Pt { x: number; y: number }
 export interface Cell extends Pt { ang: number; poly: Pt[] }

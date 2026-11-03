@@ -6,6 +6,7 @@ import { frameHooks, myName, sendFrame } from '../../lib/engine';
 import { randomId } from '@sanga/crypto';
 import { mentioned } from '../../lib/mentions';
 import { playSound } from './sounds';
+import { t, tk } from '@sanga/i18n';
 
 export type PlayerState = 'invited' | 'joined' | 'declined' | 'playing' | 'done' | 'left' | 'out';
 export interface GamePlayer { u: string; n: string; state: PlayerState; missed?: number; rank?: number; bot?: boolean }
@@ -79,9 +80,9 @@ frameHooks.g = (m) => {
   const me = meIn(g);
   if (!before && g.status === 'lobby' && me?.state === 'invited') {
     playSound('invite');
-    toast(`${nameOf(g, g.host)} invited you to play ${gameName(g.type)}`, {
+    toast(t('{name} invited you to play {game}', { name: nameOf(g, g.host), game: gameName(g.type) }), {
       duration: 15_000,
-      action: { label: 'Join', onClick: () => { join(g.id); set({ open: g.id }); } },
+      action: { label: t('Join'), onClick: () => { join(g.id); set({ open: g.id }); } },
     });
   }
 };
@@ -115,9 +116,9 @@ frameHooks.gc = (m) => {
   const g = get().games[m.id];
   if (g && m.f !== myName() && mentioned(m.x, [myName()]).length && !(get().open === m.id && get().chatOpen)) {
     navigator.vibrate?.([30, 50, 30]);
-    toast(`${nameOf(g, m.f)} mentioned you`, {
+    toast(t('{name} mentioned you', { name: nameOf(g, m.f) }), {
       description: m.x, duration: 8000,
-      action: { label: 'Reply', onClick: () => set({ open: m.id, chatOpen: true }) },
+      action: { label: t('Reply'), onClick: () => set({ open: m.id, chatOpen: true }) },
     });
   }
 };
@@ -132,20 +133,29 @@ export const tease = (id: string, to: string, k: string) => sendOrWarn({ t: 'gte
 frameHooks.gerr = (m) => {
   if (m.ref) pending.delete(m.ref);
   if (m.link) setLinkPending(null);
-  toast.error(m.e || 'Something went wrong');
+  toast.error(m.e ? t(m.e) : t('Something went wrong'));
 };
 
 /** Sends a frame; false (and a warning) if the connection is down. */
 function sendOrWarn(frame: object) {
   const sent = sendFrame(frame);
-  if (!sent) toast.error('You’re offline', { description: 'Reconnect to play.', id: 'game-offline' });
+  if (!sent) toast.error(t('You’re offline'), { description: t('Reconnect to play.'), id: 'game-offline' });
   return sent;
 }
 
 // The registry needs the store, so names are looked up lazily to avoid a cycle.
 let names: Record<string, string> = {};
 export const registerGameNames = (n: Record<string, string>) => { names = n; };
-export const gameName = (type: string) => names[type] || 'a game';
+export const gameName = (type: string) => (names[type] ? t(names[type]) : t('a game'));
+
+/** The errors the server sends back (server/games.js and the rules in packages/game-rules), shown with t(m.e). */
+export const GAME_ERRORS = [
+  tk('This game has ended'), tk('Wait for someone to join'), tk('Slow down'), tk('No seats left'),
+  tk('Call UNO when you’re about to have one card'), tk('Not allowed now'), tk('Nothing to keep'), tk('Not your turn'),
+  tk('Pick a colour'), tk('Pick a column'), tk('Pick a square'), tk('Play the card you drew, or keep it'),
+  tk('That card doesn’t match'), tk('That card isn’t in your hand'), tk('That column is full'), tk('That square is taken'),
+  tk('That token can’t move'), tk('Too late'), tk('You’re not playing'), tk('You’ve already drawn'),
+];
 
 export function createGame(type: string, to: string[]) {
   const ref = randomId();

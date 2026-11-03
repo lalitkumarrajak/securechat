@@ -1,8 +1,9 @@
+import { t } from '@sanga/i18n';
 import { useMemo, useState } from 'react';
 import { Button } from '@sanga/ui/button';
 import { Dialog } from '@sanga/ui/dialog';
 import { Input, Label, Textarea } from '@sanga/ui/input';
-import { apportion, parseAmount, splitAmount, toInput, today, validDay, type Expense, type Mode } from './model';
+import { apportion, catName, parseAmount, splitAmount, toInput, today, validDay, type Expense, type Mode } from './model';
 import { useLedger, useMe, useNames } from './hooks';
 import { deleteBill, save, type GroupData } from './store';
 import { BillField } from './BillField';
@@ -12,7 +13,7 @@ import { SplitEditor, type SplitDraft } from './SplitEditor';
 /** Add or change an expense. `expense` null: closed; an object without a saved record is new. */
 export function ExpenseEditor({ g, expense, onClose }: { g: GroupData; expense: Expense | null; onClose: () => void }) {
   return (
-    <Dialog open={!!expense} onOpenChange={(o) => { if (!o) onClose(); }} title={expense && g.expenses[expense.id] ? 'Edit expense' : 'Add expense'} className="md:max-w-lg">
+    <Dialog open={!!expense} onOpenChange={(o) => { if (!o) onClose(); }} title={expense && g.expenses[expense.id] ? t('Edit expense') : t('Add expense')} className="md:max-w-lg">
       {expense && <Form key={expense.id} g={g} expense={expense} onClose={onClose} />}
     </Dialog>
   );
@@ -53,10 +54,10 @@ function Form({ g, expense, onClose }: { g: GroupData; expense: Expense; onClose
 
   const amount = parseAmount(amountText, currency);
   const values = useMemo(() => Object.fromEntries(draft.who.map((id) => {
-    const t = (draft.texts[id] ?? '').trim();
-    if (draft.mode === 'exact') return [id, parseAmount(t, currency) ?? 0];
-    if (draft.mode === 'percent') return [id, Math.round(Number(t) * 100) || 0];
-    return [id, t === '' ? 1 : Math.round(Number(t)) || 0];
+    const tv = (draft.texts[id] ?? '').trim();
+    if (draft.mode === 'exact') return [id, parseAmount(tv, currency) ?? 0];
+    if (draft.mode === 'percent') return [id, Math.round(Number(tv) * 100) || 0];
+    return [id, tv === '' ? 1 : Math.round(Number(tv)) || 0];
   })), [draft, currency]);
   const result = useMemo(() => (amount ? splitAmount(amount, draft.mode, draft.who, values) : null), [amount, draft, values]);
   const splitError = result && 'error' in result ? result.error : '';
@@ -64,7 +65,7 @@ function Form({ g, expense, onClose }: { g: GroupData; expense: Expense; onClose
 
   const change = (d: SplitDraft) => setDraft(d.mode !== draft.mode ? { ...d, texts: seed(d.mode, d.who, amount, currency) } : d);
 
-  const problem = !amount ? 'Enter an amount' : !validDay(date) ? 'Pick a date' : splitError;
+  const problem = !amount ? t('Enter an amount') : !validDay(date) ? t('Pick a date') : splitError;
   const submit = () => {
     setTried(true);
     if (problem || !amount || !owed) return;
@@ -73,7 +74,7 @@ function Form({ g, expense, onClose }: { g: GroupData; expense: Expense; onClose
     for (const id of uploaded) if (!used.has(id)) void deleteBill(g.gid, id);
     if (expense.bill && expense.bill !== bill) void deleteBill(g.gid, expense.bill);
     save(g.gid, {
-      type: 'expense', id: expense.id, desc: desc.trim() || cats.get(cat)?.name || 'Expense', amount, cat, date, paidBy, mode: draft.mode,
+      type: 'expense', id: expense.id, desc: desc.trim() || (cats.get(cat) ? catName(cats.get(cat)!) : t('Expense')), amount, cat, date, paidBy, mode: draft.mode,
       values: draft.mode === 'equal' ? {} : values, owed, ...(notes.trim() && { notes: notes.trim() }), ...(bill && { bill }), by: me, edited: 0,
     });
     onClose();
@@ -84,32 +85,32 @@ function Form({ g, expense, onClose }: { g: GroupData; expense: Expense; onClose
   return (
     <form onSubmit={(e) => { e.preventDefault(); submit(); }} className="space-y-4">
       <div>
-        <Label htmlFor="amt">Amount ({currency})</Label>
+        <Label htmlFor="amt">{t('Amount ({currency})', { currency })}</Label>
         <Input id="amt" autoFocus={isNew} inputMode="decimal" placeholder="0.00" value={amountText} onChange={(e) => setAmountText(e.target.value)} className="h-14 text-2xl font-semibold tabular-nums" />
       </div>
       <div>
-        <Label htmlFor="desc">What was it for?</Label>
-        <Input id="desc" maxLength={120} placeholder="e.g. Dinner, Metro card, Gym fee" value={desc} onChange={(e) => setDesc(e.target.value)} />
+        <Label htmlFor="desc">{t('What was it for?')}</Label>
+        <Input id="desc" maxLength={120} placeholder={t('e.g. Dinner, Metro card, Gym fee')} value={desc} onChange={(e) => setDesc(e.target.value)} />
       </div>
-      <div><Label>Category</Label><CategoryPicker cats={catList} value={cat} onChange={setCat} /></div>
+      <div><Label>{t('Category')}</Label><CategoryPicker cats={catList} value={cat} onChange={setCat} /></div>
       <div className="grid grid-cols-2 gap-3">
-        <div className="min-w-0"><Label htmlFor="date">Date</Label><Input id="date" type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value)} /></div>
+        <div className="min-w-0"><Label htmlFor="date">{t('Date')}</Label><Input id="date" type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value)} /></div>
         <div className="min-w-0">
-          <Label htmlFor="paid">Paid by</Label>
+          <Label htmlFor="paid">{t('Paid by')}</Label>
           <select id="paid" value={paidBy} onChange={(e) => setPaidBy(e.target.value)} className="h-11 w-full min-w-0 rounded-xl border border-line bg-panel-2 px-3 text-[0.95rem] outline-none focus:border-accent">
             {choices.map((p) => <option key={p.id} value={p.id}>{name(p)}</option>)}
           </select>
         </div>
       </div>
-      <div><Label>Split</Label>
+      <div><Label>{t('Split')}</Label>
         <SplitEditor people={choices} name={name} draft={draft} onChange={change} owed={owed} currency={currency} error={tried || draft.mode !== 'equal' ? splitError : ''} />
       </div>
-      <div><Label htmlFor="notes" hint="optional">Notes</Label><Textarea id="notes" rows={2} maxLength={500} value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
-      <div><Label hint="optional">Bill</Label><BillField gid={g.gid} value={bill} onChange={setBill} onUploaded={(id) => setUploaded((u) => [...u, id])} /></div>
+      <div><Label htmlFor="notes" hint={t('optional')}>{t('Notes')}</Label><Textarea id="notes" rows={2} maxLength={500} value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
+      <div><Label hint={t('optional')}>{t('Bill')}</Label><BillField gid={g.gid} value={bill} onChange={setBill} onUploaded={(id) => setUploaded((u) => [...u, id])} /></div>
       {tried && problem && !splitError && <p className="text-sm text-danger" role="alert">{problem}</p>}
       <div className="flex gap-2 pt-1">
-        <Button variant="secondary" className="flex-1" onClick={cancel}>Cancel</Button>
-        <Button type="submit" className="flex-1">{isNew ? 'Add expense' : 'Save'}</Button>
+        <Button variant="secondary" className="flex-1" onClick={cancel}>{t('Cancel')}</Button>
+        <Button type="submit" className="flex-1">{isNew ? t('Add expense') : t('Save')}</Button>
       </div>
     </form>
   );

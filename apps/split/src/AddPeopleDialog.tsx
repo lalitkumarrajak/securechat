@@ -1,3 +1,4 @@
+import { t } from '@sanga/i18n';
 import { useState } from 'react';
 import { UserPlus } from 'lucide-react';
 import { sdk } from '@sanga/sdk';
@@ -22,40 +23,40 @@ export function AddPeopleDialog({ g, open, onClose }: { g: GroupData; open: bool
   const add = async (u: string, n: string) => {
     setBusy(u); setError('');
     try { await addFriend(g.gid, u, n); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Couldn’t add them'); }
+    catch (e) { setError(e instanceof Error ? e.message : t('Couldn’t add them')); }
     finally { setBusy(null); }
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }} title="Add people" description="Friends on Sanga see the group right away. Everything stays end-to-end encrypted.">
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }} title={t('Add people')} description={t('Friends on Sanga see the group right away. Everything stays end-to-end encrypted.')}>
       <div className="space-y-5">
         <section>
-          <h3 className="mb-2 text-sm font-semibold">Your friends</h3>
-          {!online && <p className="mb-2 rounded-xl bg-warn-bg p-3 text-sm">You’re offline. Connect to add friends.</p>}
-          {friends.length === 0 ? <p className="text-sm text-muted">{chats.some((c) => !c.peer.startsWith('g:')) ? 'All your friends are already in this group.' : 'Add friends in Sanga first, then add them here.'}</p> : (
+          <h3 className="mb-2 text-sm font-semibold">{t('Your friends')}</h3>
+          {!online && <p className="mb-2 rounded-xl bg-warn-bg p-3 text-sm">{t('You’re offline. Connect to add friends.')}</p>}
+          {friends.length === 0 ? <p className="text-sm text-muted">{chats.some((c) => !c.peer.startsWith('g:')) ? t('All your friends are already in this group.') : t('Add friends in Sanga first, then add them here.')}</p> : (
             <ul className="max-h-56 divide-y divide-line overflow-y-auto rounded-xl border border-line">
               {friends.map((f) => (
                 <li key={f.peer} className="flex items-center gap-3 px-3 py-2">
                   <PersonDot p={{ id: f.peer, name: f.name, u: f.peer }} name={f.name} size={32} />
                   <span className="min-w-0 flex-1 truncate text-sm font-medium">{f.name}</span>
-                  <Button size="sm" variant="outline" loading={busy === f.peer} disabled={!online || busy !== null} onClick={() => void add(f.peer, f.name)}>Add</Button>
+                  <Button size="sm" variant="outline" loading={busy === f.peer} disabled={!online || busy !== null} onClick={() => void add(f.peer, f.name)}>{t('Add')}</Button>
                 </li>
               ))}
             </ul>
           )}
         </section>
         <section>
-          <h3 className="mb-2 text-sm font-semibold">Someone not on Sanga</h3>
+          <h3 className="mb-2 text-sm font-semibold">{t('Someone not on Sanga')}</h3>
           <form className="flex gap-2" onSubmit={(e) => {
             e.preventDefault();
             const n = name.trim();
             if (!n || people.some((p) => p.name.toLowerCase() === n.toLowerCase() && !p.u)) return;
             addPerson(g.gid, n); setName('');
           }}>
-            <div className="flex-1"><Label htmlFor="pn">Name</Label><Input id="pn" maxLength={40} placeholder="e.g. Rohan" value={name} onChange={(e) => setName(e.target.value)} /></div>
-            <Button type="submit" variant="secondary" className="mt-[1.65rem]" disabled={!name.trim()}><UserPlus className="size-4" />Add</Button>
+            <div className="flex-1"><Label htmlFor="pn">{t('Name')}</Label><Input id="pn" maxLength={40} placeholder={t('e.g. Rohan')} value={name} onChange={(e) => setName(e.target.value)} /></div>
+            <Button type="submit" variant="secondary" className="mt-[1.65rem]" disabled={!name.trim()}><UserPlus className="size-4" />{t('Add')}</Button>
           </form>
-          <p className="mt-1.5 text-xs text-muted">They can be in expenses and balances, but they can’t open the group themselves.</p>
+          <p className="mt-1.5 text-xs text-muted">{t('They can be in expenses and balances, but they can’t open the group themselves.')}</p>
         </section>
         {error && <p className="text-sm text-danger" role="alert">{error}</p>}
       </div>

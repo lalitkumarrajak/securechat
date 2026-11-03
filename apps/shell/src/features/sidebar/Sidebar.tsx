@@ -17,6 +17,7 @@ import { AppTabs } from '../nav/AppTabs';
 import { ChatRow } from './ChatRow';
 import { EmptyList } from './EmptyList';
 import { PeekButton } from './PeekButton';
+import { t } from '@sanga/i18n';
 
 export function Sidebar() {
   const me = useApp((s) => s.me)!;
@@ -27,7 +28,7 @@ export function Sidebar() {
   const panel = useApp((s) => s.panel);
   const syncing = useApp((s) => s.syncing);
   const [waited, setWaited] = useState(false); // stop showing placeholders if the server is slow to answer
-  useEffect(() => { const t = setTimeout(() => setWaited(true), 10_000); return () => clearTimeout(t); }, []);
+  useEffect(() => { const timer = setTimeout(() => setWaited(true), 10_000); return () => clearTimeout(timer); }, []);
   const headerTitle = useSettings((s) => s.headerTitle);
   const appLock = useSettings((s) => !!s.appLock);
   const [query, setQuery] = useState('');
@@ -55,20 +56,20 @@ export function Sidebar() {
       {/* Stories has no top bar: "My story" is the first thing on it. */}
       {!storiesTab && (archivedView ? (
         <header className="flex h-14 shrink-0 items-center gap-2 px-3 md:h-16">
-          <IconButton label="Back" onClick={() => setApp({ panel: null })}><ArrowLeft /></IconButton>
-          <h1 className="flex-1 text-lg font-semibold">Archived</h1>
+          <IconButton label={t('Back')} onClick={() => setApp({ panel: null })}><ArrowLeft /></IconButton>
+          <h1 className="flex-1 text-lg font-semibold">{t('Archived')}</h1>
         </header>
       ) : (
         <header className="flex h-14 shrink-0 items-center gap-2 px-3 md:h-16">
-          <button onClick={() => setApp({ panel: 'settings' })} aria-label="Profile and settings" className="rounded-full">
+          <button onClick={() => setApp({ panel: 'settings' })} aria-label={t('Profile and settings')} className="rounded-full">
             <Avatar u={me.u} name={me.name} size={40} />
           </button>
           <h1 className="min-w-0 flex-1 truncate pl-1 text-xl font-bold tracking-tight">{headerTitle.trim() || me.u}</h1>
           <div className="flex items-center">
             <PeekButton />
-            {appLock && <IconButton label="Lock Sanga" onClick={lockNow}><Lock /></IconButton>}
+            {appLock && <IconButton label={t('Lock Sanga')} onClick={lockNow}><Lock /></IconButton>}
             <div className="relative">
-              <IconButton label="Friends" onClick={() => setApp({ panel: 'friends', friendsTab: incoming ? 'requests' : 'friends' })}>
+              <IconButton label={t('Friends')} onClick={() => setApp({ panel: 'friends', friendsTab: incoming ? 'requests' : 'friends' })}>
                 <UserPlus />
               </IconButton>
               {incoming > 0 && (
@@ -76,18 +77,18 @@ export function Sidebar() {
               )}
             </div>
             <Menu>
-              <MenuTrigger asChild><IconButton label="Menu"><MoreVertical /></IconButton></MenuTrigger>
+              <MenuTrigger asChild><IconButton label={t('Menu')}><MoreVertical /></IconButton></MenuTrigger>
               <MenuContent>
-                <MenuItem icon={<MessageSquarePlus />} onSelect={() => setApp({ panel: 'friends', friendsTab: 'friends' })}>New chat</MenuItem>
-                <MenuItem icon={<Users />} onSelect={() => setApp({ panel: 'newgroup' })}>New group</MenuItem>
-                <MenuItem icon={<CirclePlus />} onSelect={() => openComposer()}>New story</MenuItem>
-                <MenuItem icon={<UserPlus />} onSelect={() => setApp({ panel: 'friends', friendsTab: 'add' })}>Add friend</MenuItem>
-                <MenuItem icon={<Archive />} onSelect={() => setApp({ panel: 'archived' })}>Archived chats</MenuItem>
-                <MenuItem icon={<Settings />} onSelect={() => setApp({ panel: 'settings' })}>Settings</MenuItem>
+                <MenuItem icon={<MessageSquarePlus />} onSelect={() => setApp({ panel: 'friends', friendsTab: 'friends' })}>{t('New chat')}</MenuItem>
+                <MenuItem icon={<Users />} onSelect={() => setApp({ panel: 'newgroup' })}>{t('New group')}</MenuItem>
+                <MenuItem icon={<CirclePlus />} onSelect={() => openComposer()}>{t('New story')}</MenuItem>
+                <MenuItem icon={<UserPlus />} onSelect={() => setApp({ panel: 'friends', friendsTab: 'add' })}>{t('Add friend')}</MenuItem>
+                <MenuItem icon={<Archive />} onSelect={() => setApp({ panel: 'archived' })}>{t('Archived chats')}</MenuItem>
+                <MenuItem icon={<Settings />} onSelect={() => setApp({ panel: 'settings' })}>{t('Settings')}</MenuItem>
                 <MenuSeparator />
                 <MenuItem icon={<LogOut />} danger onSelect={async () => {
-                  if (await confirm({ title: 'Sign out?', description: 'Messages stored on this device will be removed. You can sign in again any time.', confirmText: 'Sign out', destructive: true })) logout();
-                }}>Sign out</MenuItem>
+                  if (await confirm({ title: t('Sign out?'), description: t('Messages stored on this device will be removed. You can sign in again any time.'), confirmText: t('Sign out'), destructive: true })) logout();
+                }}>{t('Sign out')}</MenuItem>
               </MenuContent>
             </Menu>
           </div>
@@ -97,7 +98,7 @@ export function Sidebar() {
       {conn !== 'online' && (
         <div className="mx-3 mb-2 flex items-center gap-2 rounded-xl bg-warn px-3 py-2 text-sm" role="status">
           {conn === 'offline' ? <WifiOff className="size-4" /> : <Clock className="size-4 animate-pulse" />}
-          {conn === 'offline' ? 'You’re offline. Messages will send when you reconnect.' : 'Connecting…'}
+          {conn === 'offline' ? t('You’re offline. Messages will send when you reconnect.') : t('Connecting…')}
         </div>
       )}
 
@@ -108,10 +109,10 @@ export function Sidebar() {
         <div className="px-3 pb-2">
           <div className="relative">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search chats"
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('Search chats')}
               className="h-10 w-full rounded-xl bg-panel-2 pr-8 pl-9 text-sm outline-none placeholder:text-muted focus:ring-2 focus:ring-accent/30" />
             {query && (
-              <button onClick={() => setQuery('')} aria-label="Clear search" className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded-full p-1 text-muted hover:text-ink">
+              <button onClick={() => setQuery('')} aria-label={t('Clear search')} className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded-full p-1 text-muted hover:text-ink">
                 <X className="size-4" />
               </button>
             )}
@@ -121,7 +122,7 @@ export function Sidebar() {
               {(['all', 'unread'] as const).map((f) => (
                 <button key={f} onClick={() => setFilter(f)} aria-pressed={filter === f}
                   className={cn('h-8 shrink-0 rounded-full px-3.5 text-sm font-medium transition', filter === f ? 'bg-accent/15 text-accent-ink' : 'bg-panel-2 text-muted hover:text-ink')}>
-                  {f === 'all' ? 'All' : 'Unread'}
+                  {f === 'all' ? t('All') : t('Unread')}
                 </button>
               ))}
             </div>
@@ -130,7 +131,7 @@ export function Sidebar() {
         {!archivedView && archivedCount > 0 && !query && (
           <button onClick={() => setApp({ panel: 'archived' })} className="flex w-full items-center gap-4 px-5 py-3 text-left hover:bg-hover">
             <Archive className="size-5 text-accent-ink" />
-            <span className="flex-1 font-medium">Archived</span>
+            <span className="flex-1 font-medium">{t('Archived')}</span>
             <span className="text-sm text-muted">{archivedCount}</span>
           </button>
         )}

@@ -4,6 +4,7 @@
 import * as D from '@radix-ui/react-dialog';
 import { closeStories, useStories } from '../../lib/stories';
 import { Player } from './story-viewer/Player';
+import { t } from '@sanga/i18n';
 
 export function StoryViewer() {
   const open = useStories((s) => !!s.viewer);
@@ -12,7 +13,7 @@ export function StoryViewer() {
       <D.Portal>
         <D.Overlay className="fixed inset-0 z-50 bg-black animate-fade-in" />
         <D.Content className="fixed inset-0 z-50 flex justify-center bg-black text-white outline-none" aria-describedby={undefined}>
-          <D.Title className="sr-only">Stories</D.Title>
+          <D.Title className="sr-only">{t('Stories')}</D.Title>
           {open && <Player />}
         </D.Content>
       </D.Portal>

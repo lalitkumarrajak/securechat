@@ -1,6 +1,7 @@
 import { Link2, X } from 'lucide-react';
 import { IconButton } from '@sanga/ui/button';
 import type { LinkPreview } from '../../lib/types';
+import { t } from '@sanga/i18n';
 
 export function LinkCard({ lp, onClose }: { lp: LinkPreview; onClose: () => void }) {
   return (
@@ -13,7 +14,7 @@ export function LinkCard({ lp, onClose }: { lp: LinkPreview; onClose: () => void
           <span className="block truncate text-xs text-accent-ink">{lp.site}</span>
         </span>
       </div>
-      <IconButton label="Remove link preview" size="icon-sm" onClick={onClose}><X /></IconButton>
+      <IconButton label={t('Remove link preview')} size="icon-sm" onClick={onClose}><X /></IconButton>
     </div>
   );
 }

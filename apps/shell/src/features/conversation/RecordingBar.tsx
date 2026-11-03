@@ -7,6 +7,7 @@ import { fmtDuration } from '@sanga/ui/format';
 import { cn } from '@sanga/ui/utils';
 import { getApp, setApp } from '../../state/app';
 import { hold, voice } from './voiceHold';
+import { t } from '@sanga/i18n';
 
 export function RecordingBar({ peer, onDone }: { peer: string; onDone: () => void }) {
   const [elapsed, setElapsed] = useState(0);
@@ -18,8 +19,8 @@ export function RecordingBar({ peer, onDone }: { peer: string; onDone: () => voi
     const r = voice.recorder;
     if (!r) { onDone(); return; }
     if (hold.released) { hold.active = false; setLocked(true); }
-    r.onLevel = (level, t) => {
-      setElapsed(t);
+    r.onLevel = (level, secs) => {
+      setElapsed(secs);
       setLevels((l) => [...l.slice(-39), level]);
       sendTyping(peer, true);
     };
@@ -51,9 +52,9 @@ export function RecordingBar({ peer, onDone }: { peer: string; onDone: () => voi
     voice.recorder = null;
     onDone();
     if (!r) return;
-    if (!send) { r.cancel(); toast('Recording cancelled'); return; }
+    if (!send) { r.cancel(); toast(t('Recording cancelled')); return; }
     const rec = await r.stop();
-    if (!rec) { toast('Hold the mic button to record'); return; }
+    if (!rec) { toast(t('Hold the mic button to record')); return; }
     const re = getApp().replyTo;
     setApp({ replyTo: null });
     sendVoice(peer, rec, re).catch((e) => toast.error(e.message));
@@ -62,7 +63,7 @@ export function RecordingBar({ peer, onDone }: { peer: string; onDone: () => voi
   return (
     <div className="flex shrink-0 items-center gap-3 border-t border-line bg-panel px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
       {locked ? (
-        <IconButton label="Delete recording" onClick={() => finish(false)} className="text-danger hover:text-danger"><Trash2 /></IconButton>
+        <IconButton label={t('Delete recording')} onClick={() => finish(false)} className="text-danger hover:text-danger"><Trash2 /></IconButton>
       ) : (
         <span className="size-3 animate-pulse rounded-full bg-danger" aria-hidden />
       )}
@@ -73,12 +74,12 @@ export function RecordingBar({ peer, onDone }: { peer: string; onDone: () => voi
         )) : null}
         {!locked && (
           <span className={cn('ml-auto text-sm text-muted transition', slide > 0 && 'mr-auto ml-0')} style={{ transform: `translateX(-${slide}px)` }}>
-            ‹ Slide to cancel
+            {t('‹ Slide to cancel')}
           </span>
         )}
       </div>
       {locked ? (
-        <button onClick={() => finish(true)} aria-label="Send voice message"
+        <button onClick={() => finish(true)} aria-label={t('Send voice message')}
           className="grid size-11 place-items-center rounded-full bg-accent text-white shadow-sm"><SendHorizontal className="size-5" /></button>
       ) : (
         <span className="grid size-14 -m-1.5 place-items-center rounded-full bg-accent text-white shadow-lg"><Mic className="size-6" /></span>

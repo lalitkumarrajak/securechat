@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { t } from '@sanga/i18n';
 
 interface Action { label: string; value: string; variant?: 'primary' | 'danger' | 'secondary' }
 interface Req { title: string; description?: string; actions: Action[]; resolve: (v: string | null) => void }
@@ -13,7 +14,7 @@ export function choose(o: { title: string; description?: string; actions: Action
 export async function confirm(o: { title: string; description?: string; confirmText?: string; destructive?: boolean }) {
   const v = await choose({
     title: o.title, description: o.description,
-    actions: [{ label: o.confirmText || 'OK', value: 'ok', variant: o.destructive ? 'danger' : 'primary' }],
+    actions: [{ label: o.confirmText || t('OK'), value: 'ok', variant: o.destructive ? 'danger' : 'primary' }],
   });
   return v === 'ok';
 }

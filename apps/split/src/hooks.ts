@@ -1,3 +1,4 @@
+import { t } from '@sanga/i18n';
 import { useMemo } from 'react';
 import { sdk } from '@sanga/sdk';
 import { useSplit, type GroupData } from './store';
@@ -15,7 +16,7 @@ export function useNames() {
   const me = useMe();
   return useMemo(() => {
     const names = new Map(chats.map((c) => [c.peer, c.name]));
-    return (p: Pick<Person, 'id' | 'name' | 'u'>) => (p.u === me || p.id === me ? 'You' : (p.u && names.get(p.u)) || p.name);
+    return (p: Pick<Person, 'id' | 'name' | 'u'>) => (p.u === me || p.id === me ? t('You') : (p.u && names.get(p.u)) || p.name);
   }, [chats, me]);
 }
 

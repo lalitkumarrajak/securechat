@@ -5,6 +5,7 @@ import { confirm } from '@sanga/ui/confirm';
 import { getApp } from '../state/app';
 import { openChat, sendRequest } from './engine';
 import { joinGroup, previewGroup } from './groups';
+import { t, tn } from '@sanga/i18n';
 
 const KEY = 'chattrix-add';
 const GROUP_KEY = 'chattrix-join-group';
@@ -28,8 +29,8 @@ async function handleGroupInvite() {
   try {
     const g = await previewGroup(code);
     if (g.member) return openChat('g:' + g.id);
-    const ok = await confirm({ title: `Join “${g.name}”?`, description: `${g.count} member${g.count === 1 ? '' : 's'}${g.about ? ' · ' + g.about : ''}`, confirmText: 'Join group' });
-    if (ok) { await joinGroup(code); toast.success(`You joined “${g.name}”`); }
+    const ok = await confirm({ title: t('Join “{name}”?', { name: g.name }), description: tn(g.count, '{n} member', '{n} members') + (g.about ? ' · ' + g.about : ''), confirmText: t('Join group') });
+    if (ok) { await joinGroup(code); toast.success(t('You joined “{name}”', { name: g.name })); }
   } catch (e) { toast.error((e as Error).message); }
 }
 
@@ -48,11 +49,11 @@ export async function handleInvite() {
   const { me, friends, outgoing } = getApp();
   if (!me || u === me.u) return;
   if (friends[u]) return openChat(u);
-  if (outgoing.some((r) => r.u === u)) return toast('Friend request already sent', { description: `@${u} will see it.` });
-  const ok = await confirm({ title: `Add @${u} as a friend?`, description: `@${u} invited you to Sanga. Once they accept, you can chat.`, confirmText: 'Send friend request' });
+  if (outgoing.some((r) => r.u === u)) return toast(t('Friend request already sent'), { description: t('@{u} will see it.', { u }) });
+  const ok = await confirm({ title: t('Add @{u} as a friend?', { u }), description: t('@{u} invited you to Sanga. Once they accept, you can chat.', { u }), confirmText: t('Send friend request') });
   if (!ok) return;
   try {
     const r = await sendRequest(u);
-    toast.success(r?.rel === 'friends' ? 'You’re now friends' : 'Friend request sent');
+    toast.success(r?.rel === 'friends' ? t('You’re now friends') : t('Friend request sent'));
   } catch (e) { toast.error((e as Error).message); }
 }

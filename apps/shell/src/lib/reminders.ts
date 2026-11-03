@@ -6,6 +6,7 @@ import * as C from '@sanga/crypto';
 import { frameHooks, ownIdentity } from './engine';
 import { go } from './nav';
 import { useSettings } from '../state/settings';
+import { t } from '@sanga/i18n';
 
 let cached: { me: string; key: Promise<CryptoKey> } | null = null;
 function key() {
@@ -20,9 +21,9 @@ frameHooks.remind = async (m: { id: string; b: string }) => {
   if (!k || typeof m.id !== 'string' || typeof m.b !== 'string') return;
   let r: { title?: string; body?: string };
   try { r = await C.openReminder(await k.key, m.b, k.me, m.id); } catch { return; }
-  const title = String(r?.title || 'Reminder').slice(0, 200), body = String(r?.body || '').slice(0, 300);
+  const title = String(r?.title || t('Reminder')).slice(0, 200), body = String(r?.body || '').slice(0, 300);
   if (useSettings.getState().sound) chime();
-  toast(title, { id: 'remind-' + m.id, description: body, duration: 20_000, action: { label: 'Open', onClick: () => go('calendar') } });
+  toast(title, { id: 'remind-' + m.id, description: body, duration: 20_000, action: { label: t('Open'), onClick: () => go('calendar') } });
   // In another tab or window with push off, the system notification is the only way to see it.
   if (document.visibilityState !== 'visible' && !useSettings.getState().push && 'Notification' in window && Notification.permission === 'granted') {
     navigator.serviceWorker?.ready.then((reg) => reg.showNotification(title, { body, icon: '/icon-192.png', tag: 'remind-' + m.id, data: { calendar: true } })).catch(() => {});

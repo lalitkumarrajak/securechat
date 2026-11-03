@@ -2,6 +2,7 @@
 // missed turns a player has left are in Chances.tsx.)
 import { useEffect, useState, type ReactNode } from 'react';
 import { cn } from '@sanga/ui/utils';
+import { t } from '@sanga/i18n';
 
 export const TURN_TOTAL = 35_000; // 30 s per turn + the server's allowance for animations (GAME_ANIM_MS)
 const TURN_SECS = 30;
@@ -12,8 +13,8 @@ export function TurnRing({ active, deadline, color, children, total = TURN_TOTAL
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     if (!active) return;
-    const t = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(t);
+    const iv = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(iv);
   }, [active]);
   const frac = active ? Math.max(0, Math.min(1, (deadline - now) / total)) : 0;
   const low = frac < 0.25;
@@ -24,7 +25,7 @@ export function TurnRing({ active, deadline, color, children, total = TURN_TOTAL
       {children}
       {active && (
         <span className={cn('absolute -bottom-1.5 left-1/2 -translate-x-1/2 rounded-full px-1.5 text-[10px] font-bold tabular-nums text-white shadow', low ? 'bg-red-500' : 'bg-black/70')}
-          aria-label={`${secs} seconds left`}>{secs}s</span>
+          aria-label={t('{n} seconds left', { n: secs })}>{secs}s</span>
       )}
     </div>
   );

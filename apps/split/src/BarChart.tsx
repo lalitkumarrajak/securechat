@@ -1,3 +1,4 @@
+import { t } from '@sanga/i18n';
 import { useId } from 'react';
 import { money, type Bucket } from './model';
 
@@ -16,7 +17,7 @@ export function BarChart({ buckets, currency, active, onPick, label }: { buckets
   const y = (v: number) => T + (H - T - B) * (1 - v / top);
   const every = Math.ceil(buckets.length / 8);
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={`Spending over time, highest ${money(Math.max(...buckets.map((b) => b.total), 0), currency)}`} aria-describedby={id}>
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={t('Spending over time, highest {amount}', { amount: money(Math.max(...buckets.map((b) => b.total), 0), currency) })} aria-describedby={id}>
       <desc id={id}>{buckets.map((b) => `${label(b)}: ${money(b.total, currency)}`).join('. ')}</desc>
       {[0, 0.5, 1].map((f) => (
         <g key={f}>

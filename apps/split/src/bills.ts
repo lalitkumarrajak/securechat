@@ -1,17 +1,18 @@
 // Bill photos: made small on this device before they are sealed and sent (a phone photo is several MB).
 import * as C from '@sanga/crypto';
+import { t } from '@sanga/i18n';
 
 export interface Bill { mime: string; data: string } // data: base64
 
 const MAX_BYTES = 700_000;      // after shrinking
 const MAX_PDF_BYTES = 900_000;
-export const ACCEPT = 'image/*,application/pdf';
+export const ACCEPT = 'image/' + '*,application/pdf'; // in two parts: the i18n checker would read a slash-star as a comment
 
 const toB64 = async (blob: Blob) => C.b64(new Uint8Array(await blob.arrayBuffer()));
 
 async function shrink(file: File): Promise<Blob> {
   const bmp = await createImageBitmap(file).catch(() => null);
-  if (!bmp) throw new Error('This photo can’t be read here. Try a JPEG or PNG.');
+  if (!bmp) throw new Error(t('This photo can’t be read here. Try a JPEG or PNG.'));
   let edge = 1600;
   for (let attempt = 0; attempt < 5; attempt++) {
     const k = Math.min(1, edge / Math.max(bmp.width, bmp.height));
@@ -27,16 +28,16 @@ async function shrink(file: File): Promise<Blob> {
     edge = Math.round(edge * 0.75);
   }
   bmp.close?.();
-  throw new Error('That photo is too big to attach.');
+  throw new Error(t('That photo is too big to attach.'));
 }
 
 /** A picked file as a bill ready to seal: photos are resized to JPEG, PDFs must already be small. */
 export async function prepareBill(file: File): Promise<Bill> {
   if (file.type === 'application/pdf') {
-    if (file.size > MAX_PDF_BYTES) throw new Error('That PDF is too big. Attach a photo or a smaller PDF.');
+    if (file.size > MAX_PDF_BYTES) throw new Error(t('That PDF is too big. Attach a photo or a smaller PDF.'));
     return { mime: 'application/pdf', data: await toB64(file) };
   }
-  if (!file.type.startsWith('image/')) throw new Error('Attach a photo or a PDF.');
+  if (!file.type.startsWith('image/')) throw new Error(t('Attach a photo or a PDF.'));
   const blob = await shrink(file);
   return { mime: 'image/jpeg', data: await toB64(blob) };
 }

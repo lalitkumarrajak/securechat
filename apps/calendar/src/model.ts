@@ -6,7 +6,8 @@
 import { create } from 'zustand';
 import * as C from '@sanga/crypto';
 import { sdk } from '@sanga/sdk';
-import { addDays, dayKey, dayStart, lunarMonth, tithiAt, type Group } from './panchang';
+import { lang, locale, t, tk } from '@sanga/i18n';
+import { addDays, dayKey, dayStart, lunarMonth, pakshaOf, tithiAt, tithiName, type Group } from './panchang';
 import type { Place } from './astro';
 import { billId, suggestedDue, type CardBill, type CreditCard } from './cards';
 
@@ -70,7 +71,7 @@ type Item = CalEvent | FastLog | Settings | CreditCard | CardBill;
 export const SETTINGS_ID = 'settings-v1';
 export const DEFAULT_SETTINGS: Settings = {
   id: SETTINGS_ID, type: 'settings',
-  place: { name: 'New Delhi', lat: 28.6139, lon: 77.209 },
+  place: { name: tk('New Delhi'), lat: 28.6139, lon: 77.209 },
   monthStyle: 'purnimanta',
   show: ['festivals', 'ekadashi', 'pradosh', 'sankashti', 'purnima', 'amavasya', 'shivratri', 'national'],
   remindFasts: true, fastTime: '19:00', remindFestivals: true, festivalTime: '07:00', remindParana: true,
@@ -78,22 +79,22 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 export const COLORS: Record<string, { label: string; dot: string; soft: string; text: string }> = {
-  teal: { label: 'Teal', dot: 'bg-teal-500', soft: 'bg-teal-500/12', text: 'text-teal-700 dark:text-teal-300' },
-  blue: { label: 'Blue', dot: 'bg-sky-500', soft: 'bg-sky-500/12', text: 'text-sky-700 dark:text-sky-300' },
-  violet: { label: 'Violet', dot: 'bg-violet-500', soft: 'bg-violet-500/12', text: 'text-violet-700 dark:text-violet-300' },
-  pink: { label: 'Pink', dot: 'bg-pink-500', soft: 'bg-pink-500/12', text: 'text-pink-700 dark:text-pink-300' },
-  red: { label: 'Red', dot: 'bg-red-500', soft: 'bg-red-500/12', text: 'text-red-700 dark:text-red-300' },
-  orange: { label: 'Orange', dot: 'bg-orange-500', soft: 'bg-orange-500/12', text: 'text-orange-700 dark:text-orange-300' },
-  amber: { label: 'Amber', dot: 'bg-amber-500', soft: 'bg-amber-500/12', text: 'text-amber-700 dark:text-amber-300' },
-  green: { label: 'Green', dot: 'bg-green-500', soft: 'bg-green-500/12', text: 'text-green-700 dark:text-green-300' },
-  slate: { label: 'Grey', dot: 'bg-slate-500', soft: 'bg-slate-500/12', text: 'text-slate-700 dark:text-slate-300' },
+  teal: { label: tk('Teal'), dot: 'bg-teal-500', soft: 'bg-teal-500/12', text: 'text-teal-700 dark:text-teal-300' },
+  blue: { label: tk('Blue'), dot: 'bg-sky-500', soft: 'bg-sky-500/12', text: 'text-sky-700 dark:text-sky-300' },
+  violet: { label: tk('Violet'), dot: 'bg-violet-500', soft: 'bg-violet-500/12', text: 'text-violet-700 dark:text-violet-300' },
+  pink: { label: tk('Pink'), dot: 'bg-pink-500', soft: 'bg-pink-500/12', text: 'text-pink-700 dark:text-pink-300' },
+  red: { label: tk('Red'), dot: 'bg-red-500', soft: 'bg-red-500/12', text: 'text-red-700 dark:text-red-300' },
+  orange: { label: tk('Orange'), dot: 'bg-orange-500', soft: 'bg-orange-500/12', text: 'text-orange-700 dark:text-orange-300' },
+  amber: { label: tk('Amber'), dot: 'bg-amber-500', soft: 'bg-amber-500/12', text: 'text-amber-700 dark:text-amber-300' },
+  green: { label: tk('Green'), dot: 'bg-green-500', soft: 'bg-green-500/12', text: 'text-green-700 dark:text-green-300' },
+  slate: { label: tk('Grey'), dot: 'bg-slate-500', soft: 'bg-slate-500/12', text: 'text-slate-700 dark:text-slate-300' },
 };
 export const KINDS: Record<Kind, { label: string; emoji: string; color: string }> = {
-  event: { label: 'Event', emoji: '📅', color: 'teal' },
-  birthday: { label: 'Birthday', emoji: '🎂', color: 'pink' },
-  holiday: { label: 'Holiday', emoji: '🏖️', color: 'red' },
-  fast: { label: 'Fast', emoji: '🙏', color: 'amber' },
-  reminder: { label: 'Reminder', emoji: '⏰', color: 'violet' },
+  event: { label: tk('Event'), emoji: '📅', color: 'teal' },
+  birthday: { label: tk('Birthday'), emoji: '🎂', color: 'pink' },
+  holiday: { label: tk('Holiday'), emoji: '🏖️', color: 'red' },
+  fast: { label: tk('Fast'), emoji: '🙏', color: 'amber' },
+  reminder: { label: tk('Reminder'), emoji: '⏰', color: 'violet' },
 };
 
 interface CalState {
@@ -193,16 +194,16 @@ export function occurrences(e: CalEvent, from: string, to: string, place?: Place
     }
   } else if (r.freq === 'tithi' && r.tithi && place) {
     // Every lunar month, the day this tithi holds at sunrise (or begins). Months are found from new moons.
-    let t = Math.max(dayStart(first), dayStart(from) - 40 * 86400e3);
-    for (let guard = 0; guard < 400 && dayKey(new Date(t)) <= last; guard++) {
-      const m = lunarMonth(t);
+    let tm = Math.max(dayStart(first), dayStart(from) - 40 * 86400e3);
+    for (let guard = 0; guard < 400 && dayKey(new Date(tm)) <= last; guard++) {
+      const m = lunarMonth(tm);
       for (let d = 0; d < 31; d++) {
         const key = addDays(dayKey(new Date(m.start)), d);
         const rise = dayStart(key) + 6 * 3600e3;
         if (rise >= m.end) break;
         if (tithiAt(rise) === r.tithi) { if (take(key)) return out; break; }
       }
-      t = m.end + 2 * 86400e3;
+      tm = m.end + 2 * 86400e3;
     }
   }
   return out;
@@ -237,28 +238,44 @@ export function eventsByDay(events: CalEvent[], from: string, to: string, place:
 }
 
 export function describeRepeat(r: Repeat | null, start: string) {
-  if (!r) return 'Does not repeat';
-  const n = Math.max(1, r.interval || 1);
+  if (!r) return t('Does not repeat');
+  const n = Math.max(1, r.interval || 1), one = n === 1;
   const d = new Date(dayStart(start.slice(0, 10)));
-  const wd = d.toLocaleDateString([], { weekday: 'long' });
-  const every = (one: string, many: string) => (n === 1 ? `Every ${one}` : `Every ${n} ${many}`);
+  const wd = d.toLocaleDateString(locale(), { weekday: 'long' });
   let s: string;
   switch (r.freq) {
-    case 'daily': s = every('day', 'days'); break;
-    case 'weekly': s = every('week', 'weeks') + ' on ' + (r.days?.length ? r.days.map((x) => WEEKDAYS[x].slice(0, 3)).join(', ') : wd); break;
-    case 'monthly': s = every('month', 'months') + (r.byWeekday ? ` on the ${ORD[nthWeekday(start.slice(0, 10)) - 1]} ${wd}` : ` on the ${ordinal(d.getDate())}`); break;
-    case 'yearly': s = every('year', 'years') + ' on ' + d.toLocaleDateString([], { day: 'numeric', month: 'long' }); break;
-    case 'tithi': s = `Every lunar month on ${r.tithi ? (r.tithi <= 15 ? 'Shukla ' : 'Krishna ') + TITHI_SHORT(r.tithi) : 'this tithi'}`; break;
+    case 'daily': s = one ? t('Every day') : t('Every {n} days', { n }); break;
+    case 'weekly': {
+      const days = r.days?.length ? r.days.map((x) => t(WEEKDAYS_SHORT[x])).join(', ') : wd;
+      s = one ? t('Every week on {days}', { days }) : t('Every {n} weeks on {days}', { n, days });
+      break;
+    }
+    case 'monthly':
+      if (r.byWeekday) {
+        const nth = t(ORD[nthWeekday(start.slice(0, 10)) - 1]);
+        s = one ? t('Every month on the {nth} {weekday}', { nth, weekday: wd }) : t('Every {n} months on the {nth} {weekday}', { n, nth, weekday: wd });
+      } else {
+        const day = ordinal(d.getDate());
+        s = one ? t('Every month on the {day}', { day }) : t('Every {n} months on the {day}', { n, day });
+      }
+      break;
+    case 'yearly': {
+      const date = d.toLocaleDateString(locale(), { day: 'numeric', month: 'long' });
+      s = one ? t('Every year on {date}', { date }) : t('Every {n} years on {date}', { n, date });
+      break;
+    }
+    case 'tithi': s = r.tithi ? t('Every lunar month on {paksha} {tithi}', { paksha: t(pakshaOf(r.tithi)), tithi: t(tithiName(r.tithi)) }) : t('Every lunar month on this tithi'); break;
   }
-  if (r.until) s += `, until ${new Date(dayStart(r.until)).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })}`;
-  else if (r.count) s += `, ${r.count} times`;
+  if (r.until) s = t('{repeat}, until {date}', { repeat: s, date: new Date(dayStart(r.until)).toLocaleDateString(locale(), { day: 'numeric', month: 'short', year: 'numeric' }) });
+  else if (r.count) s = t('{repeat}, {n} times', { repeat: s, n: r.count });
   return s;
 }
-export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const ORD = ['first', 'second', 'third', 'fourth', 'fifth'];
-const ordinal = (n: number) => n + (n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th');
-const TITHI_SHORT = (n: number) => (n === 15 ? 'Purnima' : n === 30 ? 'Amavasya' : ['Pratipada', 'Dwitiya', 'Tritiya', 'Chaturthi', 'Panchami', 'Shashthi',
-  'Saptami', 'Ashtami', 'Navami', 'Dashami', 'Ekadashi', 'Dwadashi', 'Trayodashi', 'Chaturdashi'][(n - 1) % 15]);
+export const WEEKDAYS = [tk('Sunday'), tk('Monday'), tk('Tuesday'), tk('Wednesday'), tk('Thursday'), tk('Friday'), tk('Saturday')];
+export const WEEKDAYS_SHORT = [tk('Sun'), tk('Mon'), tk('Tue'), tk('Wed'), tk('Thu'), tk('Fri'), tk('Sat')];
+/** "the first Monday" … "the fifth Monday": show with t(). */
+export const ORD = [tk('first'), tk('second'), tk('third'), tk('fourth'), tk('fifth')];
+/** "14th" (in Hindi, just the number). */
+export const ordinal = (n: number) => (lang() !== 'en' ? String(n) : n + (n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th'));
 
 // ---------- on this device ----------
 const KEY = 'app/calendar/item/';
@@ -320,7 +337,7 @@ const soon = () => { clearTimeout(timer); timer = window.setTimeout(() => void s
 let key: Promise<CryptoKey> | null = null;
 function calKey() {
   const { priv, pub } = sdk().identity();
-  if (!priv) throw new Error('Not signed in');
+  if (!priv) throw new Error('Not signed in'); // i18n-ok
   return (key ??= C.appKey(priv, pub, 'calendar'));
 }
 

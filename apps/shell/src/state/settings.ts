@@ -9,6 +9,7 @@ export type FontSize = 'sm' | 'md' | 'lg';
 export type Wallpaper = 'doodle' | 'dots' | 'grid' | 'gradient' | 'plain';
 
 import type { PinHash } from '../lib/pin';
+import { tk } from '@sanga/i18n';
 
 export interface Settings {
   theme: Theme;
@@ -29,12 +30,12 @@ export interface Settings {
 }
 
 export const ACCENTS: { id: Accent; label: string; color: string }[] = [
-  { id: 'teal', label: 'Teal', color: '#0d9488' },
-  { id: 'blue', label: 'Blue', color: '#2563eb' },
-  { id: 'violet', label: 'Violet', color: '#7c3aed' },
-  { id: 'pink', label: 'Pink', color: '#db2777' },
-  { id: 'orange', label: 'Orange', color: '#ea580c' },
-  { id: 'green', label: 'Green', color: '#16a34a' },
+  { id: 'teal', label: tk('Teal'), color: '#0d9488' },
+  { id: 'blue', label: tk('Blue'), color: '#2563eb' },
+  { id: 'violet', label: tk('Violet'), color: '#7c3aed' },
+  { id: 'pink', label: tk('Pink'), color: '#db2777' },
+  { id: 'orange', label: tk('Orange'), color: '#ea580c' },
+  { id: 'green', label: tk('Green'), color: '#16a34a' },
 ];
 
 const defaults: Settings = {

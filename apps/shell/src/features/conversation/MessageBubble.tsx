@@ -13,6 +13,7 @@ import { Meta } from './message-bubble/Meta';
 import { Quote } from './message-bubble/Quote';
 import { Reactions } from './message-bubble/Reactions';
 import { DesktopMenu } from './message-bubble/DesktopMenu';
+import { t } from '@sanga/i18n';
 
 interface Props {
   m: Msg;
@@ -47,8 +48,8 @@ export const MessageBubble = memo(function MessageBubble({ m, me, peerName, firs
   // ---- touch: long-press opens the action sheet, swipe right replies ----
   const onTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length > 1) return;
-    const t = e.touches[0];
-    const p = { timer: 0, x: t.clientX, y: t.clientY, dx: 0, horizontal: null as boolean | null, long: false };
+    const tch = e.touches[0];
+    const p = { timer: 0, x: tch.clientX, y: tch.clientY, dx: 0, horizontal: null as boolean | null, long: false };
     p.timer = window.setTimeout(() => {
       p.long = true;
       navigator.vibrate?.(12);
@@ -60,8 +61,8 @@ export const MessageBubble = memo(function MessageBubble({ m, me, peerName, firs
   const onTouchMove = (e: React.TouchEvent) => {
     const p = press.current;
     if (!p) return;
-    const t = e.touches[0];
-    const mx = t.clientX - p.x, my = t.clientY - p.y;
+    const tch = e.touches[0];
+    const mx = tch.clientX - p.x, my = tch.clientY - p.y;
     if (Math.abs(mx) > 8 || Math.abs(my) > 8) clearTimeout(p.timer);
     if (p.horizontal === null && (Math.abs(mx) > 10 || Math.abs(my) > 10)) {
       p.horizontal = !selecting && !deleted && mx > 0 && Math.abs(mx) > Math.abs(my) * 1.5;
@@ -152,7 +153,7 @@ export const MessageBubble = memo(function MessageBubble({ m, me, peerName, firs
           {showSender && (
             <div className="px-0.5 pb-0.5 text-[13px] font-semibold" style={{ color: `hsl(${nameHue(from)} 55% 45%)` }}>{memberName(from, group)}</div>
           )}
-          {m.fwd && <div className="flex items-center gap-1 px-0.5 text-xs text-muted italic"><Forward className="size-3" /> Forwarded</div>}
+          {m.fwd && <div className="flex items-center gap-1 px-0.5 text-xs text-muted italic"><Forward className="size-3" /> {t('Forwarded')}</div>}
           {m.re && <Quote re={m.re} me={me} peerName={isGroup(m.peer) ? memberName(m.re.f, group) : peerName} />}
           {album ? <Album album={album} /> : <Body m={m} emoji={emoji} me={me} members={group?.members.map((x) => x.u)} />}
           <Meta m={m} pinned={pinned} bare={bare} {...(album && { onPhoto: !album.some((x) => x.text) })} />
