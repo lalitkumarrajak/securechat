@@ -25,7 +25,7 @@ export function ExpensesTab({ g, onOpen }: { g: GroupData; onOpen: (e: Expense) 
       .filter((e) => (!cat || e.cat === cat) && (!s || e.desc.toLowerCase().includes(s) || (e.notes ?? '').toLowerCase().includes(s) || catOf(e.cat).name.toLowerCase().includes(s)))
       .map((e) => ({ kind: 'e' as const, e }));
     if (!cat && !s) {
-      for (const p of settles) items.push({ kind: 's', id: p.id, date: p.date, text: `${name(person(p.from))} paid ${name(person(p.to))} ${money(p.amount, currency)}` });
+      for (const p of settles) items.push({ kind: 's', id: p.id, date: p.date, text: `${name(person(p.from))} paid ${name(person(p.to))} ${money(p.amount, currency)}${p.pending ? ' · waiting for confirmation' : ''}` });
     }
     items.sort((a, b) => { const da = a.kind === 'e' ? a.e.date : a.date, db = b.kind === 'e' ? b.e.date : b.date; return da < db ? 1 : da > db ? -1 : 0; });
     const out: { day: string; items: Item[] }[] = [];

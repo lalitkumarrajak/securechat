@@ -131,6 +131,8 @@ export function save(gid: string, r: Record_) {
   void keep(gid, { ...rec, by: me(), edited: now, dirty: true } as Local<Record_>).then(soon);
 }
 export const removeRecord = (gid: string, r: Expense | Settlement) => save(gid, { ...r, deleted: true });
+/** Whoever got the money says yes: from now on the payment counts. */
+export const confirmPayment = (gid: string, s: Settlement) => { const { pending: _p, ...rest } = s; save(gid, rest); };
 
 /** You've looked at the group's activity up to now. */
 export function markSeen(gid: string) {
@@ -362,7 +364,7 @@ function valid(x: any, id: string): Record_ | null {
   }
   if (x.type === 'settle') {
     if (!isStr(x.from, 40) || !isStr(x.to, 40) || !isAmt(x.amount) || !validDay(x.date) || !isStr(x.by, 40)) return null;
-    return { type: 'settle', id, from: x.from, to: x.to, amount: x.amount, date: x.date, ...(isStr(x.note, 300) && x.note && { note: x.note }), by: x.by, edited: Number(x.edited) || 0 };
+    return { type: 'settle', id, from: x.from, to: x.to, amount: x.amount, date: x.date, ...(isStr(x.note, 300) && x.note && { note: x.note }), ...(x.pending === true && { pending: true as const }), by: x.by, edited: Number(x.edited) || 0 };
   }
   if (x.type === 'activity') {
     if (!ACTIVITY_KINDS.includes(x.kind) || !isStr(x.by, 40) || !Number.isFinite(x.ts)) return null;

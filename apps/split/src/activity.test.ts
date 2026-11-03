@@ -34,4 +34,12 @@ describe('history lines', () => {
     expect(kinds(activityFor(two, { ...two, people: two.people.filter((p) => p.id !== 'p1') }, 'a', 1))).toEqual(['person_remove']);
     expect(activityFor(two, { ...two, cats: [{ id: 'c1', name: 'Cricket', emoji: '🏏', color: '#22c55e' }] }, 'a', 1)).toMatchObject([{ kind: 'category_add', name: 'Cricket' }]);
   });
+  it('a payment that needs confirming: asked, confirmed, or cancelled', () => {
+    const s: Settlement = { type: 'settle', id: 's', from: 'b', to: 'a', amount: 50, date: '2026-11-03', pending: true, by: 'b', edited: 0 };
+    expect(kinds(activityFor(undefined, s, 'b', 1))).toEqual(['settle_request']);
+    const { pending: _p, ...done } = s;
+    expect(kinds(activityFor(s, done, 'a', 2))).toEqual(['settle_confirm']);
+    expect(kinds(activityFor(s, { ...s, deleted: true }, 'a', 3))).toEqual(['settle_decline']);
+    expect(kinds(activityFor(done, { ...done, deleted: true }, 'a', 4))).toEqual(['settle_undo']);
+  });
 });

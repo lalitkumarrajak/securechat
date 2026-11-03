@@ -35,12 +35,14 @@ export interface Expense {
 
 export interface Settlement {
   type: 'settle'; id: string; from: string; to: string; amount: number; date: string; note?: string;
+  /** Recorded by someone other than who got the money: it counts only once they confirm it. */
+  pending?: true;
   by: string; edited: number; deleted?: boolean;
 }
 
 /** One line of the group's history, never changed or removed: who did what, and when. */
 export type ActivityKind = 'group_create' | 'group_rename' | 'person_add' | 'person_remove' | 'person_left' | 'category_add'
-  | 'expense_add' | 'expense_edit' | 'expense_delete' | 'settle_add' | 'settle_undo' | 'person_link' | 'person_rename';
+  | 'expense_add' | 'expense_edit' | 'expense_delete' | 'settle_add' | 'settle_undo' | 'person_link' | 'person_rename' | 'settle_request' | 'settle_confirm' | 'settle_decline';
 export interface Activity {
   type: 'activity'; id: string; kind: ActivityKind;
   by: string;                      // username of whoever did it
@@ -53,7 +55,7 @@ export interface Activity {
   name?: string;                   // a group or category name
 }
 export const ACTIVITY_KINDS: ActivityKind[] = ['group_create', 'group_rename', 'person_add', 'person_remove', 'person_left', 'category_add',
-  'expense_add', 'expense_edit', 'expense_delete', 'settle_add', 'settle_undo', 'person_link', 'person_rename'];
+  'expense_add', 'expense_edit', 'expense_delete', 'settle_add', 'settle_undo', 'person_link', 'person_rename', 'settle_request', 'settle_confirm', 'settle_decline'];
 
 export type Record_ = Meta | Expense | Settlement | Activity;
 
@@ -79,6 +81,10 @@ export function moveLedger(expenses: Expense[], settles: Settlement[], from: str
   }
   return out;
 }
+
+/** Whether a payment someone is recording has to be confirmed first: yes, unless the one recording it is
+ *  who got the money, or that person isn't on Sanga (no one could confirm it). */
+export const needsConfirm = (to: Person | undefined, me: string) => !!to?.u && to.u !== me;
 
 // ---------- across all groups ----------
 export interface Standing { cur: string; get: number; owe: number; people: { key: string; name: string; u?: string; amount: number }[] }
@@ -201,7 +207,8 @@ export function splitAmount(amount: number, mode: Mode, ids: string[], values: R
 }
 
 // ---------- who owes whom ----------
-/** Net position per person: positive is owed money, negative owes. Deleted records are ignored. */
+/** Net position per person: positive is owed money, negative owes. Deleted records, and payments still
+ *  waiting for the person who got the money to confirm them, are ignored. */
 export function balances(expenses: Expense[], settles: Settlement[]): Record<string, number> {
   const net: Record<string, number> = {};
   const add = (id: string, n: number) => { net[id] = (net[id] ?? 0) + n; };
@@ -210,7 +217,7 @@ export function balances(expenses: Expense[], settles: Settlement[]): Record<str
     add(e.paidBy, e.amount);
     for (const [id, n] of Object.entries(e.owed)) add(id, -n);
   }
-  for (const s of settles) { if (s.deleted) continue; add(s.from, s.amount); add(s.to, -s.amount); }
+  for (const s of settles) { if (s.deleted || s.pending) continue; add(s.from, s.amount); add(s.to, -s.amount); }
   return net;
 }
 

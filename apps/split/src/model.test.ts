@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, apportion, balances, byCategory, grainFor, linesOf, moveLedger, standing, parseAmount, rangeFor, series, simplify, splitAmount, sum, toInput, type Expense, type Settlement } from './model';
+import { addDays, apportion, balances, byCategory, grainFor, linesOf, moveLedger, needsConfirm, standing, parseAmount, rangeFor, series, simplify, splitAmount, sum, toInput, type Expense, type Settlement } from './model';
 
 const exp = (o: Partial<Expense>): Expense => ({ type: 'expense', id: 'e' + Math.random(), desc: 'x', amount: 0, cat: 'food', date: '2026-11-02', paidBy: 'a', mode: 'equal', values: {}, owed: {}, by: 'a', edited: 0, ...o });
 
@@ -123,5 +123,19 @@ describe('standing across groups', () => {
     expect(inr).toMatchObject({ cur: 'INR', get: 600, owe: 250 });
     expect(inr.people.map((p) => [p.name, p.amount])).toEqual([['Rohan', 300], ['Ravi', 50]]);
     expect(usdS).toMatchObject({ cur: 'USD', get: 0, owe: 50 });
+  });
+});
+
+describe('payments waiting for confirmation', () => {
+  it('do not count until the one who got the money confirms', () => {
+    const es = [exp({ amount: 100, paidBy: 'a', owed: { a: 50, b: 50 } })];
+    const s = { type: 'settle', id: 's', from: 'b', to: 'a', amount: 50, date: '2026-11-03', by: 'b', edited: 0 } as Settlement;
+    expect(balances(es, [{ ...s, pending: true }])).toEqual({ a: 50, b: -50 });
+    expect(balances(es, [s])).toEqual({ a: 0, b: 0 });
+  });
+  it('are needed unless you got the money or they are not on Sanga', () => {
+    expect(needsConfirm({ id: 'a', name: 'A', u: 'a' }, 'b')).toBe(true);
+    expect(needsConfirm({ id: 'a', name: 'A', u: 'a' }, 'a')).toBe(false);
+    expect(needsConfirm({ id: 'p1', name: 'Rohan' }, 'b')).toBe(false);
   });
 });

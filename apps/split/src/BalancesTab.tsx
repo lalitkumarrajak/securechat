@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import { ArrowRight, Undo2 } from 'lucide-react';
+import { ArrowRight, Check, Clock, Undo2, X } from 'lucide-react';
 import { Button } from '@sanga/ui/button';
 import { balances, money, parseDay, simplify, type Transfer } from './model';
 import { useLedger, useMe, useNames } from './hooks';
-import { removeRecord, type GroupData } from './store';
+import { confirmPayment, removeRecord, type GroupData } from './store';
 import { Empty } from './Empty';
 import { PersonDot } from './PersonDot';
 import { SettleDialog } from './SettleDialog';
@@ -17,6 +17,7 @@ export function BalancesTab({ g }: { g: GroupData }) {
   const currency = meta?.currency ?? 'INR';
   const net = useMemo(() => balances(expenses, settles), [expenses, settles]);
   const plan = useMemo(() => simplify(net), [net]);
+  const waiting = settles.filter((s) => s.pending), done = settles.filter((s) => !s.pending);
   const rows = people.filter((p) => net[p.id] || !p.gone).sort((a, b) => (net[b.id] ?? 0) - (net[a.id] ?? 0));
 
   if (!expenses.length && !settles.length) return <Empty emoji="⚖️" title="Nothing to settle">Balances appear once there are expenses.</Empty>;
@@ -57,11 +58,44 @@ export function BalancesTab({ g }: { g: GroupData }) {
         )}
       </section>
 
-      {settles.length > 0 && (
+      {waiting.length > 0 && (
+        <section aria-label="Waiting for confirmation">
+          <h3 className="mb-2 text-sm font-semibold">Waiting for confirmation</h3>
+          <ul className="space-y-2">
+            {waiting.map((s) => {
+              const mine = person(s.to).u === me;
+              return (
+                <li key={s.id} className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                  <span className="flex items-start gap-2">
+                    <Clock className="mt-0.5 size-4 shrink-0 text-amber-600" aria-hidden />
+                    <span className="min-w-0 flex-1">
+                      {name(person(s.from))} paid {name(person(s.to))} <b className="tabular-nums">{money(s.amount, currency)}</b>
+                      <span className="block text-xs text-muted">
+                        {parseDay(s.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}{s.note && ` · ${s.note}`}
+                        {' · '}{mine ? `recorded by ${name(person(s.by))}` : `waiting for ${name(person(s.to))} to confirm`}
+                      </span>
+                    </span>
+                  </span>
+                  <span className="mt-2 flex justify-end gap-2">
+                    {mine ? (<>
+                      <Button size="sm" variant="outline" onClick={() => removeRecord(g.gid, s)}><X className="size-4" />Decline</Button>
+                      <Button size="sm" onClick={() => confirmPayment(g.gid, s)}><Check className="size-4" />Confirm I got it</Button>
+                    </>) : (s.by === me || person(s.from).u === me) && (
+                      <Button size="sm" variant="ghost" onClick={() => removeRecord(g.gid, s)}>Cancel</Button>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {done.length > 0 && (
         <section aria-label="Payments made">
           <h3 className="mb-2 text-sm font-semibold">Payments made</h3>
           <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-panel">
-            {settles.map((s) => (
+            {done.map((s) => (
               <li key={s.id} className="flex items-center gap-2 px-4 py-2.5 text-sm">
                 <span className="min-w-0 flex-1">
                   {name(person(s.from))} paid {name(person(s.to))} <b className="tabular-nums">{money(s.amount, currency)}</b>

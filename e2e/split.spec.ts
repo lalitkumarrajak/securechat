@@ -111,10 +111,23 @@ test('expenses sync both ways, with a bill, and balances agree', async () => {
 test('settling up: a recorded payment changes both balances', async () => {
   await split(B).getByRole('button', { name: 'Record payment' }).first().click();
   const d = B.page.getByRole('dialog', { name: 'Record a payment' });
-  await d.getByRole('button', { name: 'Save payment' }).click();
-  await expect(split(B).getByText('Payments made')).toBeVisible();
-  await split(A).getByRole('tab', { name: 'Balances' }).click();
-  await expect(split(A).getByText('Payments made')).toBeVisible({ timeout: 20_000 });
+  // B pays A back, so A (who got the money) has to confirm it before it counts.
+  await expect(d.getByText('will be asked to confirm')).toBeVisible();
+  await d.getByRole('button', { name: 'Send for confirmation' }).click();
+  const waitingB = split(B).getByRole('region', { name: 'Waiting for confirmation' });
+  await expect(waitingB.getByText(`waiting for ${A.u} to confirm`)).toBeVisible();
+  await expect(waitingB.getByRole('button', { name: 'Confirm I got it' })).toHaveCount(0);
+  await expect(split(B).getByText('Payments made')).toHaveCount(0);
+  await expect(split(B).getByText(/You\s+owes? /).first()).toBeVisible(); // nothing counted yet
+
+  await split(A).getByRole('tab', { name: /Balances/ }).click();
+  await expect(split(A).getByRole('tab', { name: /Balances/ })).toContainText('1');
+  const waitingA = split(A).getByRole('region', { name: 'Waiting for confirmation' });
+  await expect(waitingA.getByText(`recorded by ${B.u}`)).toBeVisible({ timeout: 20_000 });
+  await waitingA.getByRole('button', { name: 'Confirm I got it' }).click();
+  await expect(split(A).getByText('Payments made')).toBeVisible();
+  await expect(split(B).getByText('Payments made')).toBeVisible({ timeout: 20_000 });
+  await expect(split(B).getByRole('region', { name: 'Waiting for confirmation' })).toHaveCount(0);
 });
 
 test('insights: where the money went, by category and over time, for any period', async () => {

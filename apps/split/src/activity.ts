@@ -16,8 +16,9 @@ function expenseLines(prev: Expense | undefined, e: Expense): Line[] {
 
 function settleLines(prev: Settlement | undefined, s: Settlement): Line[] {
   const base = { from: s.from, to: s.to, amount: s.amount };
-  if (s.deleted) return prev && !prev.deleted ? [{ kind: 'settle_undo', ...base }] : [];
-  return prev && !prev.deleted ? [] : [{ kind: 'settle_add', ...base }];
+  if (s.deleted) return prev && !prev.deleted ? [{ kind: prev.pending ? 'settle_decline' : 'settle_undo', ...base }] : [];
+  if (!prev || prev.deleted) return [{ kind: s.pending ? 'settle_request' : 'settle_add', ...base }];
+  return prev.pending && !s.pending ? [{ kind: 'settle_confirm', ...base }] : [];
 }
 
 function metaLines(prev: Meta | null | undefined, m: Meta, by: string): Line[] {

@@ -35,6 +35,15 @@ export function useLedger(g: GroupData | null) {
 
 const newest = (a: { date: string; edited: number }, b: { date: string; edited: number }) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.edited - a.edited);
 
+/** Payments others recorded as paid to you, waiting for you to confirm them. */
+export function usePendingForMe(g: GroupData | null) {
+  const me = useMe();
+  return useMemo(() => {
+    const people = g?.meta?.people ?? [];
+    return Object.values(g?.settles ?? {}).filter((s) => !s.deleted && s.pending && people.find((p) => p.id === s.to)?.u === me) as Settlement[];
+  }, [g, me]);
+}
+
 /** How many entries in the group's activity are from other people and newer than when you last looked. */
 export function useUnread(gid: string) {
   const me = useMe();

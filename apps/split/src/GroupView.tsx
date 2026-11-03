@@ -3,7 +3,7 @@ import { ArrowLeft, Bell, PieChart, Plus, Receipt, Scale, Settings, Users } from
 import { IconButton } from '@sanga/ui/button';
 import { Tabs, TabsContent, TabsList } from '@sanga/ui/tabs';
 import { balances, money, type Expense } from './model';
-import { useGroup, useLedger, useMe, useUnread } from './hooks';
+import { useGroup, useLedger, useMe, usePendingForMe, useUnread } from './hooks';
 import { ActivityTab } from './ActivityTab';
 import { blankExpense } from './blankExpense';
 import { AddPeopleDialog } from './AddPeopleDialog';
@@ -17,11 +17,11 @@ import { InsightsTab } from './InsightsTab';
 import { PeopleTab } from './PeopleTab';
 
 /** A tab's name: on a phone the icon sits above a small label, so five of them fit and read at a glance. */
-function TabLabel({ icon: Icon, badge = 0, children }: { icon: typeof Bell; badge?: number; children: string }) {
+function TabLabel({ icon: Icon, badge = 0, badgeLabel = 'new', children }: { icon: typeof Bell; badge?: number; badgeLabel?: string; children: string }) {
   return (
     <span className="relative flex flex-col items-center gap-0.5 text-[11px] leading-tight sm:flex-row sm:gap-0 sm:text-sm">
       <Icon className="size-[18px] sm:hidden" aria-hidden />{children}
-      {badge > 0 && <span className="absolute -top-1 left-1/2 ml-1.5 grid min-w-4 place-items-center rounded-full bg-danger px-1 text-[10px] font-bold text-white sm:-top-1.5 sm:-right-4 sm:left-auto sm:ml-0" aria-label={`${badge} new`}>{badge}</span>}
+      {badge > 0 && <span className="absolute -top-1 left-1/2 ml-1.5 grid min-w-4 place-items-center rounded-full bg-danger px-1 text-[10px] font-bold text-white sm:-top-1.5 sm:-right-4 sm:left-auto sm:ml-0" aria-label={`${badge} ${badgeLabel}`}>{badge}</span>}
     </span>
   );
 }
@@ -37,6 +37,7 @@ export function GroupView({ gid, start, onBack, onGone }: { gid: string; start?:
   const [settings, setSettings] = useState(false);
   const [adding, setAdding] = useState(false);
   const unread = useUnread(gid);
+  const toConfirm = usePendingForMe(g).length;
   const mine = useMemo(() => balances(expenses, settles)[me] ?? 0, [expenses, settles, me]);
 
   if (!g || !meta) return <Empty emoji="🔐" title="Opening the group…">If this stays, check your connection.</Empty>;
@@ -60,7 +61,7 @@ export function GroupView({ gid, start, onBack, onGone }: { gid: string; start?:
         <div className="px-4 py-2">
           <TabsList tabs={[
             { value: 'expenses', label: <TabLabel icon={Receipt}>Expenses</TabLabel> },
-            { value: 'balances', label: <TabLabel icon={Scale}>Balances</TabLabel> },
+            { value: 'balances', label: <TabLabel icon={Scale} badge={toConfirm} badgeLabel="to confirm">Balances</TabLabel> },
             { value: 'insights', label: <TabLabel icon={PieChart}>Insights</TabLabel> },
             { value: 'people', label: <TabLabel icon={Users}>People</TabLabel> },
             { value: 'activity', label: <TabLabel icon={Bell} badge={tab !== 'activity' ? unread : 0}>Activity</TabLabel> },

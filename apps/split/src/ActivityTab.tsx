@@ -1,5 +1,5 @@
 import { useEffect, useMemo, type ReactNode } from 'react';
-import { ArrowRight, FilePlus2, FolderPlus, HandCoins, Pencil, Tag, Trash2, Undo2, UserMinus, UserPlus, LogOut, Type, Link2 } from 'lucide-react';
+import { ArrowRight, FilePlus2, FolderPlus, HandCoins, Pencil, Tag, Trash2, Undo2, UserMinus, UserPlus, LogOut, Type, Link2, Clock, CheckCircle2, XCircle } from 'lucide-react';
 import { money, parseDay, type Activity, type Person } from './model';
 import { useLedger, useNames } from './hooks';
 import { markSeen, type GroupData } from './store';
@@ -13,6 +13,8 @@ const ICON: Record<Activity['kind'], { Icon: typeof Pencil; tone: string }> = {
   expense_add: { Icon: FilePlus2, tone: 'text-emerald-600 bg-emerald-500/15' }, expense_edit: { Icon: Pencil, tone: 'text-amber-600 bg-amber-500/15' },
   expense_delete: { Icon: Trash2, tone: 'text-danger bg-danger/10' }, settle_add: { Icon: HandCoins, tone: 'text-emerald-600 bg-emerald-500/15' },
   settle_undo: { Icon: Undo2, tone: 'text-muted bg-panel-2' },
+  settle_request: { Icon: Clock, tone: 'text-amber-600 bg-amber-500/15' }, settle_confirm: { Icon: CheckCircle2, tone: 'text-emerald-600 bg-emerald-500/15' },
+  settle_decline: { Icon: XCircle, tone: 'text-muted bg-panel-2' },
   person_link: { Icon: Link2, tone: 'text-sky-600 bg-sky-500/15' }, person_rename: { Icon: Type, tone: 'text-muted bg-panel-2' },
 };
 
@@ -45,6 +47,9 @@ export function ActivityTab({ g, onOpenExpense }: { g: GroupData; onOpenExpense:
       case 'group_rename': return <>{by} renamed the group{a.wasDesc ? <> from {b(a.wasDesc)}</> : null} to {b(a.name ?? '')}</>;
       case 'person_add': return <>{by} added {sub(a.who)}</>;
       case 'person_remove': return <>{by} removed {sub(a.who)}</>;
+      case 'settle_request': return <>{by} says {sub(a.from)} paid {sub(a.to)} {amt(a.amount)} · waiting for {sub(a.to)} to confirm</>;
+      case 'settle_confirm': return <>{by} confirmed getting {amt(a.amount)} from {sub(a.from)}</>;
+      case 'settle_decline': return <>{by} cancelled the unconfirmed payment from {sub(a.from)} to {sub(a.to)} · {amt(a.amount)}</>;
       case 'person_link': return <>{by} linked {b(a.name ?? 'a name')} to {sub(a.who)}’s Sanga account</>;
       case 'person_rename': return <>{by} renamed {b(a.wasDesc ?? 'someone')} to {b(a.name ?? '')}</>;
       case 'person_left': return <>{by} left the group</>;

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@sanga/ui/button';
 import { Dialog } from '@sanga/ui/dialog';
 import { Input, Label } from '@sanga/ui/input';
-import { money, parseAmount, today, toInput, validDay, type Transfer } from './model';
+import { money, needsConfirm, parseAmount, today, toInput, validDay, type Transfer } from './model';
 import { useLedger, useMe, useNames } from './hooks';
 import { newId, save, type GroupData } from './store';
 
@@ -25,11 +25,13 @@ function Form({ g, transfer, onClose }: { g: GroupData; transfer: Transfer; onCl
   const [note, setNote] = useState('');
   const amount = parseAmount(amountText, currency);
   const ok = !!amount && validDay(date);
+  const to = person(transfer.to);
+  const confirm = needsConfirm(g.meta?.people.find((p) => p.id === transfer.to) ?? to, me);
   return (
     <form className="space-y-4" onSubmit={(e) => {
       e.preventDefault();
       if (!ok || !amount) return;
-      save(g.gid, { type: 'settle', id: newId(), from: transfer.from, to: transfer.to, amount, date, ...(note.trim() && { note: note.trim() }), by: me, edited: 0 });
+      save(g.gid, { type: 'settle', id: newId(), from: transfer.from, to: transfer.to, amount, date, ...(note.trim() && { note: note.trim() }), ...(confirm && { pending: true as const }), by: me, edited: 0 });
       onClose();
     }}>
       <p className="rounded-xl bg-panel-2 p-3 text-center text-sm">
@@ -41,7 +43,8 @@ function Form({ g, transfer, onClose }: { g: GroupData; transfer: Transfer; onCl
         <div><Label htmlFor="sd">Date</Label><Input id="sd" type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value)} /></div>
         <div><Label htmlFor="sn" hint="optional">Note</Label><Input id="sn" maxLength={100} placeholder="UPI, cash…" value={note} onChange={(e) => setNote(e.target.value)} /></div>
       </div>
-      <Button type="submit" className="w-full" disabled={!ok}>Save payment</Button>
+      {confirm && <p className="rounded-xl bg-warn-bg p-3 text-sm">{name(to)} will be asked to confirm they got it. It counts once they do.</p>}
+      <Button type="submit" className="w-full" disabled={!ok}>{confirm ? 'Send for confirmation' : 'Save payment'}</Button>
     </form>
   );
 }
