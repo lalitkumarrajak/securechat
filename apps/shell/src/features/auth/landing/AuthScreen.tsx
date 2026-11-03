@@ -20,9 +20,9 @@ export function AuthScreen({ tab, setTab, onBack }: { tab: Auth; setTab: (a: Aut
           <span className="text-xl font-bold">Sanga</span>{/* i18n-ok */}
         </span>
         <div className="mt-auto max-w-md">
-          <h2 className="text-4xl leading-tight font-bold">{t('Chat, play and write with the people you choose.')}</h2>
+          <h2 className="text-4xl leading-tight font-bold">{t('Chat, play, split and plan with the people you choose.')}</h2>
           <ul className="mt-8 grid gap-3 text-white/85">
-            {APPS.filter((a) => !a.soon).map(({ icon: Icon, name, text }) => (
+            {APPS.map(({ icon: Icon, name, text }) => (
               <li key={name} className="flex gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-xl bg-white/15"><Icon className="size-4" /></span><span className="text-sm">{tx('{name}. {text}', { name: <b className="text-white">{t(name)}</b>, text: t(text) })}</span></li>
             ))}
           </ul>

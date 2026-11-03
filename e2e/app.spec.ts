@@ -26,6 +26,17 @@ test('landing page offers sign in and sign up', async () => {
   await expect(A.page.getByRole('heading', { name: /Your people/ })).toBeVisible();
   await expect(A.page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
   await A.page.screenshot({ path: shots('01-landing-phone'), fullPage: true });
+  // What the apps are, as they are now: Split is live, and the Calendar and every game are there.
+  const apps = A.page.locator('#apps');
+  for (const name of ['Chat', 'Games', 'Split', 'Calendar', 'Diary']) await expect(apps.getByRole('heading', { name, exact: true })).toBeVisible();
+  await expect(apps).toContainText('Snakes & Ladders');
+  await expect(A.page.getByText(/Coming soon|^Soon$/)).toHaveCount(0);
+  // The page can be read in Hindi before signing in, and back.
+  await A.page.getByRole('button', { name: 'हिन्दी' }).click();
+  await expect(A.page.locator('html')).toHaveAttribute('lang', 'hi');
+  await expect(A.page.getByRole('heading', { name: /आपके लोग/ })).toBeVisible();
+  await A.page.getByRole('button', { name: 'English' }).click();
+  await expect(A.page.getByRole('heading', { name: /Your people/ })).toBeVisible();
   await A.page.getByRole('button', { name: /Get started/ }).click();
   await expect(A.page.getByRole('tab', { name: 'Sign in' })).toBeVisible();
   await expect(A.page.getByRole('heading', { name: 'Create your account' })).toBeVisible();

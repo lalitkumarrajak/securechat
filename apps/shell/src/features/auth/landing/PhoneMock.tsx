@@ -1,4 +1,4 @@
-import { Gamepad2, MessageCircle, NotebookPen, Phone, Wallet } from 'lucide-react';
+import { CalendarDays, Gamepad2, MessageCircle, NotebookPen, Phone, Wallet } from 'lucide-react';
 import { MockTile } from './MockTile';
 import { t } from '@sanga/i18n';
 
@@ -15,8 +15,10 @@ export function PhoneMock() {
           <div className="mt-4 grid grid-cols-2 gap-2.5">
             <MockTile bg="linear-gradient(140deg, #14b8a6, #0f3d3a)" icon={<MessageCircle className="size-4" />} name={t('Chat')} stat={t('{n} unread', { n: 3 })} />
             <MockTile bg="linear-gradient(140deg, #6366f1, #312e81)" icon={<Gamepad2 className="size-4" />} name={t('Games')} stat={t('Your turn')} />
+            <MockTile bg="linear-gradient(140deg, #10b981, #064e3b)" icon={<Wallet className="size-4" />} name={t('Split')} stat={t('You get back {amount}', { amount: '₹450' })} />
+            <MockTile bg="linear-gradient(140deg, #f43f5e, #881337)" icon={<CalendarDays className="size-4" />} name={t('Calendar')} stat={t('Ekadashi in 2 days')} />
             <MockTile bg="linear-gradient(140deg, #f59e0b, #92400e)" icon={<NotebookPen className="size-4" />} name={t('Diary')} stat={t('Today')} />
-            <MockTile bg="linear-gradient(140deg, #64748b, #1e293b)" icon={<Wallet className="size-4" />} name={t('Split')} stat={t('Soon')} />
+            <MockTile bg="linear-gradient(140deg, #0ea5e9, #0c4a6e)" icon={<Phone className="size-4" />} name={t('Calls')} stat={t('Voice and video')} />
           </div>
           <div className="mt-4 rounded-2xl border border-line bg-panel p-3 shadow-sm">
             <div className="flex items-center gap-2">

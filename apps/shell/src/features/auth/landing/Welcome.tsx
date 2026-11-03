@@ -5,7 +5,7 @@ import { Logo } from './Logo';
 import { PhoneMock } from './PhoneMock';
 import { APPS, SAFETY } from './landingData';
 import type { Auth } from './types';
-import { t } from '@sanga/i18n';
+import { lang, setLang, t } from '@sanga/i18n';
 
 export function Welcome({ open }: { open: (a: Auth) => void }) {
   const signupOpen = useApp((s) => s.signupOpen);
@@ -20,6 +20,7 @@ export function Welcome({ open }: { open: (a: Auth) => void }) {
             <a href="#safety" className="hover:text-ink">{t('Privacy')}</a>
           </nav>
           <span className="flex-1 md:hidden" />
+          <Button variant="ghost" size="sm" lang={lang() === 'hi' ? 'en' : 'hi'} onClick={() => void setLang(lang() === 'hi' ? 'en' : 'hi')}>{lang() === 'hi' ? 'English' : 'हिन्दी'}</Button>{/* i18n-ok: each language in its own name */}
           <Button variant="ghost" onClick={() => open('signin')}>{t('Sign in')}</Button>
           {signupOpen && <Button onClick={() => open('signup')} className="hidden sm:inline-flex">{t('Sign up')}</Button>}
         </div>
@@ -37,7 +38,7 @@ export function Welcome({ open }: { open: (a: Auth) => void }) {
               {t('Your people.')}<br />{t('Your space.')}<br /><span className="bg-linear-to-r from-accent to-indigo-500 bg-clip-text text-transparent">{t('All in one app.')}</span>
             </h1>
             <p className="mt-5 max-w-lg text-lg text-muted">
-              {t('Sanga brings chat, calls, stories, games and your diary together, all end-to-end encrypted, all with the people you choose.')}
+              {t('Sanga brings chat, calls, stories, games, shared expenses, your calendar and your diary together, all end-to-end encrypted, all with the people you choose.')}
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button size="lg" onClick={start} className="gap-2 px-6">
@@ -54,13 +55,13 @@ export function Welcome({ open }: { open: (a: Auth) => void }) {
       <section id="apps" className="mx-auto max-w-6xl scroll-mt-16 px-4 py-14 md:px-8">
         <p className="text-sm font-semibold tracking-wide text-accent-ink uppercase">{t('One sign-in, many apps')}</p>
         <h2 className="mt-2 max-w-xl text-3xl font-bold tracking-tight md:text-4xl">{t('Everything you do with friends, in one place')}</h2>
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {APPS.map(({ icon: Icon, name, text, bg, soon }) => (
-            <article key={name} className="relative overflow-hidden rounded-3xl p-5 text-white shadow-lg shadow-black/10" style={{ background: bg }}>
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {APPS.map(({ icon: Icon, name, text, bg }, i) => (
+            <article key={name} className={`relative overflow-hidden rounded-3xl p-5 text-white shadow-lg shadow-black/10${i === 0 ? ' lg:row-span-2 lg:flex lg:flex-col lg:justify-end' : ''}`} style={{ background: bg }}>
               <span aria-hidden className="absolute -right-8 -bottom-8 size-32 rounded-full bg-white/10" />
               <span className="grid size-12 place-items-center rounded-2xl bg-white/20"><Icon className="size-6" /></span>
               <h3 className="mt-10 flex items-center gap-2 text-xl font-bold">
-                {t(name)}{soon && <span className="rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-semibold">{t('Soon')}</span>}
+                {t(name)}
               </h3>
               <p className="mt-1 text-sm text-white/80">{t(text)}</p>
             </article>
@@ -90,7 +91,7 @@ export function Welcome({ open }: { open: (a: Auth) => void }) {
         <div className="relative overflow-hidden rounded-3xl px-6 py-12 text-center text-white md:py-16"
           style={{ background: 'linear-gradient(135deg, var(--accent), #312e81)' }}>
           <h2 className="text-3xl font-bold tracking-tight md:text-4xl">{t('Bring your people together')}</h2>
-          <p className="mx-auto mt-3 max-w-md text-white/80">{t('Create an account in seconds, add your friends, and start chatting and playing.')}</p>
+          <p className="mx-auto mt-3 max-w-md text-white/80">{t('Create an account in seconds, add your friends, and start chatting, playing and splitting.')}</p>
           <Button size="lg" variant="outline" onClick={start} className="mt-7 gap-2 border-transparent px-6 text-slate-900 hover:bg-white/90" style={{ background: '#fff' }}>
             {signupOpen ? t('Create your free account') : t('Sign in')} <ArrowRight className="size-4" />
           </Button>
