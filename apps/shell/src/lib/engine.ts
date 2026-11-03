@@ -1377,6 +1377,18 @@ const b64urlToBytes = (s: string) => {
 
 export const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 
+// Where to switch notifications back on depends on where Sanga runs: an installed app has no address bar
+// (so no lock icon), and a phone browser keeps it in the site settings.
+function blockedHelp(perm: NotificationPermission) {
+  const ua = navigator.userAgent;
+  const installed = matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone === true;
+  if (perm === 'default') return 'The notification prompt was closed without an answer. Tap the switch again and choose Allow.';
+  if (/iPhone|iPad/.test(ua)) return 'Notifications are blocked. Open Settings → Notifications → Sanga and turn on Allow Notifications, then try again.';
+  if (installed) return 'Notifications are blocked. Press and hold the Sanga icon → App info → Notifications, turn them on, then try again.';
+  if (/Android/.test(ua)) return 'Notifications are blocked. In Chrome tap ⋮ → Settings → Site settings → Notifications, find this site and set it to Allow, then try again.';
+  return 'Notifications are blocked. Tap the lock icon next to the address, allow Notifications, then try again.';
+}
+
 export async function enablePush(silent = false) {
   if (!pushSupported()) {
     throw new Error(/iPhone|iPad/.test(navigator.userAgent)
@@ -1384,7 +1396,7 @@ export async function enablePush(silent = false) {
       : 'This browser doesn’t support push notifications.');
   }
   const perm = silent ? Notification.permission : await Notification.requestPermission();
-  if (perm !== 'granted') throw new Error('Notifications are blocked. Tap the lock icon next to the address, allow Notifications, then try again.');
+  if (perm !== 'granted') throw new Error(blockedHelp(perm));
   const reg = await navigator.serviceWorker.ready;
   const { key } = await api('/api/push/key');
   const subscribe = () => reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64urlToBytes(key) })
