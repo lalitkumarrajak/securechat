@@ -9,7 +9,7 @@ import { create } from 'zustand';
 import * as C from '@sanga/crypto';
 import { sdk } from '@sanga/sdk';
 import { prepareBill, type Bill } from './bills';
-import { ACTIVITY_KINDS, BUILTIN_CATS, type Activity, type Expense, type Meta, type Person, type Record_, type Settlement, validDay } from './model';
+import { ACTIVITY_KINDS, BUILTIN_CATS, moveLedger, type Activity, type Expense, type Meta, type Person, type Record_, type Settlement, validDay } from './model';
 import { activityFor } from './activity';
 
 type Local<T> = T & { srv?: number; dirty?: boolean };
@@ -175,6 +175,44 @@ export async function addFriend(gid: string, u: string, name: string) {
 export function addPerson(gid: string, name: string) {
   const meta = get().groups[gid]?.meta;
   if (meta) save(gid, { ...meta, people: [...meta.people, { id: 'p' + C.randomId(6), name: name.trim() }] });
+}
+
+/** A name turned out to be a Sanga friend: they get the group (key wrapped for them), and everything the name
+ *  paid, owed or settled moves onto their account. If they are already in the group the two are merged. */
+export async function linkPerson(gid: string, pid: string, u: string, friendName: string) {
+  const g = get().groups[gid];
+  const meta = g?.meta;
+  if (!g || !meta) return;
+  const guest = meta.people.find((p) => p.id === pid && !p.u);
+  if (!guest) throw new Error('That name is already linked.');
+  if (!g.members.some((m) => m.u === u)) {
+    const { raw } = keyFor(gid);
+    await post('/api/split/add', { gid, u, wrapped: await C.wrapStoryKey(await sdk().pairKey(u), raw, me(), gid, u) });
+  }
+  const existing = meta.people.find((p) => p.u === u);
+  const target = existing ? existing.id : u;
+  const now = Date.now();
+  const moved = moveLedger(Object.values(g.expenses).filter((e) => !e.deleted), Object.values(g.settles).filter((s) => !s.deleted), pid, target);
+  for (const r of moved) await keep(gid, { ...r, by: me(), edited: now, dirty: true });
+  const people = existing
+    ? meta.people.filter((p) => p.id !== pid).map((p) => (p === existing ? { ...p, gone: undefined } : p))
+    : meta.people.map((p) => (p === guest ? { id: u, name: friendName, u } : p));
+  await keep(gid, { ...meta, people: people as Person[], by: me(), edited: now, dirty: true } as Local<Record_>);
+  await keep(gid, { type: 'activity', id: 'a' + C.randomId(8), kind: 'person_link', by: me(), ts: now, who: target, name: guest.name, dirty: true });
+  soon();
+}
+
+/** Rename someone who isn't on Sanga. */
+export function renamePerson(gid: string, pid: string, name: string) {
+  const meta = get().groups[gid]?.meta;
+  const n = name.trim();
+  if (meta && n) save(gid, { ...meta, people: meta.people.map((p) => (p.id === pid && !p.u ? { ...p, name: n } : p)) });
+}
+
+/** Hide a name from the pickers (what they owe stays) or bring them back. */
+export function archivePerson(gid: string, pid: string, archived: boolean) {
+  const meta = get().groups[gid]?.meta;
+  if (meta) save(gid, { ...meta, people: meta.people.map((p) => (p.id === pid && !p.u ? { ...p, gone: archived ? (true as const) : undefined } : p)) });
 }
 
 /** The creator takes a friend out of the group (they lose access); their past expenses stay. */

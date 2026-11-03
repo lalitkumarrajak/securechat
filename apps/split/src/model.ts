@@ -40,7 +40,7 @@ export interface Settlement {
 
 /** One line of the group's history, never changed or removed: who did what, and when. */
 export type ActivityKind = 'group_create' | 'group_rename' | 'person_add' | 'person_remove' | 'person_left' | 'category_add'
-  | 'expense_add' | 'expense_edit' | 'expense_delete' | 'settle_add' | 'settle_undo';
+  | 'expense_add' | 'expense_edit' | 'expense_delete' | 'settle_add' | 'settle_undo' | 'person_link' | 'person_rename';
 export interface Activity {
   type: 'activity'; id: string; kind: ActivityKind;
   by: string;                      // username of whoever did it
@@ -53,9 +53,32 @@ export interface Activity {
   name?: string;                   // a group or category name
 }
 export const ACTIVITY_KINDS: ActivityKind[] = ['group_create', 'group_rename', 'person_add', 'person_remove', 'person_left', 'category_add',
-  'expense_add', 'expense_edit', 'expense_delete', 'settle_add', 'settle_undo'];
+  'expense_add', 'expense_edit', 'expense_delete', 'settle_add', 'settle_undo', 'person_link', 'person_rename'];
 
 export type Record_ = Meta | Expense | Settlement | Activity;
+
+// ---------- linking a name to a real account ----------
+/** Moves everything one person paid, owes or settled onto another (a name that turned out to be a Sanga
+ *  account). Returns only the records that changed; totals stay exactly the same. A payment between the two
+ *  becomes a payment to oneself, so it is dropped. */
+export function moveLedger(expenses: Expense[], settles: Settlement[], from: string, to: string): (Expense | Settlement)[] {
+  const move = (m: Record<string, number>) => {
+    if (!(from in m)) return m;
+    const { [from]: v, ...rest } = m;
+    return { ...rest, [to]: (rest[to] ?? 0) + v };
+  };
+  const out: (Expense | Settlement)[] = [];
+  for (const e of expenses) {
+    if (e.paidBy !== from && !(from in e.owed) && !(from in e.values)) continue;
+    out.push({ ...e, paidBy: e.paidBy === from ? to : e.paidBy, owed: move(e.owed), values: move(e.values) });
+  }
+  for (const s of settles) {
+    const a = s.from === from ? to : s.from, b = s.to === from ? to : s.to;
+    if (a === s.from && b === s.to) continue;
+    out.push(a === b ? { ...s, from: a, to: b, deleted: true } : { ...s, from: a, to: b });
+  }
+  return out;
+}
 
 // ---------- categories ----------
 const C = (id: string, name: string, emoji: string, color: string): Category => ({ id, name, emoji, color });

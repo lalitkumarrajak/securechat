@@ -37,7 +37,7 @@ export function SplitEditor({ people, name, draft, onChange, owed, currency, err
             <li key={p.id} className="flex items-center gap-3 px-3 py-2">
               <input type="checkbox" checked={on} onChange={() => toggle(p.id)} aria-label={`Include ${name(p)}`} className="size-4 accent-[var(--accent)]" />
               <PersonDot p={p} name={name(p)} size={28} />
-              <span className={cn('min-w-0 flex-1 truncate text-sm', !on && 'text-muted')}>{name(p)}{p.gone && ' (left)'}</span>
+              <span className={cn('min-w-0 flex-1 truncate text-sm', !on && 'text-muted')}>{name(p)}{p.gone && (p.u ? ' (left)' : ' (archived)')}</span>
               {on && mode !== 'equal' && (
                 <label className="flex items-center gap-1 text-sm">
                   <input inputMode="decimal" value={texts[p.id] ?? ''} onChange={(e) => set({ texts: { ...texts, [p.id]: e.target.value } })}

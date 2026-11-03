@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, apportion, balances, byCategory, grainFor, linesOf, parseAmount, rangeFor, series, simplify, splitAmount, sum, toInput, type Expense, type Settlement } from './model';
+import { addDays, apportion, balances, byCategory, grainFor, linesOf, moveLedger, parseAmount, rangeFor, series, simplify, splitAmount, sum, toInput, type Expense, type Settlement } from './model';
 
 const exp = (o: Partial<Expense>): Expense => ({ type: 'expense', id: 'e' + Math.random(), desc: 'x', amount: 0, cat: 'food', date: '2026-11-02', paidBy: 'a', mode: 'equal', values: {}, owed: {}, by: 'a', edited: 0, ...o });
 
@@ -88,5 +88,27 @@ describe('statistics', () => {
     expect(rangeFor('week', new Date(2026, 10, 2))).toEqual({ from: '2026-11-02', to: '2026-11-02' }); // a Monday
     expect(rangeFor('lastMonth', new Date(2026, 10, 2))).toEqual({ from: '2026-10-01', to: '2026-10-31' });
     expect(addDays('2026-02-28', 1)).toBe('2026-03-01');
+  });
+});
+
+describe('linking a name to an account', () => {
+  const es = [
+    exp({ id: '1', amount: 300, paidBy: 'me', owed: { me: 100, p1: 200 } }),
+    exp({ id: '2', amount: 100, paidBy: 'p1', owed: { me: 50, p1: 25, ravi: 25 } }),
+    exp({ id: '3', amount: 90, paidBy: 'me', owed: { me: 90 } }),
+  ];
+  const st = [{ type: 'settle', id: 's1', from: 'p1', to: 'me', amount: 50, date: '2026-11-01', by: 'me', edited: 0 } as Settlement,
+    { type: 'settle', id: 's2', from: 'p1', to: 'ravi', amount: 5, date: '2026-11-01', by: 'me', edited: 0 } as Settlement];
+  it('keeps every balance the same, moved onto the account', () => {
+    const before = balances(es, st);
+    const moved = moveLedger(es, st, 'p1', 'ravi');
+    expect(moved.map((r) => r.id).sort()).toEqual(['1', '2', 's1', 's2']);
+    const e2 = es.map((e) => (moved.find((m) => m.id === e.id) as Expense) ?? e);
+    const s2 = st.map((s) => (moved.find((m) => m.id === s.id) as Settlement) ?? s).filter((s) => !s.deleted);
+    const after = balances(e2, s2);
+    expect(after.ravi).toBe((before.p1 ?? 0) + (before.ravi ?? 0));
+    expect(after.me).toBe(before.me);
+    expect(after.p1 ?? 0).toBe(0);
+    expect(e2[1].owed).toEqual({ me: 50, ravi: 50 });
   });
 });

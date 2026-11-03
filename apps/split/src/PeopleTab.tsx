@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { UserMinus, UserPlus } from 'lucide-react';
+import { Archive, ArchiveRestore, Pencil, UserMinus, UserPlus } from 'lucide-react';
 import { sdk } from '@sanga/sdk';
 import { Button } from '@sanga/ui/button';
 import { balances } from './model';
 import { useLedger, useMe, useNames } from './hooks';
-import { removeFriend, save, type GroupData } from './store';
+import { archivePerson, removeFriend, save, type GroupData } from './store';
 import { AddPeopleDialog } from './AddPeopleDialog';
+import { GuestDialog } from './GuestDialog';
+import type { Person } from './model';
 import { PersonDot } from './PersonDot';
 
 /** Who is in the group; the creator can add and remove people. */
@@ -15,6 +17,7 @@ export function PeopleTab({ g }: { g: GroupData }) {
   const { meta, expenses, settles, people } = useLedger(g);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState('');
+  const [editing, setEditing] = useState<Person | null>(null);
   const owner = g.members.find((m) => m.owner)?.u;
   const net = balances(expenses, settles);
   const involved = (id: string) => expenses.some((e) => e.paidBy === id || e.owed[id] !== undefined) || settles.some((s) => s.from === id || s.to === id);
@@ -37,9 +40,15 @@ export function PeopleTab({ g }: { g: GroupData }) {
             <PersonDot p={p} name={name(p)} size={40} />
             <span className="min-w-0 flex-1">
               <span className="block truncate font-medium">{name(p)}</span>
-              <span className="block text-xs text-muted">{p.gone ? 'Left the group' : p.u ? (p.u === owner ? 'Made the group' : 'On Sanga') : 'Not on Sanga'}</span>
+              <span className="block text-xs text-muted">{p.gone ? (p.u ? 'Left the group' : 'Archived') : p.u ? (p.u === owner ? 'Made the group' : 'On Sanga') : 'Not on Sanga'}</span>
             </span>
-            {me === owner && !p.gone && p.id !== me && (p.u || !involved(p.id) || net[p.id] === 0) && (
+            {me === owner && !p.u && (<>
+              <button type="button" aria-label={`Edit ${name(p)}`} onClick={() => setEditing(p)} className="rounded-full p-2 text-muted hover:bg-hover"><Pencil className="size-4" /></button>
+              <button type="button" aria-label={`${p.gone ? 'Restore' : 'Archive'} ${name(p)}`} onClick={() => archivePerson(g.gid, p.id, !p.gone)} className="rounded-full p-2 text-muted hover:bg-hover">
+                {p.gone ? <ArchiveRestore className="size-4" /> : <Archive className="size-4" />}
+              </button>
+            </>)}
+            {me === owner && p.id !== me && !p.gone && (p.u || !involved(p.id) || net[p.id] === 0) && (
               <button type="button" aria-label={`Remove ${name(p)}`} onClick={() => void remove(p.id, p.u)} className="rounded-full p-2 text-muted hover:bg-hover hover:text-danger"><UserMinus className="size-4" /></button>
             )}
           </li>
@@ -48,6 +57,7 @@ export function PeopleTab({ g }: { g: GroupData }) {
       {error && <p className="text-sm text-danger" role="alert">{error}</p>}
       <Button variant="outline" className="w-full" onClick={() => setAdding(true)}><UserPlus className="size-4" />Add people</Button>
       <AddPeopleDialog g={g} open={adding} onClose={() => setAdding(false)} />
+      <GuestDialog g={g} p={editing} onClose={() => setEditing(null)} />
     </div>
   );
 }

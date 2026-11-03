@@ -28,6 +28,7 @@ function metaLines(prev: Meta | null | undefined, m: Meta, by: string): Line[] {
   for (const p of m.people) {
     const before = was.get(p.id);
     if (!before) out.push({ kind: 'person_add', who: p.id });
+    else if (before.name !== p.name && !p.u) out.push({ kind: 'person_rename', who: p.id, wasDesc: before.name, name: p.name });
     else if (p.gone && !before.gone) out.push({ kind: p.u === by ? 'person_left' : 'person_remove', who: p.id });
     else if (!p.gone && before.gone) out.push({ kind: 'person_add', who: p.id });
   }
