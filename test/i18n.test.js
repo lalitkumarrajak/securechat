@@ -1,4 +1,4 @@
-// Every text Sanga shows has its Hindi, with the same {placeholders}, and no English is shown
+// Every text Sanga shows has its Hindi and Marathi, with the same {placeholders}, and no English is shown
 // without going through the translation layer (scripts/i18n-check.mjs says what and where).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

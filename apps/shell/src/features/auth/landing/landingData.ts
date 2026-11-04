@@ -14,5 +14,5 @@ export const SAFETY = [
   { icon: UserPlus, title: tk('Friends only'), text: tk('Nobody can message you until you accept their friend request.') },
   { icon: Wifi, title: tk('Made for slow networks'), text: tk('A small app with compressed photos. Each part loads only when you open it, and messages wait offline and send when you’re back.') },
   { icon: Smartphone, title: tk('Works like an app'), text: tk('Install it from your browser on any phone or computer. No app store needed.') },
-  { icon: Languages, title: tk('In English or Hindi'), text: tk('Switch the whole app to Hindi in Settings, any time.') },
+  { icon: Languages, title: tk('In English, Hindi or Marathi'), text: tk('Switch the whole app to Hindi or Marathi in Settings, any time.') },
 ];

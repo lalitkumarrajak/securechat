@@ -1,0 +1,13 @@
+{
+  "Close": "बंद करा",
+  "Cancel": "रद्द करा",
+  "OK": "ठीक आहे",
+  "Today": "आज",
+  "Yesterday": "काल",
+  "last seen today at {time}": "शेवटचे आज {time} वाजता पाहिले",
+  "last seen yesterday at {time}": "शेवटचे काल {time} वाजता पाहिले",
+  "last seen {date}": "शेवटचे {date} रोजी पाहिले",
+  "just now": "आत्ताच",
+  "{n}m": "{n} मि.",
+  "{n}h": "{n} ता."
+}

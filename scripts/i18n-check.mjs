@@ -1,4 +1,4 @@
-// Checks Sanga's translations: every text the code shows through t()/tn()/tx()/tk() has a Hindi entry
+// Checks Sanga's translations: every text the code shows through t()/tn()/tx()/tk() has a Hindi and a Marathi entry
 // with the same {placeholders}, no entry is left over, and no English is shown without going through
 // them (text between tags, the usual text attributes, toasts and errors). `// i18n-ok` on a line lets
 // it be (a name, a code). Run: node scripts/i18n-check.mjs [--list] — exits 1 if anything is wrong.
@@ -7,7 +7,7 @@ import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 export const NAMESPACES = ['apps/shell/src', 'apps/split/src', 'apps/calendar/src', 'apps/notes/src', 'packages/ui/src', 'packages/sdk/src'];
-const LANGS = ['hi'];
+const LANGS = ['hi', 'mr'];
 
 const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => {
   const p = path.join(d, e.name);
@@ -138,7 +138,7 @@ export function check() {
         }
       }
       for (const k of Object.keys(dict)) if (!used.has(k)) problems.push(`${ns}: ${lang} has "${k.slice(0, 70)}", which nothing shows`);
-      stats[ns] = { keys: [...used.keys()].filter((k) => !k.startsWith('\u0000')).length, [lang]: Object.keys(dict).length };
+      stats[ns] = { ...stats[ns], keys: [...used.keys()].filter((k) => !k.startsWith('\u0000')).length, [lang]: Object.keys(dict).length };
     }
   }
   return { problems, stats };

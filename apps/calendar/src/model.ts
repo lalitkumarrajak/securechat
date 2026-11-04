@@ -274,7 +274,7 @@ export const WEEKDAYS = [tk('Sunday'), tk('Monday'), tk('Tuesday'), tk('Wednesda
 export const WEEKDAYS_SHORT = [tk('Sun'), tk('Mon'), tk('Tue'), tk('Wed'), tk('Thu'), tk('Fri'), tk('Sat')];
 /** "the first Monday" … "the fifth Monday": show with t(). */
 export const ORD = [tk('first'), tk('second'), tk('third'), tk('fourth'), tk('fifth')];
-/** "14th" (in Hindi, just the number). */
+/** "14th" (in Hindi and Marathi, just the number). */
 export const ordinal = (n: number) => (lang() !== 'en' ? String(n) : n + (n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th'));
 
 // ---------- on this device ----------

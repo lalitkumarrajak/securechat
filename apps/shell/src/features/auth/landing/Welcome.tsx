@@ -1,11 +1,11 @@
-import { ArrowRight, ShieldCheck, Sparkles } from 'lucide-react';
+import { ArrowRight, Languages, ShieldCheck, Sparkles } from 'lucide-react';
 import { Button } from '@sanga/ui/button';
 import { useApp } from '../../../state/app';
 import { Logo } from './Logo';
 import { PhoneMock } from './PhoneMock';
 import { APPS, SAFETY } from './landingData';
 import type { Auth } from './types';
-import { lang, setLang, t } from '@sanga/i18n';
+import { LANGS, lang, setLang, t, type Lang } from '@sanga/i18n';
 
 export function Welcome({ open }: { open: (a: Auth) => void }) {
   const signupOpen = useApp((s) => s.signupOpen);
@@ -20,7 +20,13 @@ export function Welcome({ open }: { open: (a: Auth) => void }) {
             <a href="#safety" className="hover:text-ink">{t('Privacy')}</a>
           </nav>
           <span className="flex-1 md:hidden" />
-          <Button variant="ghost" size="sm" lang={lang() === 'hi' ? 'en' : 'hi'} onClick={() => void setLang(lang() === 'hi' ? 'en' : 'hi')}>{lang() === 'hi' ? 'English' : 'हिन्दी'}</Button>{/* i18n-ok: each language in its own name */}
+          <label className="relative flex items-center rounded-lg text-sm font-medium text-muted hover:bg-hover hover:text-ink">
+            <Languages className="pointer-events-none absolute left-2 size-4" aria-hidden />
+            <select aria-label={t('Language')} value={lang()} onChange={(e) => void setLang(e.target.value as Lang)}
+              className="h-9 cursor-pointer appearance-none bg-transparent pr-2 pl-8 outline-none focus-visible:ring-2 focus-visible:ring-accent">
+              {LANGS.map((l) => <option key={l.id} value={l.id} lang={l.id}>{l.name}</option>)}
+            </select>
+          </label>
           <Button variant="ghost" onClick={() => open('signin')}>{t('Sign in')}</Button>
           {signupOpen && <Button onClick={() => open('signup')} className="hidden sm:inline-flex">{t('Sign up')}</Button>}
         </div>

@@ -4,21 +4,23 @@
 // of this module, so they all keep one state on globalThis: switching the language reaches all of them.
 import { createElement, Fragment, useSyncExternalStore, type ReactNode } from 'react';
 
-export type Lang = 'en' | 'hi';
+export type Lang = 'en' | 'hi' | 'mr';
 /** The languages you can pick, each named in itself. */
 export const LANGS: { id: Lang; name: string; english: string }[] = [
   { id: 'en', name: 'English', english: 'English' },
   { id: 'hi', name: 'हिन्दी', english: 'Hindi' },
+  { id: 'mr', name: 'मराठी', english: 'Marathi' },
 ];
 export type Entry = string | { one: string; other: string };
 export type Dict = Record<string, Entry>;
 export type Loader = () => Promise<Dict>;
 
 const KEY = 'sanga-lang';
-interface State { lang: Lang; dict: Dict; version: number; subs: Set<() => void>; loaders: Map<string, Partial<Record<Lang, Loader>>>; loaded: Map<string, Promise<void>>; ready: Set<string> }
-const readLang = (): Lang => { try { return localStorage.getItem(KEY) === 'hi' ? 'hi' : 'en'; } catch { return 'en'; } };
+interface State { lang: Lang; dicts: Partial<Record<Lang, Dict>>; version: number; subs: Set<() => void>; loaders: Map<string, Partial<Record<Lang, Loader>>>; loaded: Map<string, Promise<void>>; ready: Set<string> }
+const isLang = (l: unknown): l is Lang => LANGS.some((x) => x.id === l);
+const readLang = (): Lang => { try { const l = localStorage.getItem(KEY); return isLang(l) ? l : 'en'; } catch { return 'en'; } };
 const G = globalThis as typeof globalThis & { __sangaI18n?: State };
-const S: State = (G.__sangaI18n ??= { lang: readLang(), dict: {}, version: 0, subs: new Set(), loaders: new Map(), loaded: new Map(), ready: new Set() });
+const S: State = (G.__sangaI18n ??= { lang: readLang(), dicts: {}, version: 0, subs: new Set(), loaders: new Map(), loaded: new Map(), ready: new Set() });
 
 const notify = () => { S.version++; for (const f of S.subs) f(); };
 const setHtmlLang = () => { if (typeof document !== 'undefined') document.documentElement.lang = S.lang; };
@@ -26,11 +28,13 @@ setHtmlLang();
 
 /** The language now on. English unless you picked another in Settings. */
 export const lang = () => S.lang;
+// Marathi would otherwise write numbers in Devanagari digits; amounts and dates keep 0-9, as in Hindi.
+const LOCALES: Partial<Record<Lang, string>> = { hi: 'hi-IN', mr: 'mr-IN-u-nu-latn' };
 /** For Intl and toLocale…(): the browser's own for English (as before), the language's otherwise. */
-export const locale = (): string | undefined => (S.lang === 'hi' ? 'hi-IN' : undefined);
+export const locale = (): string | undefined => LOCALES[S.lang];
 
 const fill = (s: string, vars?: Record<string, string | number>) => (vars ? s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m)) : s);
-const lookup = (en: string) => (S.lang === 'en' ? undefined : S.dict[en]);
+const lookup = (en: string) => (S.lang === 'en' ? undefined : S.dicts[S.lang]?.[en]);
 
 /** The text in the language now on (English if it has no translation yet). `{name}` is filled from `vars`. */
 export function t(en: string, vars?: Record<string, string | number>): string {
@@ -71,7 +75,7 @@ function load(ns: string, l: Lang = S.lang, quiet = false): Promise<void> {
   let p = S.loaded.get(key);
   if (!p) {
     p = loader().then((d) => {
-      Object.assign(S.dict, (d as { default?: Dict }).default ?? d);
+      Object.assign((S.dicts[l] ??= {}), (d as { default?: Dict }).default ?? d);
       S.ready.add(key);
       if (!quiet) notify();
     }, () => { S.loaded.delete(key); });
@@ -104,7 +108,7 @@ export function useLang(): Lang {
   return S.lang;
 }
 
-/** Dictionaries split into parts (import.meta.glob of locales/hi/*.json), as one loader. */
+/** Dictionaries split into parts (import.meta.glob of locales/<lang>/*.json), as one loader. */
 export const fromParts = (parts: Record<string, () => Promise<unknown>>): Loader => async () =>
   Object.assign({}, ...(await Promise.all(Object.values(parts).map(async (f) => { const m = await f() as { default?: Dict }; return m.default ?? m; }))));
 

@@ -31,11 +31,15 @@ test('landing page offers sign in and sign up', async () => {
   for (const name of ['Chat', 'Games', 'Split', 'Calendar', 'Diary']) await expect(apps.getByRole('heading', { name, exact: true })).toBeVisible();
   await expect(apps).toContainText('Snakes & Ladders');
   await expect(A.page.getByText(/Coming soon|^Soon$/)).toHaveCount(0);
-  // The page can be read in Hindi before signing in, and back.
-  await A.page.getByRole('button', { name: 'हिन्दी' }).click();
+  // The page can be read in Hindi or Marathi before signing in, and back.
+  const pick = A.page.getByRole('banner').getByRole('combobox'); // its label changes language with the page
+  await pick.selectOption('hi');
   await expect(A.page.locator('html')).toHaveAttribute('lang', 'hi');
   await expect(A.page.getByRole('heading', { name: /आपके लोग/ })).toBeVisible();
-  await A.page.getByRole('button', { name: 'English' }).click();
+  await pick.selectOption('mr');
+  await expect(A.page.locator('html')).toHaveAttribute('lang', 'mr');
+  await expect(A.page.getByRole('heading', { name: /आपके लोग/ })).toHaveCount(0);
+  await pick.selectOption('en');
   await expect(A.page.getByRole('heading', { name: /Your people/ })).toBeVisible();
   await A.page.getByRole('button', { name: /Get started/ }).click();
   await expect(A.page.getByRole('tab', { name: 'Sign in' })).toBeVisible();

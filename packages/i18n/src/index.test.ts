@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lang, register, setLang, t, tn, tx } from './index';
+import { lang, locale, register, setLang, t, tn, tx } from './index';
 
 describe('translations', () => {
   it('English by default: the text in the code', () => {
@@ -21,5 +21,16 @@ describe('translations', () => {
     expect(node.props.children).toHaveLength(2);
     await setLang('en');
     expect(t('Add expense')).toBe('Add expense');
+  });
+  it('Marathi keeps its own words: nothing Hindi shows where Marathi has none', async () => {
+    register('test2', { hi: async () => ({ Save: 'सहेजें', Cancel: 'रद्द करें' }), mr: async () => ({ Save: 'सेव्ह करा' }) });
+    await setLang('hi');
+    expect(t('Cancel')).toBe('रद्द करें');
+    await setLang('mr');
+    expect(lang()).toBe('mr');
+    expect(t('Save')).toBe('सेव्ह करा');
+    expect(t('Cancel')).toBe('Cancel');
+    expect(new Intl.NumberFormat(locale()).format(1234)).toMatch(/1,234/); // 0-9, not Devanagari digits
+    await setLang('en');
   });
 });
