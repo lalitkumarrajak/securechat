@@ -14,7 +14,7 @@ import { go } from './nav';
 import { deviceHints, deviceName, placeName } from './device';
 import { setSettings, useSettings } from '../state/settings';
 import './swLang'; // push notifications in the language now on
-import { t } from '@sanga/i18n';
+import { lang, t } from '@sanga/i18n';
 
 const S = {
   token: null as string | null,
@@ -84,6 +84,7 @@ export async function boot() {
   const groups: Record<string, Group> | undefined = await db.get('kv', 'groups');
   setApp({ status: 'app', me, groups: groups || {}, groupsLoaded: !!groups, friendsLoaded: !!fr.friends, friends: fr.friends || {}, incoming: fr.incoming || [], outgoing: fr.outgoing || [], blocked: fr.blocked || [], chats: sortChats(await db.all('chats')) });
   connect();
+  void relabelChats(); // the language may have changed since they were written
   refreshMe().catch(() => {});
   refreshFriends().catch(() => setApp({ friendsLoaded: true }));
   if (useSettings.getState().push && 'Notification' in window && Notification.permission === 'granted') enablePush(true).catch(() => {});
@@ -227,7 +228,7 @@ function connect() {
     clearInterval(S.pingTimer);
     clearTimeout(S.pongTimer);
     if (e.code === 4001) { sessionExpired(); return; }
-    setConn(navigator.onLine ? 'connecting' : 'offline');
+    setApp({ conn: navigator.onLine ? 'connecting' : 'offline', syncing: false });
     // Exponential backoff with jitter so many clients don't reconnect in lockstep.
     S.reconnectTimer = window.setTimeout(connect, S.backoff * (0.5 + Math.random()));
     S.backoff = Math.min(S.backoff * 2, 8000);
@@ -283,7 +284,7 @@ async function handle(m: any) {
     case 'ok':
       S.ready = true;
       S.backoff = 1000;
-      setConn('online');
+      setApp({ conn: 'online', syncing: true }); // what came in while away is on its way
       clearInterval(S.pingTimer);
       S.pingTimer = window.setInterval(() => wsSend({ t: 'p' }), 20000);
       wsSend({ t: 'sync', after: S.lastSeq });
@@ -299,7 +300,8 @@ async function handle(m: any) {
     case 'batch': {
       for (const row of m.msgs) await ingest(row, true);
       if (m.msgs.length) await saveSeq(m.msgs[m.msgs.length - 1].seq, true);
-      if (m.more) { wsSend({ t: 'sync', after: S.lastSeq }); break; }
+      // A long backlog: the list catches up a page at a time instead of after the very last one.
+      if (m.more) { wsSend({ t: 'sync', after: S.lastSeq }); await reloadChats(); break; }
       S.synced = true;
       await reloadChats();
       setApp({ syncing: false });
@@ -905,13 +907,34 @@ async function groupSendingKey(gid: string) {
   return { kid: cur.kid, key: (await groupKey(S.me, cur.kid))!.key };
 }
 
+/** The chat list's line for a message. In groups it says who said it: "Rakhi: see you". Messages in a
+ *  tab say which: "🏠 House · Rent paid". */
+function lineOf(chat: Chat, msg: Msg) {
+  const who = isGroup(chat.peer) && !msg.out && msg.type !== 'sys' ? nameOf(senderOf(msg), getApp().groups[groupIdOf(chat.peer)]) + ': ' : '';
+  const topic = msg.tp && chat.topics?.find((tp) => tp.id === msg.tp);
+  return (topic ? `${topic.emoji} ${topic.name} · ` : '') + who + preview(msg);
+}
+
+/** The list keeps each chat's line as text, written in the language that was on then ("📷 Photo"):
+ *  after a switch, they're written again from the messages, in the new one. */
+// In line with the messages being handled, so a chat isn't written twice at once.
+const relabelChats = () => (S.inbox = S.inbox.then(relabel).catch(() => {}));
+async function relabel() {
+  const now = lang();
+  if ((await db.get('kv', 'chatsLang')) === now) return;
+  for (const chat of await db.all('chats')) {
+    const msg = chat.lastK && await db.getMsg(chat.lastK);
+    if (msg) await db.putChat({ ...chat, last: lineOf(chat, msg) });
+  }
+  await db.put('kv', now, 'chatsLang');
+  if (S.token) await reloadChats();
+}
+if (typeof MutationObserver !== 'undefined')
+  new MutationObserver(() => { if (S.token) void relabelChats(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] });
+
 async function bumpChat(peer: string, msg: Msg, unread: boolean, fromSync: boolean, tabUnread = unread) {
   const chat = (await db.getChat(peer)) || newChat(peer);
-  // In groups the list shows who said it: "Rakhi: see you". Messages in a tab say which: "🏠 House · Rent paid".
-  const who = isGroup(peer) && !msg.out && msg.type !== 'sys' ? nameOf(senderOf(msg), getApp().groups[groupIdOf(peer)]) + ': ' : '';
-  const topic = msg.tp && chat.topics?.find((tp) => tp.id === msg.tp);
-  const tab = topic ? `${topic.emoji} ${topic.name} · ` : '';
-  if (msg.ts >= chat.ts) Object.assign(chat, { ts: msg.ts, last: tab + who + preview(msg), lastOut: msg.out, lastK: msg.k, lastS: msg.s });
+  if (msg.ts >= chat.ts) Object.assign(chat, { ts: msg.ts, last: lineOf(chat, msg), lastOut: msg.out, lastK: msg.k, lastS: msg.s });
   if (unread) chat.unread++;
   if (tabUnread && chat.topics?.length) chat.tunread = { ...chat.tunread, [msg.tp || '']: (chat.tunread?.[msg.tp || ''] || 0) + 1 };
   if (!msg.out && chat.archived && !isMuted(peer)) chat.archived = false; // new message un-archives, like WhatsApp
@@ -938,7 +961,7 @@ async function applyControl(c: any, from: string, ts: number, peer: string) {
   showMessage(next);
   if (c.type === 'edit') {
     const chat = await db.getChat(peer);
-    if (chat?.lastK === next.k) await saveChat({ ...chat, last: preview(next) });
+    if (chat?.lastK === next.k) await saveChat({ ...chat, last: lineOf(chat, next) });
   }
 }
 
@@ -1001,7 +1024,7 @@ async function markDeleted(m: Msg) {
   const chat = await db.getChat(m.peer);
   if (chat) {
     const pins = (chat.pins || []).filter((p) => p.k !== m.k);
-    await saveChat({ ...chat, pins, ...(chat.lastK === m.k && { last: preview(gone) }) });
+    await saveChat({ ...chat, pins, ...(chat.lastK === m.k && { last: lineOf(chat, gone) }) });
   }
 }
 
@@ -1018,7 +1041,7 @@ async function removeLocal(m: Msg) {
   const pins = (chat.pins || []).filter((p) => p.k !== m.k);
   if (chat.lastK === m.k) {
     const [prev] = (await db.recentMessages(m.peer, 1));
-    await saveChat({ ...chat, pins, last: prev ? preview(prev) : '', lastOut: !!prev?.out, lastK: prev?.k, ts: prev?.ts ?? chat.ts });
+    await saveChat({ ...chat, pins, last: prev ? lineOf(chat, prev) : '', lastOut: !!prev?.out, lastK: prev?.k, ts: prev?.ts ?? chat.ts });
   } else await saveChat({ ...chat, pins });
 }
 

@@ -88,7 +88,8 @@ function load() {
       if (g) put(g, r);
     }
     cache = list ?? [];
-    set((s) => ({ loaded: true, groups: { ...groups, ...s.groups }, seen: { ...(seen ?? {}), ...s.seen } }));
+    // On a device that has never synced, "no groups" isn't known yet: the first sync says (syncSplit).
+    set((s) => ({ loaded: s.loaded || !!list, groups: { ...groups, ...s.groups }, seen: { ...(seen ?? {}), ...s.seen } }));
     // The keys: from the saved wrapped copies, so a group opens offline.
     await Promise.all(cache.map((e) => groupKey(e).catch(() => {})));
   })());
@@ -282,6 +283,7 @@ export function syncSplit(): Promise<void> {
   if (running) { again = true; return running; }
   running = sync().then(() => set({ error: '' }), () => { /* offline: changes stay marked and go up on reconnect */ }).finally(() => {
     running = null;
+    if (!get().loaded) set({ loaded: true });
     if (again) { again = false; void syncSplit(); }
   });
   return running;
@@ -322,24 +324,50 @@ async function syncGroup(gid: string) {
   let since: number = (await sdk().store.get<number>(SINCE(gid))) || 0;
   for (;;) {
     const r = await sdk().api<{ items: { id: string; body: string; updated: number }[]; more: boolean }>(`/api/split/records?gid=${gid}&since=${since}`);
-    for (const row of r.items) await receive(gid, k, row);
+    // A page is opened first and shown at once: totals don't tick up record by record.
+    const got = (await Promise.all(r.items.map((row) => receive(gid, k, row)))).filter((x) => !!x);
+    await apply(gid, got);
     if (r.items.length) since = r.items[r.items.length - 1].updated;
     await sdk().store.put(SINCE(gid), since);
     if (!r.more) break;
   }
 }
 
-async function receive(gid: string, k: CryptoKey, row: { id: string; body: string; updated: number }) {
+type Change = { keep: Local<Record_> } | { drop: Record_ };
+/** What a record from the server changes here, if anything. */
+async function receive(gid: string, k: CryptoKey, row: { id: string; body: string; updated: number }): Promise<Change | null> {
   const g = get().groups[gid];
   const local = row.id === 'meta' ? g?.meta : g?.expenses[row.id] ?? g?.settles[row.id] ?? g?.activity[row.id];
-  if (local?.dirty) return;                          // this device's newer change goes up next
-  if (local?.srv && local.srv >= row.updated) return; // already have it
-  if (!row.body) { if (local) await drop(gid, local); return; }
+  if (local?.dirty) return null;                          // this device's newer change goes up next
+  if (local?.srv && local.srv >= row.updated) return null; // already have it
+  if (!row.body) return local ? { drop: local } : null;
   try {
     const r = valid(await C.decryptItem(k, row.body, gid, 'split', row.id), row.id);
-    if (r) await keep(gid, { ...r, srv: row.updated });
-  } catch { /* not sealed with this group's key, or damaged: ignore it */ }
+    return r ? { keep: { ...r, srv: row.updated } } : null;
+  } catch { return null; } // not sealed with this group's key, or damaged: ignore it
 }
+
+/** Several changes to a group in one go: one redraw, then saved on this device. */
+async function apply(gid: string, changes: Change[]) {
+  if (!changes.length) return;
+  const done: Change[] = [];
+  patch(gid, (g) => {
+    const n = { ...g, expenses: { ...g.expenses }, settles: { ...g.settles }, activity: { ...g.activity } };
+    for (const c of changes) {
+      if (!stillClean(g, 'keep' in c ? c.keep : c.drop)) continue;
+      if ('keep' in c) put(n, c.keep);
+      else if (c.drop.type === 'expense') delete n.expenses[c.drop.id]; else if (c.drop.type === 'settle') delete n.settles[c.drop.id]; else if (c.drop.type === 'activity') delete n.activity[c.drop.id];
+      done.push(c);
+    }
+    return n;
+  });
+  await Promise.all(done.map((c) => ('keep' in c ? sdk().store.put(REC(gid, c.keep.id), { ...c.keep, gid }) : sdk().store.del(REC(gid, c.drop.id)))));
+}
+/** Changed here while the page was being opened: this device's change wins, and goes up next. */
+const stillClean = (g: GroupData, r: Record_) => {
+  const local = r.type === 'meta' ? g.meta : r.type === 'expense' ? g.expenses[r.id] : r.type === 'settle' ? g.settles[r.id] : g.activity[r.id];
+  return !local?.dirty;
+};
 
 // ---------- what another member sent is checked before it's used ----------
 const isStr = (x: unknown, max = 200): x is string => typeof x === 'string' && x.length <= max;

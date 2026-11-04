@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Archive, ArrowLeft, CirclePlus, Clock, Lock, LogOut, MessageSquarePlus, MoreVertical, Search, Settings, UserPlus, Users, WifiOff, X } from 'lucide-react';
+import { Archive, ArrowLeft, CirclePlus, Clock, Loader2, Lock, LogOut, MessageSquarePlus, MoreVertical, Search, Settings, UserPlus, Users, WifiOff, X } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
 import { IconButton } from '@sanga/ui/button';
 import { confirm } from '@sanga/ui/confirm';
@@ -29,6 +29,17 @@ export function Sidebar() {
   const syncing = useApp((s) => s.syncing);
   const [waited, setWaited] = useState(false); // stop showing placeholders if the server is slow to answer
   useEffect(() => { const timer = setTimeout(() => setWaited(true), 10_000); return () => clearTimeout(timer); }, []);
+  // Opening the app: the connection usually comes up within a second. Until it has been trying for a
+  // while, a quiet "Updating…" by the title says so, not a yellow banner that flashes on every open.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (conn !== 'connecting') { setSlow(false); return; }
+    const timer = setTimeout(() => setSlow(true), 3000);
+    return () => clearTimeout(timer);
+  }, [conn]);
+  const banner = conn === 'offline' || (conn === 'connecting' && slow);
+  // What this device had shows at once; what came in meanwhile is still on its way.
+  const updating = !banner && (conn === 'connecting' || syncing);
   const headerTitle = useSettings((s) => s.headerTitle);
   const appLock = useSettings((s) => !!s.appLock);
   const [query, setQuery] = useState('');
@@ -64,7 +75,14 @@ export function Sidebar() {
           <button onClick={() => setApp({ panel: 'settings' })} aria-label={t('Profile and settings')} className="rounded-full">
             <Avatar u={me.u} name={me.name} size={40} />
           </button>
-          <h1 className="min-w-0 flex-1 truncate pl-1 text-xl font-bold tracking-tight">{headerTitle.trim() || me.u}</h1>
+          <div className="flex min-w-0 flex-1 items-center gap-2 pl-1">
+            <h1 className="min-w-0 truncate text-xl font-bold tracking-tight">{headerTitle.trim() || me.u}</h1>
+            {updating && (
+              <span data-testid="chats-updating" role="status" className="flex shrink-0 animate-fade-in items-center gap-1 text-xs text-muted">
+                <Loader2 className="size-3.5 animate-spin" aria-hidden />{t('Updating…')}
+              </span>
+            )}
+          </div>
           <div className="flex items-center">
             <PeekButton />
             {appLock && <IconButton label={t('Lock Sanga')} onClick={lockNow}><Lock /></IconButton>}
@@ -95,7 +113,7 @@ export function Sidebar() {
         </header>
       ))}
 
-      {conn !== 'online' && (
+      {banner && (
         <div className="mx-3 mb-2 flex items-center gap-2 rounded-xl bg-warn px-3 py-2 text-sm" role="status">
           {conn === 'offline' ? <WifiOff className="size-4" /> : <Clock className="size-4 animate-pulse" />}
           {conn === 'offline' ? t('You’re offline. Messages will send when you reconnect.') : t('Connecting…')}

@@ -31,7 +31,10 @@
   "Split costs with friends": "दोस्तों के साथ ख़र्च बाँटें",
   "Make a group for a trip, your flat, the gym or office lunches, add people, and keep track of who owes whom.": "यात्रा, अपने फ़्लैट, जिम या ऑफ़िस लंच के लिए ग्रुप बनाएँ, लोग जोड़ें, और हिसाब रखें कि किसे किसको कितना देना है।",
   "Create your first group": "अपना पहला ग्रुप बनाएँ",
-  "{n} expenses": { "one": "{n} ख़र्चा", "other": "{n} ख़र्चे" },
+  "{n} expenses": {
+    "one": "{n} ख़र्चा",
+    "other": "{n} ख़र्चे"
+  },
   "You won’t see this group any more. You still have an unsettled balance here; it stays on the books for the others.": "यह ग्रुप आपको अब नहीं दिखेगा। यहाँ आपका हिसाब अभी बाकी है; वह बाकी लोगों के लिए दर्ज रहेगा।",
   "You won’t see this group any more.": "यह ग्रुप आपको अब नहीं दिखेगा।",
   "Leave “{name}”?": "“{name}” छोड़ें?",
@@ -103,5 +106,6 @@
   "Not signed in": "साइन इन नहीं है",
   "This group’s key isn’t on this device yet. Reconnect and try again.": "इस ग्रुप की चाबी अभी इस डिवाइस पर नहीं है। फिर से कनेक्ट करें और फिर से कोशिश करें।",
   "That name is already linked.": "यह नाम पहले से जुड़ा हुआ है।",
-  "Some groups can’t be opened yet. Their key needs your friend’s details; try again when you’re online.": "कुछ ग्रुप अभी नहीं खुल सकते। उनकी चाबी के लिए आपके दोस्त की जानकारी चाहिए; ऑनलाइन होने पर फिर से कोशिश करें।"
+  "Some groups can’t be opened yet. Their key needs your friend’s details; try again when you’re online.": "कुछ ग्रुप अभी नहीं खुल सकते। उनकी चाबी के लिए आपके दोस्त की जानकारी चाहिए; ऑनलाइन होने पर फिर से कोशिश करें।",
+  "Loading your groups…": "आपके ग्रुप लोड हो रहे हैं…"
 }

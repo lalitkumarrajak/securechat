@@ -38,12 +38,27 @@ function Card({ g, active, onOpen }: { g: GroupData; active: boolean; onOpen: ()
   );
 }
 
+/** The groups' shape while they're on their way, so the page doesn't jump when they arrive. */
+function Placeholder() {
+  return (
+    <div aria-busy="true" aria-label={t('Loading your groups…')} className="animate-pulse">
+      <div className="mx-3 mb-3 h-[74px] rounded-2xl bg-panel-2" />
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="flex items-center gap-3 px-4 py-3.5">
+          <span className="size-12 shrink-0 rounded-2xl bg-panel-2" />
+          <span className="flex-1 space-y-2"><span className="block h-3.5 w-2/5 rounded bg-panel-2" /><span className="block h-3 w-3/4 rounded bg-panel-2" /></span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** Your groups, each with what you're owed or owe and what you spent this month. */
 export function GroupList({ active, onOpen, onNew }: { active: string | null; onOpen: (gid: string) => void; onNew: () => void }) {
   const groups = useSplit((s) => s.groups);
   const loaded = useSplit((s) => s.loaded);
   const list = useMemo(() => Object.values(groups).sort((a, b) => (a.meta?.name ?? '').localeCompare(b.meta?.name ?? '')), [groups]);
-  if (!loaded) return null;
+  if (!loaded) return <Placeholder />;
   if (!list.length) return (
     <Empty emoji="💸" title={t('Split costs with friends')}>
       {t('Make a group for a trip, your flat, the gym or office lunches, add people, and keep track of who owes whom.')}

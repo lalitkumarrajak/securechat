@@ -31,7 +31,10 @@
   "Split costs with friends": "मित्रांसोबत खर्च वाटा",
   "Make a group for a trip, your flat, the gym or office lunches, add people, and keep track of who owes whom.": "ट्रिप, फ्लॅट, जिम किंवा ऑफिस लंचसाठी ग्रुप बनवा, लोक जोडा आणि कोणी कोणाला किती द्यायचे याचा हिशोब ठेवा.",
   "Create your first group": "तुमचा पहिला ग्रुप बनवा",
-  "{n} expenses": { "one": "{n} खर्च", "other": "{n} खर्च" },
+  "{n} expenses": {
+    "one": "{n} खर्च",
+    "other": "{n} खर्च"
+  },
   "You won’t see this group any more. You still have an unsettled balance here; it stays on the books for the others.": "हा ग्रुप तुम्हाला आता दिसणार नाही. इथे तुमचा हिशोब अजून बाकी आहे; तो इतरांसाठी नोंदवलेला राहील.",
   "You won’t see this group any more.": "हा ग्रुप तुम्हाला आता दिसणार नाही.",
   "Leave “{name}”?": "“{name}” सोडायचा?",
@@ -103,5 +106,6 @@
   "Not signed in": "साइन इन केलेले नाही",
   "This group’s key isn’t on this device yet. Reconnect and try again.": "या ग्रुपची की अजून या डिव्हाइसवर नाही. पुन्हा कनेक्ट करून प्रयत्न करा.",
   "That name is already linked.": "हे नाव आधीच लिंक केलेले आहे.",
-  "Some groups can’t be opened yet. Their key needs your friend’s details; try again when you’re online.": "काही ग्रुप अजून उघडता येत नाहीत. त्यांच्या कीसाठी तुमच्या मित्राची माहिती लागते; ऑनलाइन असताना पुन्हा प्रयत्न करा."
+  "Some groups can’t be opened yet. Their key needs your friend’s details; try again when you’re online.": "काही ग्रुप अजून उघडता येत नाहीत. त्यांच्या कीसाठी तुमच्या मित्राची माहिती लागते; ऑनलाइन असताना पुन्हा प्रयत्न करा.",
+  "Loading your groups…": "तुमचे ग्रुप लोड होत आहेत…"
 }
