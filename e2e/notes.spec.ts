@@ -1,7 +1,7 @@
 // End-to-end: the diary. Notes filed under days, personal or about a chat, end-to-end encrypted
 // and synced to the account's other devices.
 import { test, expect } from '@playwright/test';
-import { phone, signIn, signUp, uname, type Phone } from './helpers';
+import { openApp, phone, signIn, signUp, uname, type Phone } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -27,7 +27,7 @@ test('set up: two friends', async () => {
 });
 
 test('write a diary entry for today, with a mood', async () => {
-  await P.page.getByRole('tab', { name: 'Diary' }).click();
+  await openApp(P, 'Diary');
   const d = diary(P);
   await expect(d.getByText(/Only you can read them/)).toBeVisible();
   await d.getByRole('button', { name: 'New note' }).click();
@@ -92,7 +92,7 @@ test("notes about a chat, from the chat's menu; filters and search", async () =>
 test('they reach my other phone (decrypted there), and changes go both ways', async ({ browser }) => {
   P2 = await phone(browser, P.u);
   await signIn(P2);
-  await P2.page.getByRole('tab', { name: 'Diary' }).click();
+  await openApp(P2, 'Diary');
   for (const t of ['Morning run', 'Paid the electricity bill', 'Owes me 200']) await expect(card(P2, t)).toBeVisible({ timeout: 15_000 });
 
   // Edited on the second phone: shows on the first without reopening

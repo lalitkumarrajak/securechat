@@ -1,7 +1,7 @@
 // End-to-end: Sanga on a laptop. The chat list stays a column on the left with the chat beside it,
 // whichever tab you've been on (the diary once broke this), and everything opens where it should.
 import { test, expect, type Locator } from '@playwright/test';
-import { makeFriends, phone, signUp, tab, uname, type Phone } from './helpers';
+import { openApp, makeFriends, phone, signUp, tab, uname, type Phone } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -29,7 +29,7 @@ test('set up: two friends on laptops', async () => {
 });
 
 test('after the diary, Chats and Stories are still two columns', async () => {
-  await tab(P, 'Diary').click();
+  await openApp(P, 'Diary');
   const diary = P.page.getByRole('region', { name: 'Diary and notes' });
   await expect(diary.getByRole('heading', { name: 'Diary', exact: true })).toBeVisible();
   await expect(diary.getByRole('status', { name: /Opening/ })).toHaveCount(0);
@@ -40,7 +40,7 @@ test('after the diary, Chats and Stories are still two columns', async () => {
   await tab(P, 'Stories').click();
   await twoColumns(P);
   await expect(P.page.getByRole('region', { name: 'Stories' })).toBeVisible();
-  await tab(P, 'Games').click();
+  await openApp(P, 'Games');
   await expect(P.page.getByRole('button', { name: 'Play Ludo' })).toBeVisible();
   await tab(P, 'Chats').click();
   await twoColumns(P);
@@ -63,7 +63,7 @@ test('a friend from Friends opens their chat beside the list', async () => {
 
 test('from the Stories and Games tabs, a friend still opens their chat', async () => {
   for (const t of ['Stories', 'Games', 'Diary']) {
-    await tab(P, t).click();
+    if (t === 'Stories') await tab(P, t).click(); else await openApp(P, t);
     await tab(P, 'Chats').click(); // Friends is above the chat list
     await P.page.getByRole('button', { name: 'Friends' }).click();
     await P.page.getByRole('dialog').locator('li').filter({ hasText: Q.u }).first().click();

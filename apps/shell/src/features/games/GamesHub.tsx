@@ -1,6 +1,8 @@
 // Games: pick a game to start (with friends, a link, or computer players), and the games you're in.
-import { Bot, Link2, Users } from 'lucide-react';
+import { ArrowLeft, Bot, Link2, Users } from 'lucide-react';
+import { IconButton } from '@sanga/ui/button';
 import { t } from '@sanga/i18n';
+import { back } from '../../lib/nav';
 import { AppTabs } from '../nav/AppTabs';
 import { GAME_UI } from './registry';
 import { GamesStrip } from './GamesStrip';
@@ -13,6 +15,7 @@ export function GamesHub() {
     <div className="min-h-0 flex-1 overflow-y-auto">
       <header className="sticky top-0 z-10 border-b border-line bg-bg/85 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-5xl items-center gap-2 px-4 md:h-16 md:px-8">
+          <IconButton label={t('Back')} onClick={back} className="-ml-2"><ArrowLeft /></IconButton>
           <h1 className="flex-1 text-xl font-bold tracking-tight">{t('Games')}</h1>
         </div>
       </header>

@@ -1,10 +1,10 @@
-// Which tab you're on once signed in: Chats, Stories, Games, Diary, Calendar or Split. Kept in the address
-// (#stories, #games, #diary, #calendar, #split) so a reload stays put. Switching tabs doesn't add to the history.
+// Which tab you're on once signed in: Chats, Stories, Calendar, Split or More, and the apps on the More page
+// (Games, the Diary). Kept in the address (#stories, #games, #diary, #calendar, #split, #more) so a reload stays put. Switching tabs doesn't add to the history.
 import { getApp, setApp, type Section } from '../state/app';
 
 export const sectionFromHash = (): Section => {
   const h = location.hash.slice(1);
-  return h === 'stories' || h === 'games' || h === 'diary' || h === 'calendar' || h === 'split' ? h : 'chat';
+  return h === 'stories' || h === 'games' || h === 'diary' || h === 'calendar' || h === 'split' || h === 'more' ? h : 'chat';
 };
 
 const base = () => location.pathname + location.search;
@@ -14,6 +14,9 @@ export function go(section: Section) {
   history.replaceState(history.state, '', section === 'chat' ? base() : `${base()}#${section}`);
   setApp({ section });
 }
+
+/** Back from an app on the More page (Games, the Diary): to the More page. */
+export const back = () => go('more');
 
 /** Signed out, or just signed in: start from Chats. */
 export function resetSection() {

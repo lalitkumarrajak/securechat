@@ -4,7 +4,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-import { phone, signUp, tab, uname, type Phone } from './helpers';
+import { openApp, phone, signUp, tab, uname, type Phone } from './helpers';
 
 const shots = (name: string) => `e2e/.artifacts/screens/${name}.png`;
 
@@ -95,8 +95,9 @@ for (const L of LANGS) test.describe(L.english, () => {
     await clean(P.page, 'Chats');
     await P.page.screenshot({ path: shots(`61-${L.english.toLowerCase()}-chats`) });
     for (const [en, shot] of [['Stories', `62-${L.english.toLowerCase()}-stories`], ['Games', `63-${L.english.toLowerCase()}-games`], ['Diary', `64-${L.english.toLowerCase()}-diary`], ['Calendar', `65-${L.english.toLowerCase()}-calendar`], ['Split', `66-${L.english.toLowerCase()}-split`]] as const) {
-      await tab(P, tr(en)).click();
-      await expect(tab(P, tr(en))).toHaveAttribute('aria-selected', 'true');
+      const inMore = en === 'Games' || en === 'Diary';
+      if (inMore) await openApp(P, tr(en), tr('More')); else await tab(P, tr(en)).click();
+      await expect(tab(P, tr(inMore ? 'More' : en))).toHaveAttribute('aria-selected', 'true');
       await P.page.waitForTimeout(400); // the app's own words load with it
       await clean(P.page, en);
       await P.page.screenshot({ path: shots(shot) });

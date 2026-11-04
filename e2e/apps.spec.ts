@@ -2,7 +2,7 @@
 // the shell downloads it only when it's opened, it also runs on its own page, and a failed download
 // can be retried without breaking the rest.
 import { test, expect } from '@playwright/test';
-import { PHONE, phone, signUp, uname, type Phone } from './helpers';
+import { openApp, PHONE, phone, signUp, uname, type Phone } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -23,7 +23,7 @@ test('nothing from the diary is downloaded until it is opened', async () => {
   await P.page.waitForTimeout(5000); // past the shell's own quiet preloading of its screens
   expect(appRequests()).toEqual([]);
 
-  await P.page.getByRole('tab', { name: 'Diary' }).click();
+  await openApp(P, 'Diary');
   const diary = P.page.getByRole('region', { name: 'Diary and notes' });
   await expect(diary.getByRole('heading', { name: 'Diary', exact: true })).toBeVisible();
   expect(appRequests()).toContain('/apps.json');
@@ -35,7 +35,8 @@ test('nothing from the diary is downloaded until it is opened', async () => {
   await diary.getByLabel('Note', { exact: true }).fill('Written in the shell');
   await expect(diary.getByRole('status')).toHaveText('Saved');
   await diary.getByRole('button', { name: 'Back to diary' }).click();
-  await expect(diary.getByRole('button', { name: 'Back', exact: true })).toHaveCount(0); // a tab: nothing to go back to
+  await diary.getByRole('button', { name: 'Back', exact: true }).click(); // opened from More: Back to More
+  await expect(P.page.getByRole('region', { name: 'More' })).toBeVisible();
   expect(P.errors).toEqual([]);
 });
 
@@ -50,7 +51,7 @@ test('the diary also runs on its own page, with the same sign-in and notes', asy
 
   await P.page.getByRole('button', { name: 'Back', exact: true }).click(); // back to Sanga
   await expect(P.page.getByRole('heading', { level: 1, name: P.u })).toBeVisible(); // Chat
-  await P.page.getByRole('tab', { name: 'Diary' }).click();
+  await openApp(P, 'Diary');
   await expect(P.page.getByRole('region', { name: 'Diary and notes' }).getByRole('button', { name: /Written on its own/ })).toBeVisible();
   await P.page.keyboard.press('Escape');
   expect(P.errors).toEqual([]);
@@ -69,7 +70,7 @@ test('if an app can’t be downloaded, Sanga keeps working and it can be retried
   const Q = await phone(browser, uname('offapp'), { ...PHONE, serviceWorkers: 'block' }); // so the blocked download really fails
   await signUp(Q);
   await Q.page.route('**/apps/notes/remoteEntry.js', (r) => r.abort());
-  await Q.page.getByRole('tab', { name: 'Diary' }).click();
+  await openApp(Q, 'Diary');
   const diary = Q.page.getByRole('region', { name: 'Diary and notes' });
   await expect(diary.getByText('Couldn’t open the diary')).toBeVisible();
   await Q.page.unroute('**/apps/notes/remoteEntry.js');

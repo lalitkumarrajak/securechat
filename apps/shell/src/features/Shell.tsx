@@ -4,6 +4,7 @@ import { handleInvite } from '../lib/invite';
 import { DiaryPage } from './notes/DiaryPage';
 import { CalendarPage } from './calendar/CalendarPage';
 import { SplitPage } from './split/SplitPage';
+import { MorePage } from './nav/MorePage';
 import { GamesSkeleton } from './games/GamesSkeleton';
 import { Overlays } from './shell/Overlays';
 import { Shell } from './shell/Shell';
@@ -22,6 +23,7 @@ export function Main() {
       {section === 'diary' && <DiaryPage />}
       {section === 'calendar' && <CalendarPage />}
       {section === 'split' && <SplitPage />}
+      {section === 'more' && <MorePage />}
       {section === 'games' && <Suspense fallback={<GamesSkeleton />}><GamesHub /></Suspense>}
       <Overlays />
     </>

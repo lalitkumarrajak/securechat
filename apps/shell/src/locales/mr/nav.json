@@ -2,6 +2,14 @@
   "Calendar": "कॅलेंडर",
   "Diary": "डायरी",
   "Games": "गेम्स",
+  "More": "आणखी",
+  "Your other Sanga apps": "Sanga चे इतर ॲप्स",
+  "Ludo, UNO and more": "Ludo, UNO आणि बरेच काही",
+  "Notes and your daily diary": "नोट्स आणि तुमची रोजची डायरी",
+  "{n} games waiting for you": {
+    "one": "{n} गेम तुमची वाट पाहत आहे",
+    "other": "{n} गेम तुमची वाट पाहत आहेत"
+  },
   "New stories": "नवीन स्टोरी",
   "Split": "स्प्लिट",
   "Stories": "स्टोरी",

@@ -1,7 +1,7 @@
 // End-to-end: Ludo between people who aren't friends, joined from a shared link.
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
-import { newGame, phone, signUp, tab, uname, type Phone } from './helpers';
+import { openApp, newGame, phone, signUp, tab, uname, type Phone } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -160,15 +160,27 @@ test('5 or 6 players use the six-arm board', async ({ browser }) => {
   }
 });
 
-test('opening Games keeps the tabs on screen while it downloads', async ({ browser }) => {
+test('More → Games keeps the tabs on screen while it downloads, Back returns to More, and the Diary from there', async ({ browser }) => {
   const P = await phone(browser, uname('gtab'));
   try {
     await signUp(P);
     await P.page.route(/\/assets\/GamesHub-.*\.js/, async (route) => { await new Promise((r) => setTimeout(r, 2500)); await route.continue(); });
-    await tab(P, 'Games').click();
+    await openApp(P, 'Games');
     // Still downloading: the page shows its frame and every tab, not a blank screen.
     await expect(P.page.getByRole('heading', { name: 'Games', exact: true })).toBeVisible({ timeout: 1000 });
-    for (const t of ['Chats', 'Stories', 'Games', 'Diary', 'Calendar', 'Split']) await expect(tab(P, t)).toBeVisible({ timeout: 500 });
+    for (const t of ['Chats', 'Stories', 'Calendar', 'Split', 'More']) await expect(tab(P, t)).toBeVisible({ timeout: 500 });
+    await expect(tab(P, 'More')).toHaveAttribute('aria-selected', 'true');
+    await expect(P.page.getByRole('tablist', { name: 'Sanga' }).getByRole('tab')).toHaveText([/Chats$/, /Stories$/, /Calendar$/, /Split$/, /More$/]); // five fit a phone
     await expect(P.page.getByRole('button', { name: 'Play Ludo' })).toBeVisible({ timeout: 10_000 });
+    // Back: to the More page, with Games and the Diary; the Diary's Back too.
+    await P.page.getByRole('button', { name: 'Back', exact: true }).click();
+    const more = P.page.getByRole('region', { name: 'More' });
+    await expect(more.getByRole('heading', { name: 'More' })).toBeVisible();
+    await expect(tab(P, 'More')).toHaveAttribute('aria-selected', 'true');
+    await more.getByRole('button', { name: /^Diary/ }).click();
+    await expect(P.page.getByRole('region', { name: 'Diary and notes' })).toBeVisible();
+    await expect(tab(P, 'More')).toHaveAttribute('aria-selected', 'true');
+    await P.page.getByRole('button', { name: 'Back', exact: true }).click();
+    await expect(more.getByRole('button', { name: /^Games/ })).toBeVisible();
   } finally { await P.ctx.close(); }
 });

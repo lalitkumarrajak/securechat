@@ -38,8 +38,14 @@ export async function openAuth(page: Page, tab: 'Sign in' | 'Create account') {
 /** Signed out: the landing page (or the sign-in screen) is showing. */
 export const signedOutView = (page: Page) => page.getByRole('button', { name: /Get started/ }).or(page.getByRole('tab', { name: 'Sign in' })).first();
 
-/** One of the tabs along the bottom: Chats, Stories, Games or Diary. */
+/** One of the tabs along the bottom: Chats, Stories, Calendar, Split or More. */
 export const tab = (p: Phone, name: string) => p.page.getByRole('tab', { name: new RegExp(`${name}$`) });
+
+/** Games or Diary: the More tab, then the app's tile on its page. `more` is "More" in the language showing. */
+export async function openApp(p: Phone, name: string, more = 'More') {
+  await tab(p, more).click();
+  await p.page.getByRole('region', { name: more }).getByRole('button', { name: new RegExp(`^${name}`) }).click();
+}
 
 /** Signed in, Chat opens; the Chats tab if another one is showing. dispatchEvent: a game opened
  *  from an invite link may cover the page. */
@@ -53,7 +59,7 @@ export async function openChats(p: Phone) {
 /** Games tab → Play <game>: the "new game" dialog. */
 export async function newGame(p: Phone, game = 'Ludo') {
   const play = p.page.getByRole('button', { name: `Play ${game}` });
-  if (!(await play.isVisible())) await tab(p, 'Games').click();
+  if (!(await play.isVisible())) await openApp(p, 'Games');
   await play.click();
 }
 
