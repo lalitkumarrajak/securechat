@@ -68,7 +68,7 @@ export async function api<T = any>(path: string, body?: unknown): Promise<T> {
 // ---------- boot & accounts ----------
 export async function boot() {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
-  fetch('/api/config').then((r) => r.json()).then((c) => setApp({ signupOpen: !!c.signup, gifsEnabled: !!c.gifs })).catch(() => {});
+  fetch('/api/config').then((r) => r.json()).then((c) => setApp({ signupOpen: !!c.signup, gifsEnabled: !!c.gifs, emailRequired: !!c.email })).catch(() => {});
   const sess = await db.get('kv', 'session');
   if (!sess) return setApp({ status: 'auth' });
   if (useSettings.getState().signOutOnClose && await tabWasClosed()) {
@@ -92,19 +92,26 @@ export async function boot() {
 
 const normalize = (u: string) => u.trim().toLowerCase();
 
-export async function login(username: string, password: string) {
-  const u = normalize(username);
+/** Sign in with a username or an email. With an email the server says whose it is first: the
+ *  password's keys are derived with the username. */
+export async function login(userOrEmail: string, password: string) {
+  let u = normalize(userOrEmail);
+  if (u.includes('@')) u = (await api<{ u: string }>('/api/login/lookup', { email: u })).u;
   const { auth, wrapKey } = await C.deriveFromPassword(u, password);
   const res = await api('/api/login', { u, auth, dev: await deviceHints() });
   const priv = await C.unwrapIdentity(res.encPriv, wrapKey);
   await startSession(u, res.token, priv, res.pub);
 }
 
-export async function register(username: string, password: string) {
+/** Sign-up, step 1 when an email is needed: checks the username and email are free and emails a code. */
+export const sendSignupCode = (username: string, email: string) =>
+  api('/api/register/code', { u: normalize(username), email: email.trim(), lang: lang() });
+
+export async function register(username: string, password: string, email?: string, code?: string) {
   const u = normalize(username);
   const { auth, wrapKey } = await C.deriveFromPassword(u, password);
   const id = await C.generateIdentity(wrapKey);
-  const { token } = await api('/api/register', { u, auth, pub: id.pub, encPriv: id.encPriv, dev: await deviceHints() });
+  const { token } = await api('/api/register', { u, auth, pub: id.pub, encPriv: id.encPriv, dev: await deviceHints(), email: email?.trim() || undefined, code });
   await startSession(u, token, id.priv, id.pub);
 }
 
@@ -185,6 +192,15 @@ async function sessionExpired() {
   setSettings({ appLock: null });
   await db.clearAll();
   location.reload();
+}
+
+// ---------- email (Settings → Account) ----------
+export const sendEmailCode = (email: string) => api('/api/email/code', { email: email.trim(), lang: lang() });
+export async function verifyEmail(email: string, code: string) {
+  const res = await api<{ email: string }>('/api/email/verify', { email: email.trim(), code: code.trim() });
+  const me = getApp().me;
+  if (me) setApp({ me: { ...me, email: res.email } });
+  return res.email;
 }
 
 export async function changePassword(current: string, next: string) {

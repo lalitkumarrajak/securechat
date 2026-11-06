@@ -152,5 +152,13 @@
   "These devices are signed in to your account. If you don’t recognise one, sign it out and change your password.": "ये डिवाइस आपके अकाउंट में साइन इन हैं। अगर आप किसी को नहीं पहचानते, तो उसे साइन आउट करें और अपना पासवर्ड बदलें।",
   "This device": "यह डिवाइस",
   "You’ll stay signed in on this device.": "आप इस डिवाइस पर साइन इन रहेंगे।",
-  "You’re not signed in anywhere else.": "आप कहीं और साइन इन नहीं हैं।"
+  "You’re not signed in anywhere else.": "आप कहीं और साइन इन नहीं हैं।",
+  "Email verified": "ईमेल पक्का हो गया",
+  "You can now sign in with it.": "अब आप इससे साइन इन कर सकते हैं।",
+  "Verified. You can sign in with it.": "पक्का है। आप इससे साइन इन कर सकते हैं।",
+  "Change": "बदलें",
+  "Add an email to sign in with it. We’ll send a code to check it’s yours.": "इससे साइन इन करने के लिए ईमेल जोड़ें। यह आपका है, यह जाँचने के लिए हम एक कोड भेजेंगे।",
+  "New email": "नया ईमेल",
+  "Send code": "कोड भेजें",
+  "Verify": "पक्का करें"
 }

@@ -86,8 +86,9 @@ export function imageType(b) {
 export const routes = {
   'GET /api/me': async (req, res, me) => {
     const p = await getProfile(me);
-    const encPriv = (await ctx.db.get('getUser', me))?.enc_priv; // your own encrypted key backup
-    sendJson(res, 200, { u: me, name: p.name, about: p.about, privacy: p.privacy, mutes: p.mutes, av: await avatarVersion(me), encPriv });
+    const user = await ctx.db.get('getUser', me);
+    // Your own encrypted key backup, and your verified email (only ever shown to you).
+    sendJson(res, 200, { u: me, name: p.name, about: p.about, privacy: p.privacy, mutes: p.mutes, av: await avatarVersion(me), encPriv: user?.enc_priv, email: user?.email || null });
   },
 
   'POST /api/profile': async (req, res, me) => {

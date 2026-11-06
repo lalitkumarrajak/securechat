@@ -38,6 +38,12 @@ export const config = {
   klipyKey: process.env.KLIPY_API_KEY || '',
   klipyBase: process.env.KLIPY_BASE_URL || 'https://api.klipy.com', // overridable for tests
   itunesBase: process.env.ITUNES_BASE_URL || 'https://itunes.apple.com', // song search for stories; overridable for tests
+  // Email (one-time codes) through Brevo's web API: Render's free plan blocks the SMTP ports.
+  // With a key set, every new account needs a verified email; without one (development, tests) it's optional.
+  brevoKey: process.env.BREVO_API_KEY || '',
+  brevoBase: process.env.BREVO_BASE_URL || 'https://api.brevo.com', // overridable for tests
+  mailFrom: process.env.MAIL_FROM || '',
+  get emailRequired() { return !!this.brevoKey && process.env.REQUIRE_EMAIL !== '0'; },
   vapid: { publicKey: process.env.VAPID_PUBLIC_KEY, privateKey: process.env.VAPID_PRIVATE_KEY },
 };
 

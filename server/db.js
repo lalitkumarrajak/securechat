@@ -206,17 +206,22 @@ const SCHEMA = (pg) => `
   );
 `;
 
-// Columns added after a table was first created (CREATE TABLE IF NOT EXISTS won't add them).
+// Columns added after a table was first created (CREATE TABLE IF NOT EXISTS won't add them), and
+// indexes on them, which can only come after the column.
 const COLUMNS = [
   "ALTER TABLE session_info ADD COLUMN device TEXT NOT NULL DEFAULT ''", // phone model etc., JSON
+  'ALTER TABLE users ADD COLUMN email TEXT', // verified, lowercase; NULL for accounts without one
+  'CREATE UNIQUE INDEX IF NOT EXISTS users_email ON users (email)', // NULLs don't clash
 ];
 
 // Queries written once with `?` placeholders; converted to $1, $2… for Postgres.
 // A message whose body is '' has been deleted for everyone.
 const SQL = {
   getUser: 'SELECT * FROM users WHERE username = ?',
-  insertUser: `INSERT INTO users (username, auth_hash, auth_salt, pubkey, enc_priv, created)
-               VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (username) DO NOTHING`,
+  insertUser: `INSERT INTO users (username, auth_hash, auth_salt, pubkey, enc_priv, created, email)
+               VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (username) DO NOTHING`,
+  getUserByEmail: 'SELECT username FROM users WHERE email = ?',
+  setEmail: 'UPDATE users SET email = ? WHERE username = ?',
   updateAuth: 'UPDATE users SET auth_hash = ?, auth_salt = ?, enc_priv = ? WHERE username = ?',
   searchUsers: `SELECT username FROM users WHERE username LIKE ? ESCAPE '\\'
                 AND username != ? ORDER BY username LIMIT 20`,
@@ -477,6 +482,7 @@ async function openMongo(uri) {
     ['users', 'sessions', 'messages', 'message_hidden', 'avatars', 'friendships', 'blocks', 'profiles', 'push_subs', 'games', 'config',
       'groups', 'group_members', 'group_photos', 'notes', 'stories', 'story_keys', 'story_views', 'story_comments', 'items', 'reminders', 'split_members', 'split_records', 'split_bills'].map(c);
   await Promise.all([
+    users.createIndex({ email: 1 }, { unique: true, partialFilterExpression: { email: { $type: 'string' } } }),
     sessions.createIndex({ expires: 1 }),
     sessions.createIndex({ username: 1 }),
     messages.createIndex({ sender: 1, cid: 1 }, { unique: true }),
@@ -525,8 +531,10 @@ async function openMongo(uri) {
 
   const ops = {
     getUser: async (u) => userRow(await users.findOne({ _id: u })),
-    insertUser: (u, auth_hash, auth_salt, pubkey, enc_priv, created) =>
-      insertIgnoringDupes(users, { _id: u, auth_hash, auth_salt, pubkey, enc_priv, created, last_seen: 0 }),
+    insertUser: (u, auth_hash, auth_salt, pubkey, enc_priv, created, email) =>
+      insertIgnoringDupes(users, { _id: u, auth_hash, auth_salt, pubkey, enc_priv, created, last_seen: 0, ...(email && { email }) }),
+    getUserByEmail: async (email) => { const d = await users.findOne({ email }, { projection: { _id: 1 } }); return d ? { username: d._id } : undefined; },
+    setEmail: async (email, u) => changes((await users.updateOne({ _id: u }, { $set: { email } })).matchedCount),
     updateAuth: async (auth_hash, auth_salt, enc_priv, u) =>
       changes((await users.updateOne({ _id: u }, { $set: { auth_hash, auth_salt, enc_priv } })).modifiedCount),
     searchUsers: async (pattern, me) => (await users

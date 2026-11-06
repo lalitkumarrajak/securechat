@@ -12,6 +12,7 @@ export interface AppState {
   section: Section;                      // home screen, Chat or Games (lib/nav.ts)
   signupOpen: boolean;
   gifsEnabled: boolean;                  // server has a KLIPY key
+  emailRequired: boolean;                // new accounts need a verified email (the server can send it)
   syncing: boolean;                      // first download of messages since opening the app
   friendsLoaded: boolean;                // friend list known (saved on this device, or fetched)
   settingsPage: string | null;           // open Settings at this page (e.g. 'sessions' from a sign-in alert)
@@ -50,6 +51,7 @@ export const useApp = create<AppState>(() => ({
   section: location.hash === '#stories' ? 'stories' : location.hash === '#games' ? 'games' : location.hash === '#diary' ? 'diary' : location.hash === '#calendar' ? 'calendar' : location.hash === '#split' ? 'split' : location.hash === '#more' ? 'more' : 'chat',
   signupOpen: true,
   gifsEnabled: false,
+  emailRequired: false,
   syncing: true,
   friendsLoaded: false,
   settingsPage: null,

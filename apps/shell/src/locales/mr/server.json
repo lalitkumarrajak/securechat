@@ -93,5 +93,11 @@
   "This game is invite-only": "या गेममध्ये फक्त बोलावलेले लोकच येऊ शकतात",
   "You can’t join this game": "तुम्ही या गेममध्ये सामील होऊ शकत नाही",
   "This game is full": "हा गेम भरला आहे",
-  "No seats left": "एकही जागा रिकामी नाही"
+  "No seats left": "एकही जागा रिकामी नाही",
+  "Enter a valid email address": "योग्य ईमेल पत्ता टाका",
+  "This email is already used by another account": "हा ईमेल दुसऱ्या अकाउंटमध्ये आधीच वापरला आहे",
+  "Couldn’t send the email, try again later": "ईमेल पाठवता आला नाही, थोड्या वेळाने पुन्हा प्रयत्न करा",
+  "This is already your email": "हा आधीच तुमचा ईमेल आहे",
+  "That code isn’t right": "हा कोड बरोबर नाही",
+  "That code has expired, ask for a new one": "या कोडची वेळ संपली, नवीन कोड मागवा"
 }

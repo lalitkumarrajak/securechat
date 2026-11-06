@@ -11,6 +11,8 @@ export const SERVER_TEXT = [
   tk('Invalid public key'), tk('Invalid key backup'), tk('Username taken'), tk('Invalid credentials'),
   tk('Too many attempts, try again in 15 minutes'), tk('Wrong username or password'), tk('Invalid session'), tk('Session not found'),
   tk('Invalid request'), tk('Current password is wrong'),
+  tk('Enter a valid email address'), tk('This email is already used by another account'), tk('Couldn’t send the email, try again later'),
+  tk('This is already your email'), tk('That code isn’t right'), tk('That code has expired, ask for a new one'),
   // friends (friends.js)
   tk('Not your friend'), tk('Too many requests, try later'), tk('No such user'), tk('Unblock them first'), tk("You can't add this user"),
   tk('No pending request from them'), tk('No pending request'),

@@ -79,7 +79,7 @@ export interface SearchHit extends Person { rel: Relation }
 export interface Presence { on: boolean; ls: number; hid?: boolean }
 
 export interface Privacy { lastSeen: boolean; receipts: boolean }
-export interface Me { u: string; name: string; about: string; privacy: Privacy; mutes: Record<string, number>; av: number; encPriv?: string }
+export interface Me { u: string; name: string; about: string; privacy: Privacy; mutes: Record<string, number>; av: number; encPriv?: string; email?: string | null }
 
 /** Encrypted message content. Control types change other messages and aren't shown as bubbles. */
 export type Content =
