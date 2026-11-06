@@ -40,9 +40,10 @@ export const config = {
   itunesBase: process.env.ITUNES_BASE_URL || 'https://itunes.apple.com', // song search for stories; overridable for tests
   // Email (one-time codes) through Brevo's web API: Render's free plan blocks the SMTP ports.
   // With a key set, every new account needs a verified email; without one (development, tests) it's optional.
-  brevoKey: process.env.BREVO_API_KEY || '',
+  // Stray quotes, spaces or line breaks from pasting it into a dashboard are dropped.
+  brevoKey: (process.env.BREVO_API_KEY || '').trim().replace(/^["']+|["']+$/g, '').trim(),
   brevoBase: process.env.BREVO_BASE_URL || 'https://api.brevo.com', // overridable for tests
-  mailFrom: process.env.MAIL_FROM || '',
+  mailFrom: (process.env.MAIL_FROM || '').trim().replace(/^["']+|["']+$/g, '').trim(),
   get emailRequired() { return !!this.brevoKey && process.env.REQUIRE_EMAIL !== '0'; },
   vapid: { publicKey: process.env.VAPID_PUBLIC_KEY, privateKey: process.env.VAPID_PRIVATE_KEY },
 };
