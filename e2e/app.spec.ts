@@ -49,7 +49,9 @@ test('landing page offers sign in and sign up', async () => {
   const form = A.page.getByRole('tabpanel');
   await form.getByLabel('Username').fill('X');
   await form.getByRole('button', { name: 'Create account' }).click();
-  await expect(form.getByRole('alert')).toContainText('Username');
+  // Each field says what's wrong with it (capitals become small letters, so 'X' is just too short).
+  await expect(form.locator('#signup-u-note')).toHaveText('Too short: a username needs at least 3 characters.');
+  await expect(form.locator('#signup-pw-note')).toHaveText('Choose a password.');
 });
 
 test('three people sign up', async () => {

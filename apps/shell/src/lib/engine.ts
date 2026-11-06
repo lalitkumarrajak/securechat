@@ -103,6 +103,9 @@ export async function login(userOrEmail: string, password: string) {
   await startSession(u, res.token, priv, res.pub);
 }
 
+/** Sign-up: whether a username is still free (asked while it's typed). */
+export const usernameFree = async (username: string) => (await api<{ free: boolean }>('/api/register/check', { u: normalize(username) })).free;
+
 /** Sign-up, step 1 when an email is needed: checks the username and email are free and emails a code. */
 export const sendSignupCode = (username: string, email: string) =>
   api('/api/register/code', { u: normalize(username), email: email.trim(), lang: lang() });

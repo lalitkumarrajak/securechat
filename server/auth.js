@@ -87,7 +87,7 @@ function dropSockets(user, keepTokenHash) {
   }
 }
 
-export const PUBLIC_ROUTES = new Set(['POST /api/register', 'POST /api/register/code', 'POST /api/login', 'POST /api/login/lookup',
+export const PUBLIC_ROUTES = new Set(['POST /api/register', 'POST /api/register/code', 'POST /api/register/check', 'POST /api/login', 'POST /api/login/lookup',
   'GET /api/config', 'POST /api/session/closing']);
 
 const emailTaken = async (email) => !!(await ctx.db.get('getUserByEmail', email));
@@ -102,6 +102,14 @@ const madeUpUser = (email) => 'u' + crypto.createHmac('sha256', LOOKUP_KEY).upda
 export const routes = {
   // What the landing page needs to know before anyone signs in.
   'GET /api/config': async (req, res) => sendJson(res, 200, { signup: config.allowSignup, gifs: !!config.klipyKey, email: config.emailRequired }),
+
+  // Sign-up: is this username free? Asked while it's typed. (Usernames aren't secret: friends search by them.)
+  'POST /api/register/check': async (req, res) => {
+    if (rateLimited('check:' + clientIp(req), 60, 60e3)) return sendJson(res, 429, { error: 'Slow down' });
+    const { u } = await readJson(req);
+    if (typeof u !== 'string' || !USER_RE.test(u)) return sendJson(res, 400, { error: 'Username: 3-24 chars, a-z 0-9 _ .' });
+    sendJson(res, 200, { free: !(await ctx.db.get('getUser', u)) });
+  },
 
   // Sign-up, step 1 (when an email is needed): check the username and email are free, and email a code.
   'POST /api/register/code': async (req, res) => {
