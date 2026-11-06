@@ -27,7 +27,9 @@ export async function checkMailSetup() {
   try {
     const acc = await get('/v3/account');
     if (!acc.ok) {
-      return console.error(`EMAIL NOT WORKING: Brevo refused BREVO_API_KEY (${acc.status}: ${(await acc.text()).slice(0, 200)}). ` +
+      // What kind of key it is, never the key: an SMTP key (xsmtpsib-) or a cut-off one is the usual mistake.
+      const kind = `it starts with "${config.brevoKey.slice(0, config.brevoKey.indexOf('-') + 1 || 4)}…" and is ${config.brevoKey.length} characters long`;
+      return console.error(`EMAIL NOT WORKING: Brevo refused BREVO_API_KEY (${acc.status}: ${(await acc.text()).slice(0, 200).trim()}); ${kind}. ` +
         'Use an API key (xkeysib-…) from Brevo → SMTP & API → API Keys, with no quotes or spaces.');
     }
     const senders = (await (await get('/v3/senders')).json().catch(() => ({}))).senders || [];
