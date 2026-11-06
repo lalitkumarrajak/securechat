@@ -35,6 +35,27 @@ navigator.serviceWorker?.addEventListener('message', (e) => {
 });
 if (myBuild) navigator.serviceWorker?.ready.then((r) => r.active?.postMessage({ t: 'build', build: myBuild })).catch(() => {});
 
+// An installed app on a phone is mostly brought back from the background, not opened anew, so the
+// page above never loads again and never hears of a new build. Each time it comes back (at most once
+// a minute): look for a new sw.js, and fetch the page, which sw.js compares with the saved one and,
+// if the server has a newer build, answers with the 'update' message above. Without a service worker
+// yet (the first visit), compare here.
+let lastCheck = Date.now();
+function checkForUpdate() {
+  if (!myBuild || document.visibilityState !== 'visible' || Date.now() - lastCheck < 60_000) return;
+  lastCheck = Date.now();
+  navigator.serviceWorker?.getRegistration().then((r) => r?.update()).catch(() => {});
+  fetch('/', { cache: 'no-store' }).then((r) => r.text()).then((html) => {
+    const build = html.match(/\/assets\/index-[\w-]+\.js/)?.[0];
+    if (build && build !== myBuild && !navigator.serviceWorker?.controller) {
+      toast(t('A new version of Sanga is ready'), { id: 'update', duration: Infinity, action: { label: t('Reload'), onClick: () => location.reload() } });
+    }
+  }).catch(() => {});
+}
+document.addEventListener('visibilitychange', checkForUpdate);
+window.addEventListener('focus', checkForUpdate);
+setInterval(checkForUpdate, 30 * 60_000); // left open on a laptop
+
 window.addEventListener('vite:preloadError', (e) => {
   // The other apps (/apps/<name>/) show their own "Couldn't open … Try again" instead.
   if (/\/apps\//.test(String((e as Event & { payload?: unknown }).payload))) return;
