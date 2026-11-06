@@ -14,6 +14,9 @@ before(async () => {
     let body = '';
     req.on('data', (d) => { body += d; });
     req.on('end', () => {
+      // The check on start (checkMailSetup): the key works, and the sender is confirmed.
+      if (req.url === '/v3/account') return res.writeHead(200, { 'Content-Type': 'application/json' }).end('{"email":"owner@example.com"}');
+      if (req.url === '/v3/senders') return res.writeHead(200, { 'Content-Type': 'application/json' }).end('{"senders":[{"email":"sanga@example.com","active":true}]}');
       if (failNext) { failNext = false; return res.writeHead(401).end('{"message":"Key not found"}'); }
       mails.push({ key: req.headers['api-key'], path: req.url, ...JSON.parse(body) });
       res.writeHead(201, { 'Content-Type': 'application/json' }).end('{"messageId":"x"}');
@@ -37,6 +40,11 @@ async function signIn(u, pw = 'test password 123') {
 }
 
 describe('email', () => {
+  it('checks the Brevo setup on start and says so in the log', async () => {
+    for (let i = 0; i < 50 && !srv.log.includes('Email:'); i++) await new Promise((r) => setTimeout(r, 100));
+    assert.match(srv.log, /Email: Brevo works, sending from sanga@example\.com/);
+  });
+
   it('is required to sign up once email is set up', async () => {
     assert.equal((await srv.api('/api/config')).data.email, true);
     const r = await signUp(name('noemail'), undefined, undefined);
@@ -118,6 +126,21 @@ describe('email', () => {
     assert.equal((await srv.api('/api/login/lookup', { email: next })).data.u, u);
     assert.notEqual((await srv.api('/api/login/lookup', { email })).data.u, u); // the old one is let go
     assert.equal((await srv.api('/api/email/code', { email: 'x@example.com' })).status, 401); // signed in only
+  });
+});
+
+describe('email set up wrong', () => {
+  it('says in the log what Brevo didn’t accept', async () => {
+    const bad = http.createServer((req, res) => res.writeHead(401, { 'Content-Type': 'application/json' }).end('{"code":"unauthorized","message":"Key not found"}'));
+    await new Promise((r) => bad.listen(0, r));
+    const s = await startServer({ BREVO_API_KEY: 'xkeysib-wrong', MAIL_FROM: 'sanga@example.com', BREVO_BASE_URL: `http://localhost:${bad.address().port}` });
+    try {
+      for (let i = 0; i < 50 && !s.log.includes('EMAIL NOT WORKING'); i++) await new Promise((r) => setTimeout(r, 100));
+      assert.match(s.log, /EMAIL NOT WORKING: Brevo refused BREVO_API_KEY \(401: .*Key not found/);
+      const r = await s.api('/api/register/code', { u: name('badkey'), email: 'x@example.com' });
+      assert.equal(r.status, 502);
+      assert.match(s.log, /sign-up email failed brevo 401/);
+    } finally { await s.stop(); bad.close(); }
   });
 });
 

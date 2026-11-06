@@ -20,6 +20,27 @@ if (config.brevoKey.startsWith('xsmtpsib-')) {
 }
 if (config.brevoKey && !config.mailFrom) console.warn('MAIL_FROM is not set: Brevo needs the sender address you confirmed there.');
 
+/** On start: does Brevo take the key, and is MAIL_FROM one of its confirmed senders? One line in the log either way. */
+export async function checkMailSetup() {
+  if (!config.brevoKey) return;
+  const get = (p) => fetch(config.brevoBase + p, { headers: { 'api-key': config.brevoKey, Accept: 'application/json' }, signal: AbortSignal.timeout(15e3) });
+  try {
+    const acc = await get('/v3/account');
+    if (!acc.ok) {
+      return console.error(`EMAIL NOT WORKING: Brevo refused BREVO_API_KEY (${acc.status}: ${(await acc.text()).slice(0, 200)}). ` +
+        'Use an API key (xkeysib-…) from Brevo → SMTP & API → API Keys, with no quotes or spaces.');
+    }
+    const senders = (await (await get('/v3/senders')).json().catch(() => ({}))).senders || [];
+    const me = senders.find((s) => s.email?.toLowerCase() === config.mailFrom.toLowerCase());
+    if (!me) {
+      return console.error(`EMAIL NOT WORKING: MAIL_FROM "${config.mailFrom}" isn't a sender in Brevo (senders there: ${senders.map((s) => s.email).join(', ') || 'none'}). ` +
+        'Add it in Brevo → Senders, Domains & Dedicated IPs → Senders, or set MAIL_FROM to one of those.');
+    }
+    if (me.active === false) return console.error(`EMAIL NOT WORKING: the sender ${config.mailFrom} isn't confirmed yet in Brevo: open the link Brevo emailed to it.`);
+    console.info(`Email: Brevo works, sending from ${config.mailFrom}`);
+  } catch (err) { console.error('Email: couldn’t reach Brevo to check the setup:', err.message); }
+}
+
 // Each email's words in English, Hindi and Marathi.
 const TEXT = {
   register: {

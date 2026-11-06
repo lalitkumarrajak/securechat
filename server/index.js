@@ -13,6 +13,7 @@ import { PUBLIC_ROUTES, routes as authRoutes, touchSession, userFromToken } from
 import { routes as profileRoutes, avatarVersion } from './profiles.js';
 import { routes as friendRoutes, migrateFriends } from './friends.js';
 import { routes as pushRoutes, initPush } from './push.js';
+import { checkMailSetup } from './mail.js';
 import { routes as gifRoutes } from './gifs.js';
 import { routes as songRoutes } from './songs.js';
 import { routes as previewRoutes } from './preview.js';
@@ -181,6 +182,7 @@ startPresenceSweep();
 server.listen(config.port, config.host, () => {
   const proto = config.tlsCert ? 'https' : 'http';
   console.log(`Sanga running at ${proto}://localhost:${config.port} (${ctx.db.kind})`);
+  checkMailSetup(); // says in the log whether email (Brevo) is set up right
 });
 
 for (const sig of ['SIGINT', 'SIGTERM']) {
