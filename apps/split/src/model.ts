@@ -24,6 +24,8 @@ export const GROUP_KINDS: { id: GroupKind; emoji: string; name: string; about: s
   { id: 'lending', emoji: '🤝', name: tk('Lending & borrowing'), about: tk('Money you lent or borrowed. Shows who owes whom, not counted as spending.') },
 ];
 export const kindOf = (m: { kind?: GroupKind } | null | undefined): GroupKind => m?.kind ?? 'spending';
+/** The categories a kind of group is mostly about: offered first, and the first is a new expense's. */
+export const KIND_CATS: Record<GroupKind, string[]> = { spending: [], cards: ['cards', 'cardfees'], lending: ['lent', 'borrowed'] };
 
 export interface Meta {
   type: 'meta'; id: 'meta'; name: string; emoji: string; currency: string;

@@ -2,18 +2,19 @@ import { t } from '@sanga/i18n';
 import { useMemo, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@sanga/ui/utils';
-import { money, standing } from './model';
+import { kindOf, money, standing } from './model';
 import { useMe, useNames } from './hooks';
 import { useSplit } from './store';
 import { PersonDot } from './PersonDot';
 
-/** At the top of the groups: what you will get and what you owe over all of them, and with whom. */
+/** At the top of the groups: what you will get and what you owe over your spending groups, and with whom.
+ *  Lending & borrowing groups (and card bills groups) keep their balances inside the group, not here. */
 export function Overview() {
   const me = useMe();
   const name = useNames();
   const groups = useSplit((s) => s.groups);
   const [open, setOpen] = useState(false);
-  const rows = useMemo(() => standing(Object.values(groups).filter((g) => g.meta).map((g) => ({
+  const rows = useMemo(() => standing(Object.values(groups).filter((g) => g.meta && kindOf(g.meta) === 'spending').map((g) => ({
     currency: g.meta!.currency, people: g.meta!.people,
     expenses: Object.values(g.expenses).filter((e) => !e.deleted), settles: Object.values(g.settles).filter((s) => !s.deleted),
   })), me), [groups, me]);

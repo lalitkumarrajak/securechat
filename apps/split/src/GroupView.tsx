@@ -83,7 +83,7 @@ export function GroupView({ gid, start, onBack, onGone }: { gid: string; start?:
         </div>
       </Tabs>
 
-      <button type="button" onClick={() => setEditing(blankExpense(me))} aria-label={t('Add expense')}
+      <button type="button" onClick={() => setEditing(blankExpense(me, kindOf(meta)))} aria-label={t('Add expense')}
         className="absolute right-4 bottom-4 z-10 flex h-14 items-center gap-2 rounded-2xl bg-accent px-5 font-semibold text-white shadow-lg active:scale-95">
         <Plus className="size-5" />{t('Add expense')}
       </button>

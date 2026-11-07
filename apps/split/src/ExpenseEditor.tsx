@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { Button } from '@sanga/ui/button';
 import { Dialog } from '@sanga/ui/dialog';
 import { Input, Label, Textarea } from '@sanga/ui/input';
-import { apportion, catName, isSpending, kindOf, parseAmount, splitAmount, toInput, today, validDay, type Expense, type Mode } from './model';
+import { apportion, catName, isSpending, KIND_CATS, kindOf, parseAmount, splitAmount, toInput, today, validDay, type Expense, type Mode } from './model';
 import { useLedger, useMe, useNames } from './hooks';
 import { deleteBill, save, type GroupData } from './store';
 import { BillField } from './BillField';
@@ -43,8 +43,12 @@ function Form({ g, expense, onClose }: { g: GroupData; expense: Expense; onClose
   const [notes, setNotes] = useState(expense.notes ?? '');
   const [bill, setBill] = useState(expense.bill);
   const [uploaded, setUploaded] = useState<string[]>([]);
+  const kind = kindOf(meta);
+  // Lending: what's lent is owed by the others, not shared with whoever paid (until you change the split).
+  const others = (payer: string) => { const o = choices.filter((p) => !p.gone && p.id !== payer).map((p) => p.id); return o.length ? o : [payer]; };
+  const [splitTouched, setSplitTouched] = useState(false);
   const [draft, setDraft] = useState<SplitDraft>(() => {
-    const who = Object.keys(expense.owed).length ? Object.keys(expense.owed) : choices.filter((p) => !p.gone).map((p) => p.id);
+    const who = Object.keys(expense.owed).length ? Object.keys(expense.owed) : kind === 'lending' ? others(expense.paidBy) : choices.filter((p) => !p.gone).map((p) => p.id);
     const texts = Object.keys(expense.owed).length
       ? Object.fromEntries(Object.entries(expense.values).map(([id, v]) => [id, expense.mode === 'exact' ? toInput(v, currency) : expense.mode === 'percent' ? String(v / 100) : String(v)]))
       : {};
@@ -63,7 +67,11 @@ function Form({ g, expense, onClose }: { g: GroupData; expense: Expense; onClose
   const splitError = result && 'error' in result ? result.error : '';
   const owed = result && 'owed' in result ? result.owed : null;
 
-  const change = (d: SplitDraft) => setDraft(d.mode !== draft.mode ? { ...d, texts: seed(d.mode, d.who, amount, currency) } : d);
+  const change = (d: SplitDraft) => { setSplitTouched(true); setDraft(d.mode !== draft.mode ? { ...d, texts: seed(d.mode, d.who, amount, currency) } : d); };
+  const pickPayer = (id: string) => {
+    setPaidBy(id);
+    if (isNew && kind === 'lending' && !splitTouched) setDraft((d) => ({ ...d, who: others(id) }));
+  };
 
   const problem = !amount ? t('Enter an amount') : !validDay(date) ? t('Pick a date') : splitError;
   const submit = () => {
@@ -81,7 +89,8 @@ function Form({ g, expense, onClose }: { g: GroupData; expense: Expense; onClose
   };
   const cancel = () => { for (const id of uploaded) void deleteBill(g.gid, id); onClose(); };
 
-  const catList = useMemo(() => [...cats.values()], [cats]);
+  // The group's own kind of categories first (Lent and Borrowed in a lending group, and so on).
+  const catList = useMemo(() => { const first = KIND_CATS[kind]; const all = [...cats.values()]; return [...first.map((id) => cats.get(id)).filter((c) => !!c), ...all.filter((c) => !first.includes(c.id))]; }, [cats, kind]);
   return (
     <form onSubmit={(e) => { e.preventDefault(); submit(); }} className="space-y-4">
       <div>
@@ -99,7 +108,7 @@ function Form({ g, expense, onClose }: { g: GroupData; expense: Expense; onClose
         <div className="min-w-0"><Label htmlFor="date">{t('Date')}</Label><Input id="date" type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value)} /></div>
         <div className="min-w-0">
           <Label htmlFor="paid">{t('Paid by')}</Label>
-          <select id="paid" value={paidBy} onChange={(e) => setPaidBy(e.target.value)} className="h-11 w-full min-w-0 rounded-xl border border-line bg-panel-2 px-3 text-[0.95rem] outline-none focus:border-accent">
+          <select id="paid" value={paidBy} onChange={(e) => pickPayer(e.target.value)} className="h-11 w-full min-w-0 rounded-xl border border-line bg-panel-2 px-3 text-[0.95rem] outline-none focus:border-accent">
             {choices.map((p) => <option key={p.id} value={p.id}>{name(p)}</option>)}
           </select>
         </div>

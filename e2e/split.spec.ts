@@ -151,3 +151,42 @@ test('insights: where the money went, by category and over time, for any period'
   expect(A.errors).toEqual([]);
   expect(B.errors).toEqual([]);
 });
+
+test('a lending group keeps its balance to itself: not in the summary at the top, nor in My spending', async () => {
+  const summary = split(A).getByRole('region', { name: 'Your balance' });
+  await expect(summary).toContainText('₹360.00'); // from the Goa trip
+
+  await split(A).getByRole('button', { name: 'New group' }).click();
+  const d = A.page.getByRole('dialog', { name: 'New group' });
+  await d.getByRole('radio', { name: /Lending & borrowing/ }).click();
+  await expect(d.getByLabel('Name')).toHaveValue('Lending & borrowing');
+  await d.getByRole('button', { name: 'Create group' }).click();
+  await expect(split(A).getByRole('heading', { name: 'Lending & borrowing' })).toBeVisible();
+  await split(A).getByRole('tab', { name: 'People' }).click();
+  await split(A).getByRole('button', { name: 'Add people' }).click();
+  const add = A.page.getByRole('dialog', { name: 'Add people' });
+  await add.getByLabel('Name', { exact: true }).fill('Vikram');
+  await add.getByRole('button', { name: 'Add', exact: true }).last().click();
+  await A.page.keyboard.press('Escape');
+  await split(A).getByRole('tab', { name: 'Expenses' }).click();
+  // In a lending group, Lent is offered first and chosen, and what you lend is owed by them, not shared with you
+  await split(A).getByRole('button', { name: 'Add expense' }).click();
+  const ed = A.page.getByRole('dialog', { name: 'Add expense' });
+  await expect(ed.getByRole('radio', { name: /Lent/ })).toHaveAttribute('aria-checked', 'true');
+  await expect(ed.getByText(/Not counted in My spending/)).toHaveCount(0); // the whole group isn't, so no note per expense
+  await ed.getByLabel(/^Amount/).fill('5000');
+  await ed.getByLabel('What was it for?').fill('Lent to Vikram');
+  await ed.getByRole('button', { name: 'Add expense' }).click();
+  await expect(ed).toBeHidden();
+  await expect(split(A).getByText(/You get back ₹5,000\.00/)).toBeVisible(); // the group itself still says so
+
+  await split(A).getByRole('button', { name: 'Back to groups' }).click();
+  await expect(split(A).getByRole('button', { name: /Lending & borrowing/ })).toContainText('not in My spending');
+  // The top summary is just as it was: Vikram's 5,000 stays inside the lending group
+  await expect(split(A).getByRole('button', { name: /Lending & borrowing/ })).toContainText('₹5,000.00');
+  await expect(summary).toContainText('₹360.00');
+  await expect(summary).not.toContainText('5,000');
+  await summary.getByRole('button', { name: 'By person' }).click();
+  await expect(summary).not.toContainText('Vikram');
+  expect(A.errors).toEqual([]);
+});
