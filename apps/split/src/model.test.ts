@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, apportion, balances, byCategory, grainFor, linesOf, moveLedger, needsConfirm, standing, parseAmount, rangeFor, series, simplify, splitAmount, sum, toInput, type Expense, type Settlement } from './model';
+import { addDays, apportion, balances, pairDebts, byCategory, grainFor, linesOf, moveLedger, needsConfirm, standing, parseAmount, rangeFor, series, simplify, splitAmount, sum, toInput, type Expense, type Settlement } from './model';
 
 const exp = (o: Partial<Expense>): Expense => ({ type: 'expense', id: 'e' + Math.random(), desc: 'x', amount: 0, cat: 'food', date: '2026-11-02', paidBy: 'a', mode: 'equal', values: {}, owed: {}, by: 'a', edited: 0, ...o });
 
@@ -58,6 +58,39 @@ describe('balances', () => {
       for (const p of pay) { after[p.from] += p.amount; after[p.to] -= p.amount; }
       expect(Object.values(after).every((n) => n === 0)).toBe(true);
     }
+  });
+});
+
+describe('who owes whom, person to person (lending)', () => {
+  const settle = (from: string, to: string, amount: number, extra: Partial<Settlement> = {}): Settlement => ({ type: 'settle', id: from + to + amount, from, to, amount, date: '2026-11-02', by: from, edited: 0, ...extra });
+  it('never routes one person’s debt through another', () => {
+    // I lent Vikram 5,000; Rohan lent me 2,000. Netting the group would have Vikram pay Rohan.
+    const e = [exp({ amount: 5000, paidBy: 'me', owed: { v: 5000 } }), exp({ amount: 2000, paidBy: 'r', owed: { me: 2000 } })];
+    expect(pairDebts(e, [])).toEqual([{ from: 'v', to: 'me', amount: 5000, lent: 5000 }, { from: 'me', to: 'r', amount: 2000, lent: 2000 }]);
+    expect(simplify(balances(e, [])).some((t) => t.from === 'v' && t.to === 'r')).toBe(true); // what the group shortcut would say
+  });
+  it('paying back, and lending both ways, bring a pair down; confirmed payments only', () => {
+    const e = [exp({ amount: 8000, paidBy: 'me', owed: { v: 8000 } }), exp({ amount: 1000, paidBy: 'v', owed: { me: 1000 } })];
+    expect(pairDebts(e, [settle('v', 'me', 2000)])).toEqual([{ from: 'v', to: 'me', amount: 5000, lent: 8000 }]);
+    expect(pairDebts(e, [settle('v', 'me', 2000, { pending: true })])[0].amount).toBe(7000);
+    expect(pairDebts(e, [settle('v', 'me', 7000)])).toEqual([]);
+    expect(pairDebts(e, [settle('v', 'me', 9000)])).toEqual([{ from: 'me', to: 'v', amount: 2000, lent: 1000 }]); // paid too much
+  });
+  it('a shared expense: each person owes the one who paid their part', () => {
+    expect(pairDebts([exp({ amount: 900, paidBy: 'a', owed: { a: 300, b: 300, c: 300 } })], [])).toEqual([
+      { from: 'b', to: 'a', amount: 300, lent: 300 }, { from: 'c', to: 'a', amount: 300, lent: 300 }]);
+    expect(pairDebts([exp({ amount: 50, paidBy: 'a', owed: { b: 50 }, deleted: true })], [])).toEqual([]);
+  });
+});
+
+describe('lent and borrowed money in the charts', () => {
+  it('what you lent is what you paid for others; what you borrowed is what they paid for you', () => {
+    const es = [exp({ amount: 5000, paidBy: 'me', cat: 'lent', owed: { v: 5000 } }), exp({ amount: 2000, paidBy: 'r', cat: 'borrowed', owed: { me: 2000 } }),
+      exp({ amount: 600, paidBy: 'me', cat: 'food', owed: { me: 300, v: 300 } })];
+    expect(linesOf('g', es, 'share', 'me').map((l) => [l.cat, l.amount])).toEqual([['lent', 5000], ['borrowed', 2000], ['food', 300]]);
+    // In a lending group every entry is lent or borrowed, whatever its category says
+    expect(linesOf('g', es, 'share', 'me', true).map((l) => [l.cat, l.amount])).toEqual([['lent', 5000], ['borrowed', 2000], ['lent', 300]]);
+    expect(linesOf('g', es, 'total', 'me').map((l) => l.amount)).toEqual([5000, 2000, 600]); // the group total is untouched
   });
 });
 

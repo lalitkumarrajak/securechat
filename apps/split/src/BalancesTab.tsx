@@ -2,7 +2,7 @@ import { locale, t, tx } from '@sanga/i18n';
 import { useMemo, useState } from 'react';
 import { ArrowRight, Check, Clock, Undo2, X } from 'lucide-react';
 import { Button } from '@sanga/ui/button';
-import { balances, money, parseDay, simplify, type Transfer } from './model';
+import { balances, kindOf, money, pairDebts, parseDay, simplify, type Transfer } from './model';
 import { useLedger, useMe, useNames } from './hooks';
 import { confirmPayment, removeRecord, type GroupData } from './store';
 import { Empty } from './Empty';
@@ -17,7 +17,9 @@ export function BalancesTab({ g }: { g: GroupData }) {
   const [paying, setPaying] = useState<Transfer | null>(null);
   const currency = meta?.currency ?? 'INR';
   const net = useMemo(() => balances(expenses, settles), [expenses, settles]);
-  const plan = useMemo(() => simplify(net), [net]);
+  // Lending: each pays back whoever lent to them. Otherwise the fewest payments that settle everyone.
+  const lending = kindOf(meta) === 'lending';
+  const plan = useMemo(() => (lending ? pairDebts(expenses, settles) : simplify(net)), [lending, expenses, settles, net]);
   const waiting = settles.filter((s) => s.pending), done = settles.filter((s) => !s.pending);
   const rows = people.filter((p) => net[p.id] || !p.gone).sort((a, b) => (net[b.id] ?? 0) - (net[a.id] ?? 0));
 
@@ -44,6 +46,7 @@ export function BalancesTab({ g }: { g: GroupData }) {
 
       <section aria-label={t('Suggested payments')}>
         <h3 className="mb-2 text-sm font-semibold">{t('Settle up')}</h3>
+        {lending && <p className="-mt-1 mb-2 text-xs text-muted">{t('Person to person: each pays back whoever lent to them.')}</p>}
         {plan.length === 0 ? <p className="rounded-2xl border border-line bg-panel p-4 text-center text-sm text-muted">{t('Everyone is settled up 🎉')}</p> : (
           <ul className="space-y-2">
             {plan.map((tr) => (

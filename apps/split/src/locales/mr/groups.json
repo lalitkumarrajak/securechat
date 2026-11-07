@@ -138,5 +138,15 @@
   "Show all {n}": {
     "one": "दाखवा",
     "other": "सर्व {n} दाखवा"
-  }
+  },
+  "Person to person: each pays back whoever lent to them.": "थेट व्यक्तीला: ज्याने उसने दिले त्यालाच प्रत्येकजण परत करतो.",
+  "Who owes whom": "कोणी कोणाला द्यायचे",
+  "Lent & borrowed": "उसने दिले आणि घेतले",
+  "From your lending groups: who owes you, and whom you owe.": "तुमच्या उसनवारीच्या ग्रुपमधून: कोणी तुम्हाला द्यायचे आणि तुम्ही कोणाला द्यायचे.",
+  "The fewest payments that settle the group.": "ग्रुपचा हिशोब पूर्ण करणारी सर्वात कमी देयके.",
+  "Nobody owes anyone 🎉": "कोणीही कोणाचे देणे लागत नाही 🎉",
+  "{from} owes {to}": "{from} ने {to} ला द्यायचे आहे",
+  "{back} of {lent} paid back": "{lent} पैकी {back} परत केले",
+  "You owe {to}": "तुम्हाला {to} ला द्यायचे आहे",
+  "{from} owes you": "{from} ने तुम्हाला द्यायचे आहे"
 }

@@ -3,15 +3,17 @@ import { useMemo, useState } from 'react';
 import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import { cn } from '@sanga/ui/utils';
 import {
-  addDays, BUILTIN_CATS, byCategory, catName, categoryMap, catOf, daysBetween, grainFor, inRange, isSpending, kindOf, linesOf, money, parseDay, rangeFor, series, sum, today,
+  addDays, BUILTIN_CATS, byCategory, catName, categoryMap, catOf, daysBetween, balances, grainFor, inRange, isSpending, kindOf, linesOf, money, pairDebts, simplify, parseDay, rangeFor, series, sum, today,
   type Bucket, type Category, type Line, type Preset, type Range,
 } from './model';
 import { useMe, useNames } from './hooks';
+import type { Person } from './model';
 import { useSplit } from './store';
 import { BarChart } from './BarChart';
 import { Donut } from './Donut';
 import { Empty } from './Empty';
 import { PeriodBar } from './PeriodBar';
+import { WhoOwes, type OweRow } from './WhoOwes';
 
 type Scope = { kind: 'group'; gid: string } | { kind: 'all' };
 const fmtDay = (d: string, o: Intl.DateTimeFormatOptions) => parseDay(d).toLocaleDateString(locale(), o);
@@ -43,7 +45,7 @@ export function InsightsTab({ scope }: { scope: Scope }) {
     for (const g of all) for (const c of g.meta!.cats) m.set(c.id, c);
     return m;
   }, [all]);
-  const every = useMemo(() => all.filter((g) => g.meta!.currency === currency).flatMap((g) => linesOf(g.gid, Object.values(g.expenses), effView, me)), [all, currency, effView, me]);
+  const every = useMemo(() => all.filter((g) => g.meta!.currency === currency).flatMap((g) => linesOf(g.gid, Object.values(g.expenses), effView, g.meta!.people.find((p) => p.u === me)?.id ?? me, kindOf(g.meta) === 'lending')), [all, currency, effView, me]);
   // Spending only: paying card bills, lending and borrowing move money (in groups for them, or in those
   // categories); they're listed apart below. A card bills or lending group's own view shows all of it.
   const kindIn = (gid: string) => kindOf(groups[gid]?.meta);
@@ -70,7 +72,7 @@ export function InsightsTab({ scope }: { scope: Scope }) {
   // What was left out, under the heading it belongs to: a card bills group's payments are card bills, and so on.
   const movedLines = useMemo(() => inRange(every.filter((l) => !counts(l)).map((l) => {
     const k = kindIn(l.group);
-    return k === 'cards' ? { ...l, cat: 'cards' } : k === 'lending' && isSpending(l.cat) ? { ...l, cat: 'lent' } : l;
+    return k === 'cards' ? { ...l, cat: 'cards' } : l; // lending lines already say lent or borrowed (linesOf)
   }), range).sort((a, b) => (a.date < b.date ? 1 : -1)), [every, range.from, range.to, own, groups]);
   const moved = useMemo(() => byCategory(movedLines), [movedLines]);
   const movedTotal = sum(movedLines);
@@ -88,6 +90,29 @@ export function InsightsTab({ scope }: { scope: Scope }) {
     return [...m.values()].sort((a, b) => b.total - a.total);
   }, [inside, ownKind]);
   const biggest = inside.reduce<Line | null>((m, l) => (!m || l.amount > m.amount ? l : m), null);
+
+  // Who owes whom now (whatever the period). One group: person to person in a lending group, else the
+  // fewest payments that settle it. All groups: what you and each person owe each other in lending groups.
+  const owes = useMemo((): OweRow[] => {
+    const live = (gid: string) => { const g = groups[gid]; return { ex: Object.values(g?.expenses ?? {}).filter((e) => !e.deleted), st: Object.values(g?.settles ?? {}).filter((x) => !x.deleted) }; };
+    const who = (gid: string, id: string): Person => groups[gid]?.meta?.people.find((p) => p.id === id) ?? { id, name: id };
+    if (scope.kind === 'group') {
+      const { ex, st } = live(scope.gid);
+      const list: { from: string; to: string; amount: number; lent?: number }[] = ownKind === 'lending' ? pairDebts(ex, st) : simplify(balances(ex, st));
+      return list.map((d) => ({ key: d.from + '>' + d.to, from: who(scope.gid, d.from), to: who(scope.gid, d.to), amount: d.amount, lent: d.lent }));
+    }
+    const out: OweRow[] = [];
+    for (const g of all) {
+      if (kindOf(g.meta) !== 'lending' || g.meta!.currency !== currency) continue;
+      const self = g.meta!.people.find((p) => p.u === me)?.id ?? me;
+      const { ex, st } = live(g.gid);
+      for (const d of pairDebts(ex, st)) {
+        if (d.from !== self && d.to !== self) continue;
+        out.push({ key: g.gid + d.from + '>' + d.to, from: who(g.gid, d.from), to: who(g.gid, d.to), amount: d.amount, lent: d.lent, where: g.meta!.name });
+      }
+    }
+    return out.sort((a, b) => b.amount - a.amount);
+  }, [groups, scope, ownKind, all, currency, me]);
 
   // Who paid (the whole bill, whoever it was for): one group only.
   const paid = useMemo(() => {
@@ -151,6 +176,8 @@ export function InsightsTab({ scope }: { scope: Scope }) {
             : t('A lending & borrowing group: it isn’t counted in My spending. Balances show who owes whom.')}
         </p>
       )}
+      {ownKind === 'lending' && <WhoOwes title={t('Who owes whom')} hint={t('Person to person: each pays back whoever lent to them.')} rows={owes} currency={currency} name={name} me={me} />}
+      {scope.kind === 'all' && owes.length > 0 && <WhoOwes title={t('Lent & borrowed')} hint={t('From your lending groups: who owes you, and whom you owe.')} rows={owes} currency={currency} name={name} me={me} />}
       {moved.length > 0 && (
         <section aria-label={t('Not counted as spending')} className="rounded-2xl border border-line bg-panel p-4">
           <div className="flex items-baseline justify-between gap-3">
@@ -259,6 +286,8 @@ export function InsightsTab({ scope }: { scope: Scope }) {
               ))}
             </ul>
           </section>
+
+          {scope.kind === 'group' && ownKind === 'spending' && (groups[scope.gid]?.meta?.people.filter((p) => !p.gone).length ?? 0) > 1 && <WhoOwes title={t('Who owes whom')} hint={t('The fewest payments that settle the group.')} rows={owes} currency={currency} name={name} me={me} />}
 
           {paid.length > 0 && (
             <section aria-label={t('Who paid')} className="rounded-2xl border border-line bg-panel p-4">

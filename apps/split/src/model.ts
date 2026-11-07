@@ -264,6 +264,31 @@ export function simplify(net: Record<string, number>): Transfer[] {
   return out;
 }
 
+/** One person's debt to another, person to person: what lending needs ("who has to give whom the money
+ *  back"), rather than the fewest payments that settle a whole group. `lent`: what the creditor paid for
+ *  the debtor in all; `amount` is what's left after paying back (and after what the creditor owes them). */
+export interface Debt { from: string; to: string; amount: number; lent: number }
+
+/** Who owes whom, each pair on its own, never netted through someone else. Deleted records, and payments
+ *  still waiting for confirmation, are ignored, as in balances(). */
+export function pairDebts(expenses: Expense[], settles: Settlement[]): Debt[] {
+  const spent = new Map<string, number>(); // "a|b": what b paid for a (a owes b)
+  const paid = new Map<string, number>();  // "a|b": what a paid back to b
+  const add = (m: Map<string, number>, a: string, b: string, n: number) => { if (a !== b && n) m.set(a + '|' + b, (m.get(a + '|' + b) ?? 0) + n); };
+  for (const e of expenses) if (!e.deleted) for (const [id, n] of Object.entries(e.owed)) add(spent, id, e.paidBy, n);
+  for (const s of settles) if (!s.deleted && !s.pending) add(paid, s.from, s.to, s.amount);
+  const pairs = new Set([...spent.keys(), ...paid.keys()].map((k) => k.split('|').sort().join('|')));
+  const out: Debt[] = [];
+  for (const pair of pairs) {
+    const [x, y] = pair.split('|');
+    const g = (m: Map<string, number>, a: string, b: string) => m.get(a + '|' + b) ?? 0;
+    const net = g(spent, x, y) - g(spent, y, x) - g(paid, x, y) + g(paid, y, x); // > 0: x owes y
+    if (net > 0) out.push({ from: x, to: y, amount: net, lent: g(spent, x, y) });
+    else if (net < 0) out.push({ from: y, to: x, amount: -net, lent: g(spent, y, x) });
+  }
+  return out.sort((a, b) => b.amount - a.amount || a.from.localeCompare(b.from) || a.to.localeCompare(b.to));
+}
+
 // ---------- dates ----------
 const pad = (n: number) => String(n).padStart(2, '0');
 export const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -296,13 +321,19 @@ export function rangeFor(p: Exclude<Preset, 'custom' | 'all'>, now = new Date())
 /** One amount spent: what the charts add up. */
 export interface Line { id: string; group: string; date: string; cat: string; amount: number; desc: string }
 
-/** The expenses as lines. `share`: only what `me` owes (their own spending); `total`: the whole bill. */
-export function linesOf(group: string, expenses: Expense[], view: 'share' | 'total', me: string): Line[] {
+/** The expenses as lines. `share`: only what `me` owes (their own spending); `total`: the whole bill.
+ *  Money lent or borrowed (those categories, or everything in a lending group) counts differently in
+ *  `share`: what you lent is what you paid for others (your share of it is nothing), and what you
+ *  borrowed is what someone else paid for you. */
+export function linesOf(group: string, expenses: Expense[], view: 'share' | 'total', me: string, lending = false): Line[] {
   const out: Line[] = [];
   for (const e of expenses) {
     if (e.deleted) continue;
-    const amount = view === 'total' ? e.amount : (e.owed[me] ?? 0);
-    if (amount > 0) out.push({ id: e.id, group, date: e.date, cat: e.cat, amount, desc: e.desc });
+    let amount = view === 'total' ? e.amount : (e.owed[me] ?? 0), cat = e.cat;
+    if (view === 'share' && (lending || e.cat === 'lent' || e.cat === 'borrowed')) {
+      if (e.paidBy === me) { amount = e.amount - (e.owed[me] ?? 0); cat = 'lent'; } else { cat = 'borrowed'; }
+    }
+    if (amount > 0) out.push({ id: e.id, group, date: e.date, cat, amount, desc: e.desc });
   }
   return out;
 }

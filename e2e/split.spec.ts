@@ -190,3 +190,52 @@ test('a lending group keeps its balance to itself: not in the summary at the top
   await expect(summary).not.toContainText('Vikram');
   expect(A.errors).toEqual([]);
 });
+
+test('lending with several people: who owes whom, person to person, in the group and across groups', async () => {
+  await split(A).getByRole('button', { name: /Lending & borrowing/ }).click();
+  await split(A).getByRole('tab', { name: 'People' }).click();
+  await split(A).getByRole('button', { name: 'Add people' }).click();
+  const add = A.page.getByRole('dialog', { name: 'Add people' });
+  await add.getByLabel('Name', { exact: true }).fill('Rohan');
+  await add.getByRole('button', { name: 'Add', exact: true }).last().click();
+  await A.page.keyboard.press('Escape');
+  // Rohan lent me 2,000: Borrowed, paid by Rohan, owed by me alone
+  await split(A).getByRole('tab', { name: 'Expenses' }).click();
+  await split(A).getByRole('button', { name: 'Add expense' }).click();
+  const ed = A.page.getByRole('dialog', { name: 'Add expense' });
+  await ed.getByLabel(/^Amount/).fill('2000');
+  await ed.getByLabel('What was it for?').fill('Borrowed from Rohan');
+  await ed.getByRole('radio', { name: /Borrowed/ }).click();
+  await ed.getByLabel('Paid by').selectOption({ label: 'Rohan' });
+  await ed.getByRole('checkbox', { name: /Vikram/ }).uncheck();
+  await ed.getByRole('button', { name: 'Add expense' }).click();
+  await expect(ed).toBeHidden();
+
+  // Insights: each pair on its own; Vikram is never sent to Rohan
+  await split(A).getByRole('tab', { name: 'Insights' }).click();
+  const who = split(A).getByRole('region', { name: 'Who owes whom' });
+  await expect(who).toContainText('Vikram owes you');
+  await expect(who).toContainText('₹5,000.00');
+  await expect(who).toContainText('You owe Rohan');
+  await expect(who).toContainText('₹2,000.00');
+  await expect(who).not.toContainText('Vikram owes Rohan');
+  // Balances suggests the same paybacks
+  await split(A).getByRole('tab', { name: 'Balances' }).click();
+  const settle = split(A).getByRole('region', { name: 'Suggested payments' });
+  await expect(settle).toContainText('Person to person');
+  await expect(settle.getByRole('listitem')).toHaveCount(2);
+  await expect(settle.getByRole('listitem').filter({ hasText: 'Vikram' })).not.toContainText('Rohan');
+
+  // My spending: the same, across lending groups, with the group's name
+  await split(A).getByRole('button', { name: 'My spending' }).first().click();
+  const lent = split(A).getByRole('region', { name: 'Lent & borrowed' });
+  await expect(lent).toContainText('Vikram owes you');
+  await expect(lent).toContainText('You owe Rohan');
+  await expect(lent).toContainText('Lending & borrowing');
+  const left = split(A).getByRole('region', { name: 'Not counted as spending' });
+  await expect(left).toContainText('Lent'); // what you lent out, not your (zero) share of it
+  await expect(left).toContainText('₹5,000.00');
+  await expect(left).toContainText('Borrowed');
+  await A.page.screenshot({ path: shots('84-split-lent-borrowed') });
+  expect(A.errors).toEqual([]);
+});
