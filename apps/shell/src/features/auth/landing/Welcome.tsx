@@ -1,14 +1,15 @@
-import { ArrowRight, Languages, ShieldCheck, Sparkles } from 'lucide-react';
+import { ArrowRight, BellRing, Check, Languages, ShieldCheck, Sparkles } from 'lucide-react';
 import { Button } from '@sanga/ui/button';
 import { useApp } from '../../../state/app';
 import { Logo } from './Logo';
 import { PhoneMock } from './PhoneMock';
-import { APPS, SAFETY } from './landingData';
+import { APPS, SAFETY, SPLIT_KINDS, STEPS } from './landingData';
 import type { Auth } from './types';
 import { LANGS, lang, setLang, t, type Lang } from '@sanga/i18n';
 
 export function Welcome({ open }: { open: (a: Auth) => void }) {
   const signupOpen = useApp((s) => s.signupOpen);
+  const emailRequired = useApp((s) => s.emailRequired);
   const start = () => open(signupOpen ? 'signup' : 'signin');
   return (
     <div className="h-full overflow-y-auto bg-bg">
@@ -17,6 +18,8 @@ export function Welcome({ open }: { open: (a: Auth) => void }) {
           <Logo />
           <nav className="ml-8 hidden flex-1 gap-6 text-sm font-medium text-muted md:flex">
             <a href="#apps" className="hover:text-ink">{t('Apps')}</a>
+            <a href="#how" className="hover:text-ink">{t('How it works')}</a>
+            <a href="#split" className="hover:text-ink">{t('Split')}</a>
             <a href="#safety" className="hover:text-ink">{t('Privacy')}</a>
           </nav>
           <span className="flex-1 md:hidden" />
@@ -52,7 +55,12 @@ export function Welcome({ open }: { open: (a: Auth) => void }) {
               </Button>
               {signupOpen && <Button size="lg" variant="outline" onClick={() => open('signin')} className="px-6">{t('I have an account')}</Button>}
             </div>
-            <p className="mt-5 flex items-center gap-2 text-sm text-muted"><ShieldCheck className="size-4 text-accent-ink" /> {t('No phone number or email needed.')}</p>
+            <p className="mt-5 flex items-center gap-2 text-sm text-muted"><ShieldCheck className="size-4 text-accent-ink" /> {emailRequired ? t('No phone number needed.') : t('No phone number or email needed.')}</p>
+            <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm font-medium">
+              {[t('6 apps, one sign-in'), t('5 games'), t('English, हिन्दी, मराठी')].map((x) => (
+                <li key={x} className="flex items-center gap-1.5"><Check className="size-4 text-accent-ink" />{x}</li>
+              ))}
+            </ul>
           </div>
           <PhoneMock />
         </div>
@@ -62,16 +70,56 @@ export function Welcome({ open }: { open: (a: Auth) => void }) {
         <p className="text-sm font-semibold tracking-wide text-accent-ink uppercase">{t('One sign-in, many apps')}</p>
         <h2 className="mt-2 max-w-xl text-3xl font-bold tracking-tight md:text-4xl">{t('Everything you do with friends, in one place')}</h2>
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {APPS.map(({ icon: Icon, name, text, bg }, i) => (
-            <article key={name} className={`relative overflow-hidden rounded-3xl p-5 text-white shadow-lg shadow-black/10${i === 0 ? ' lg:row-span-2 lg:flex lg:flex-col lg:justify-end' : ''}`} style={{ background: bg }}>
+          {APPS.map(({ icon: Icon, name, text, bg, tags }) => (
+            <article key={name} className={`relative flex flex-col overflow-hidden rounded-3xl p-5 text-white shadow-lg shadow-black/10 transition hover:-translate-y-0.5 hover:shadow-xl`} style={{ background: bg }}>
               <span aria-hidden className="absolute -right-8 -bottom-8 size-32 rounded-full bg-white/10" />
               <span className="grid size-12 place-items-center rounded-2xl bg-white/20"><Icon className="size-6" /></span>
-              <h3 className="mt-10 flex items-center gap-2 text-xl font-bold">
+              <h3 className="mt-8 flex items-center gap-2 text-xl font-bold">
                 {t(name)}
               </h3>
               <p className="mt-1 text-sm text-white/80">{t(text)}</p>
+              <ul className="relative mt-auto flex flex-wrap gap-1.5 pt-4">
+                {tags.map((x) => <li key={x} className="rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium ring-1 ring-white/20">{t(x)}</li>)}
+              </ul>
             </article>
           ))}
+        </div>
+      </section>
+
+      <section id="how" className="mx-auto max-w-6xl scroll-mt-16 px-4 pb-14 md:px-8">
+        <p className="text-sm font-semibold tracking-wide text-accent-ink uppercase">{t('How it works')}</p>
+        <h2 className="mt-2 max-w-xl text-3xl font-bold tracking-tight md:text-4xl">{t('Up and running in a minute')}</h2>
+        <ol className="mt-8 grid gap-4 md:grid-cols-3">
+          {STEPS.map(({ icon: Icon, title, text }, i) => (
+            <li key={title} className="relative rounded-3xl border border-line bg-panel p-5 shadow-sm">
+              <span className="absolute top-4 right-5 text-4xl font-extrabold text-line">{i + 1}</span>
+              <span className="grid size-11 place-items-center rounded-2xl bg-accent/12 text-accent-ink"><Icon className="size-5" /></span>
+              <h3 className="mt-4 font-semibold">{t(title)}</h3>
+              <p className="mt-1 text-sm text-muted">{t(text)}</p>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section id="split" className="scroll-mt-16 border-t border-line">
+        <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-14 md:grid-cols-[1fr_1.1fr] md:px-8">
+          <div>
+            <p className="text-sm font-semibold tracking-wide text-emerald-600 uppercase dark:text-emerald-400">{t('Split')}</p>
+            <h2 className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">{t('Money between friends, without the awkward part')}</h2>
+            <p className="mt-4 text-muted">{t('Every group says what it’s for, so your spending stays honest: card bills and money lent never count twice.')}</p>
+            <p className="mt-5 flex items-start gap-2 text-sm"><BellRing className="mt-0.5 size-4 shrink-0 text-rose-500" />
+              <span>{t('The Calendar reminds you when a card bill is due, and one tap records the payment in Split.')}</span></p>
+          </div>
+          <ul className="grid gap-3">
+            {SPLIT_KINDS.map(({ icon: Icon, title, text }, i) => (
+              <li key={title} className="flex items-center gap-4 rounded-2xl border border-line bg-panel p-4 shadow-sm">
+                <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"><Icon className="size-5" /></span>
+                <span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold">{t(title)}
+                  {i === 0 && <span className="rounded-full bg-emerald-500/12 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">{t('Counts as spending')}</span>}</span>
+                  <span className="mt-0.5 block text-sm text-muted">{t(text)}</span></span>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
