@@ -26,10 +26,10 @@ export function MorePage() {
   return (
     <section aria-label={t('More')} className="mx-auto flex h-[var(--app-h,100dvh)] max-w-[1600px] flex-col bg-bg md:border-x md:border-line">
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <header className="mx-auto max-w-3xl px-4 pt-6 pb-2 md:px-8 md:pt-8">
+        {/* <header className="mx-auto max-w-3xl px-4 pt-6 pb-2 md:px-8 md:pt-8">
           <h1 className="text-2xl font-bold tracking-tight">{t('More')}</h1>
           <p className="text-sm text-muted">{t('Your other Sanga apps')}</p>
-        </header>
+        </header> */}
         <ul className="mx-auto grid max-w-3xl grid-cols-2 gap-3 px-4 py-4 md:gap-4 md:px-8">
           {tile(t('Games'), gamesDue > 0 ? tn(gamesDue, '{n} game waiting for you', '{n} games waiting for you') : t('Ludo, UNO and more'),
             <Gamepad2 />, 'linear-gradient(140deg, #6366f1, #312e81)', () => go('games'),
