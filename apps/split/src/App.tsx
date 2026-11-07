@@ -19,7 +19,7 @@ import { InsightsTab } from './InsightsTab';
 import { NewGroupDialog } from './NewGroupDialog';
 import { DraftDialog } from './DraftDialog';
 import { expenseFromDraft, parseDraft, type Draft } from './draft';
-import type { Expense } from './model';
+import { kindOf, type Expense } from './model';
 
 type Pane = { kind: 'none' } | { kind: 'group'; gid: string; start?: Expense } | { kind: 'insights' };
 
@@ -31,6 +31,16 @@ function SplitAppInner({ onClose, tab, params }: AppProps) {
   const online = sdk().useOnline();
   const error = useSplit((s) => s.error);
   useEffect(() => { startSplit(); }, []);
+  // A card bill from the Calendar, and you have one Credit card bills group in its currency: straight there.
+  const groups = useSplit((s) => s.groups);
+  const loaded = useSplit((s) => s.loaded);
+  useEffect(() => {
+    if (!draft || draft.cat !== 'cards' || !loaded) return;
+    const cardGroups = Object.values(groups).filter((g) => g.meta && g.meta.currency === draft.cur && kindOf(g.meta) === 'cards');
+    if (cardGroups.length !== 1) return;
+    setPane({ kind: 'group', gid: cardGroups[0].gid, start: expenseFromDraft(draft, me) });
+    setDraft(null);
+  }, [draft, groups, loaded, me]);
 
   const open = pane.kind !== 'none';
   const back = () => setPane({ kind: 'none' });
@@ -58,7 +68,7 @@ function SplitAppInner({ onClose, tab, params }: AppProps) {
             <header className="flex h-16 shrink-0 items-center gap-1 px-2">
               <IconButton label={t('Back to groups')} onClick={back} className="md:hidden"><ArrowLeft /></IconButton>
               <h2 className="px-2 text-lg font-bold tracking-tight">{t('My spending')}</h2>
-              <span className="text-sm text-muted">{t('your share, all groups')}</span>
+              <span className="text-sm text-muted">{t('your share, spending groups')}</span>
             </header>
             <div className="min-h-0 flex-1 overflow-y-auto"><InsightsTab scope={{ kind: 'all' }} /></div>
           </>
@@ -68,7 +78,7 @@ function SplitAppInner({ onClose, tab, params }: AppProps) {
 
       <DraftDialog draft={creating ? null : draft} onClose={() => setDraft(null)} onNew={() => setCreating(true)}
         onPick={(gid) => { if (draft) setPane({ kind: 'group', gid, start: expenseFromDraft(draft, me) }); setDraft(null); }} />
-      <NewGroupDialog key={draft?.cur} open={creating} currency={draft?.cur} onClose={() => setCreating(false)}
+      <NewGroupDialog key={`${draft?.cur}:${draft?.cat}`} open={creating} currency={draft?.cur} kind={draft?.cat === 'cards' ? 'cards' : 'spending'} onClose={() => setCreating(false)}
         onCreated={(gid) => { setCreating(false); setPane({ kind: 'group', gid, ...(draft && { start: expenseFromDraft(draft, me) }) }); setDraft(null); }} />
     </div>
   );

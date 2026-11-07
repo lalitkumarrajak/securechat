@@ -14,8 +14,20 @@ export interface Person { id: string; name: string; u?: string; gone?: true }
 
 export interface Category { id: string; name: string; emoji: string; color: string }
 
+/** What a group is for. Only spending groups count in My spending: a card bills group records paying
+ *  the cards (the purchases are already counted where they were spent), and a lending group money lent
+ *  or borrowed. Every group still counts in balances (who owes whom). Absent: spending. */
+export type GroupKind = 'spending' | 'cards' | 'lending';
+export const GROUP_KINDS: { id: GroupKind; emoji: string; name: string; about: string }[] = [
+  { id: 'spending', emoji: '🧾', name: tk('Spending'), about: tk('Trips, home, food, shopping… Counts in My spending.') },
+  { id: 'cards', emoji: '💳', name: tk('Credit card bills'), about: tk('Paying your card bills. Not counted as spending: what you bought with the card already is.') },
+  { id: 'lending', emoji: '🤝', name: tk('Lending & borrowing'), about: tk('Money you lent or borrowed. Shows who owes whom, not counted as spending.') },
+];
+export const kindOf = (m: { kind?: GroupKind } | null | undefined): GroupKind => m?.kind ?? 'spending';
+
 export interface Meta {
   type: 'meta'; id: 'meta'; name: string; emoji: string; currency: string;
+  kind?: GroupKind;
   people: Person[]; cats: Category[]; edited: number;
 }
 
@@ -126,11 +138,16 @@ export const BUILTIN_CATS: Category[] = [
   C('food', tk('Food & drink'), '🍽️', '#f97316'), C('cafe', tk('Cafe & snacks'), '☕', '#b45309'), C('groceries', tk('Groceries'), '🛒', '#22c55e'),
   C('gym', tk('Gym & fitness'), '🏋️', '#ef4444'), C('sports', tk('Sports'), '⚽', '#16a34a'), C('health', tk('Health'), '💊', '#10b981'),
   C('rent', tk('Rent'), '🏠', '#0891b2'), C('utilities', tk('Utilities'), '💡', '#14b8a6'), C('internet', tk('Internet & phone'), '📶', '#06b6d4'),
-  C('subscriptions', tk('Subscriptions'), '🔁', '#7c3aed'), C('cards', tk('Credit card bill'), '💳', '#4f46e5'), C('lent', tk('Lent'), '🤝', '#059669'), C('borrowed', tk('Borrowed'), '🙏', '#dc2626'), C('entertainment', tk('Entertainment'), '🎬', '#ec4899'), C('party', tk('Party & events'), '🎉', '#f43f5e'),
+  C('subscriptions', tk('Subscriptions'), '🔁', '#7c3aed'), C('cards', tk('Credit card bill'), '💳', '#4f46e5'), C('cardfees', tk('Card fees & interest'), '💸', '#be123c'), C('lent', tk('Lent'), '🤝', '#059669'), C('borrowed', tk('Borrowed'), '🙏', '#dc2626'), C('entertainment', tk('Entertainment'), '🎬', '#ec4899'), C('party', tk('Party & events'), '🎉', '#f43f5e'),
   C('shopping', tk('Shopping'), '🛍️', '#e11d48'), C('gifts', tk('Gifts'), '🎁', '#d946ef'), C('education', tk('Education'), '🎓', '#2563eb'),
   C('travelmisc', tk('Tickets & entry'), '🎟️', '#0d9488'), C('pets', tk('Pets'), '🐾', '#65a30d'), C('repairs', tk('Repairs'), '🔧', '#64748b'),
   C('other', tk('Other'), '🧾', '#94a3b8'),
 ];
+
+/** Money that moves rather than gets spent: paying a card's bill (what you bought with the card is the
+ *  spending), and money lent or borrowed. They stay in the expenses and balances, but not in spending charts. */
+export const NOT_SPENDING: ReadonlySet<string> = new Set(['cards', 'lent', 'borrowed']);
+export const isSpending = (cat: string) => !NOT_SPENDING.has(cat);
 
 const BUILTIN_NAMES = new Map(BUILTIN_CATS.map((c) => [c.id, c.name]));
 /** How a category is shown: a ready-made one in the language now on, a group's own just as it was typed. */

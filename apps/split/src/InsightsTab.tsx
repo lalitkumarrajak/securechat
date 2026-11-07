@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import { cn } from '@sanga/ui/utils';
 import {
-  addDays, BUILTIN_CATS, byCategory, catName, categoryMap, catOf, daysBetween, grainFor, inRange, linesOf, money, parseDay, rangeFor, series, sum, today,
+  addDays, BUILTIN_CATS, byCategory, catName, categoryMap, catOf, daysBetween, grainFor, inRange, isSpending, kindOf, linesOf, money, parseDay, rangeFor, series, sum, today,
   type Bucket, type Category, type Line, type Preset, type Range,
 } from './model';
 import { useMe, useNames } from './hooks';
@@ -42,9 +42,16 @@ export function InsightsTab({ scope }: { scope: Scope }) {
     for (const g of all) for (const c of g.meta!.cats) m.set(c.id, c);
     return m;
   }, [all]);
-  const lines = useMemo(() => all.filter((g) => g.meta!.currency === currency).flatMap((g) => linesOf(g.gid, Object.values(g.expenses), effView, me)), [all, currency, effView, me]);
+  const every = useMemo(() => all.filter((g) => g.meta!.currency === currency).flatMap((g) => linesOf(g.gid, Object.values(g.expenses), effView, me)), [all, currency, effView, me]);
+  // Spending only: paying card bills, lending and borrowing move money (in groups for them, or in those
+  // categories); they're listed apart below. A card bills or lending group's own view shows all of it.
+  const kindIn = (gid: string) => kindOf(groups[gid]?.meta);
+  const ownKind = scope.kind === 'group' ? kindIn(scope.gid) : 'spending';
+  const own = ownKind !== 'spending';
+  const counts = (l: Line) => own || (kindIn(l.group) === 'spending' && isSpending(l.cat));
+  const lines = useMemo(() => every.filter(counts), [every, own, groups]);
 
-  const first = useMemo(() => lines.reduce((m, l) => (l.date < m ? l.date : m), today()), [lines]);
+  const first = useMemo(() => every.reduce((m, l) => (l.date < m ? l.date : m), today()), [every]);
   const range: Range = preset === 'custom' ? custom : preset === 'all' ? { from: first, to: today() } : rangeFor(preset);
   const days = daysBetween(range.from, range.to) + 1;
   const inside = useMemo(() => inRange(lines, range), [lines, range.from, range.to]);
@@ -59,6 +66,11 @@ export function InsightsTab({ scope }: { scope: Scope }) {
   const bucketTitle = (b: Bucket) => grain === 'month' ? fmtDay(b.key, { month: 'long', year: 'numeric' }) : grain === 'week' ? `${fmtDay(b.from, { day: 'numeric', month: 'short' })} – ${fmtDay(b.to, { day: 'numeric', month: 'short' })}` : fmtDay(b.key, { weekday: 'long', day: 'numeric', month: 'long' });
   const delta = before > 0 ? Math.round(((total - before) / before) * 100) : null;
   const top = ranked[0];
+  // What was left out, under the heading it belongs to: a card bills group's payments are card bills, and so on.
+  const moved = useMemo(() => byCategory(inRange(every.filter((l) => !counts(l)).map((l) => {
+    const k = kindIn(l.group);
+    return k === 'cards' ? { ...l, cat: 'cards' } : k === 'lending' && isSpending(l.cat) ? { ...l, cat: 'lent' } : l;
+  }), range)), [every, range.from, range.to, own, groups]);
 
   // Who paid (the whole bill, whoever it was for): one group only.
   const paid = useMemo(() => {
@@ -69,7 +81,7 @@ export function InsightsTab({ scope }: { scope: Scope }) {
     return [...by.entries()].map(([id, v]) => ({ id, v, p: g?.meta?.people.find((p) => p.id === id) ?? { id, name: id } })).sort((a, b) => b.v - a.v);
   }, [groups, scope, range.from, range.to]);
 
-  if (!lines.length) return <Empty emoji="📊" title={t('Nothing to chart yet')}>{t('Add some expenses and your spending shows up here.')}</Empty>;
+  if (!every.length) return <Empty emoji="📊" title={t('Nothing to chart yet')}>{t('Add some expenses and your spending shows up here.')}</Empty>;
 
   const catAt = (id: string): Category => catOf(cats, id) ?? BUILTIN_CATS[0];
   const reset = (fn: () => void) => { fn(); setCat(null); setBucket(null); };
@@ -95,7 +107,7 @@ export function InsightsTab({ scope }: { scope: Scope }) {
       </div>
 
       <section className="grid grid-cols-2 gap-2.5 sm:grid-cols-4" aria-label={t('Summary')}>
-        <Tile label={effView === 'share' ? t('You spent') : t('Group spent')} value={money(total, currency)}>
+        <Tile label={own ? (ownKind === 'cards' ? t('Card bills paid') : t('Total')) : effView === 'share' ? t('You spent') : t('Group spent')} value={money(total, currency)}>
           {delta !== null && (
             <span className={cn('inline-flex items-center gap-0.5 text-xs font-medium', delta > 0 ? 'text-danger' : 'text-emerald-600 dark:text-emerald-400')}>
               {delta > 0 ? <ArrowUpRight className="size-3.5" /> : <ArrowDownRight className="size-3.5" />}{tn(days, '{pct}% vs previous day', '{pct}% vs previous {n} days', { pct: Math.abs(delta) })}
@@ -108,6 +120,20 @@ export function InsightsTab({ scope }: { scope: Scope }) {
           {top && total > 0 && <span className="text-xs text-muted">{Math.round((top.total / total) * 100)}% · {money(top.total, currency)}</span>}
         </Tile>
       </section>
+
+      {own && (
+        <p className="rounded-2xl bg-panel-2 px-4 py-3 text-sm text-muted">
+          {ownKind === 'cards' ? t('A credit card bills group: it isn’t counted in My spending, since what you bought with the cards already is.')
+            : t('A lending & borrowing group: it isn’t counted in My spending. Balances show who owes whom.')}
+        </p>
+      )}
+      {moved.length > 0 && (
+        <p className="rounded-2xl bg-panel-2 px-4 py-3 text-sm text-muted" aria-label={t('Not counted as spending')}>
+          {t('Not counted as spending:')}{' '}
+          {moved.map((m, i) => <span key={m.cat} className="whitespace-nowrap">{i > 0 && ' · '}{catAt(m.cat).emoji} {catName(catAt(m.cat))} <b className="text-ink tabular-nums">{money(m.total, currency)}</b></span>)}
+          <span className="mt-1 block text-xs">{t('Paying a card bill only moves money: what you bought with the card is the spending. Lent and borrowed money stays in balances.')}</span>
+        </p>
+      )}
 
       {inside.length === 0 ? <p className="rounded-2xl border border-line bg-panel p-6 text-center text-sm text-muted">{t('No spending in this period.')}</p> : (
         <>

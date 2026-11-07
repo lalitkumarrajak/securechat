@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { ArrowLeft, Bell, PieChart, Plus, Receipt, Scale, Settings, Users } from 'lucide-react';
 import { IconButton } from '@sanga/ui/button';
 import { Tabs, TabsContent, TabsList } from '@sanga/ui/tabs';
-import { balances, money, type Expense } from './model';
+import { balances, kindOf, money, type Expense } from './model';
 import { useGroup, useLedger, useMe, usePendingForMe, useUnread } from './hooks';
 import { ActivityTab } from './ActivityTab';
 import { blankExpense } from './blankExpense';
@@ -42,7 +42,8 @@ export function GroupView({ gid, start, onBack, onGone }: { gid: string; start?:
   const mine = useMemo(() => balances(expenses, settles)[me] ?? 0, [expenses, settles, me]);
 
   if (!g || !meta) return <Empty emoji="🔐" title={t('Opening the group…')}>{t('If this stays, check your connection.')}</Empty>;
-  const alone = g.meta!.people.filter((p) => !p.gone).length < 2;
+  // Just you: a nudge to add people (not in a card bills group, which is yours alone).
+  const alone = g.meta!.people.filter((p) => !p.gone).length < 2 && kindOf(meta) !== 'cards';
 
   return (
     <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden bg-bg">

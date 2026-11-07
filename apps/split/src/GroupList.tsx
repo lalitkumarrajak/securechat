@@ -2,7 +2,7 @@ import { t, tn } from '@sanga/i18n';
 import { useMemo } from 'react';
 import { ChevronRight, Users } from 'lucide-react';
 import { cn } from '@sanga/ui/utils';
-import { balances, money, rangeFor, sum, inRange, linesOf } from './model';
+import { balances, GROUP_KINDS, isSpending, kindOf, money, rangeFor, sum, inRange, linesOf } from './model';
 import { useMe, usePendingForMe, useUnread } from './hooks';
 import { useSplit, type GroupData } from './store';
 import { Empty } from './Empty';
@@ -15,16 +15,17 @@ function Card({ g, active, onOpen }: { g: GroupData; active: boolean; onOpen: ()
   const toConfirm = usePendingForMe(g).length;
   const stats = useMemo(() => {
     const ex = Object.values(g.expenses).filter((e) => !e.deleted), st = Object.values(g.settles).filter((s) => !s.deleted);
-    return { net: balances(ex, st)[me] ?? 0, month: sum(inRange(linesOf(g.gid, ex, 'share', me), rangeFor('month'))), count: ex.length };
+    return { net: balances(ex, st)[me] ?? 0, month: sum(inRange(linesOf(g.gid, ex, 'share', me).filter((l) => isSpending(l.cat)), rangeFor('month'))), count: ex.length };
   }, [g, me]);
   if (!meta) return <li className="px-4 py-3 text-sm text-muted">{t('Opening a group…')}</li>;
+  const kind = kindOf(meta), kindInfo = GROUP_KINDS.find((k) => k.id === kind)!;
   return (
     <li>
       <button type="button" onClick={onOpen} aria-current={active} className={cn('flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-hover', active && 'bg-hover')}>
         <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-accent/12 text-2xl" aria-hidden>{meta.emoji}</span>
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2 truncate font-semibold">{meta.name}{unread > 0 && <span className="rounded-full bg-danger px-1.5 text-[10px] font-bold text-white" aria-label={t('{n} new in activity', { n: unread })}>{t('{n} new', { n: unread })}</span>}{toConfirm > 0 && <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-white">{t('{n} to confirm', { n: toConfirm })}</span>}</span>
-          <span className="flex items-center gap-1 truncate text-xs text-muted"><Users className="size-3.5" />{meta.people.filter((p) => !p.gone).length} · {tn(stats.count, '{n} expense', '{n} expenses')} · {t('you spent {amount} this month', { amount: money(stats.month, meta.currency, { compact: true }) })}</span>
+          <span className="flex items-center gap-1 truncate text-xs text-muted"><Users className="size-3.5" />{meta.people.filter((p) => !p.gone).length} · {tn(stats.count, '{n} expense', '{n} expenses')} · {kind === 'spending' ? t('you spent {amount} this month', { amount: money(stats.month, meta.currency, { compact: true }) }) : `${kindInfo.emoji} ${t('not in My spending')}`}</span>
         </span>
         <span className="shrink-0 text-right">
           <span className={cn('block text-sm font-semibold tabular-nums', stats.net > 0 ? 'text-emerald-600 dark:text-emerald-400' : stats.net < 0 ? 'text-danger' : 'text-muted')}>

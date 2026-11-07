@@ -69,7 +69,7 @@ function Form({ b, card, setB, onClose }: { b: CardBill; card: CreditCard; setB:
               </div>
             )}
             <div className="mt-3 flex items-center gap-2 border-t border-line pt-3 text-sm">
-              <span className="flex-1 text-muted">{b.split ? t('Sent to Split as an expense.') : t('Count this in your spending charts.')}</span>
+              <span className="flex-1 text-muted">{b.split ? t('Recorded in Split.') : t('Record this payment in Split. It isn’t counted as spending: what you bought with the card already is.')}</span>
               <Button variant="outline" size="sm" disabled={!ok} onClick={() => toSplit(build())}><Send className="size-4" />{b.split ? t('Send again') : t('Add to Split')}</Button>
             </div>
           </div>

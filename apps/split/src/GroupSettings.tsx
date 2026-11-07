@@ -5,7 +5,8 @@ import { sdk } from '@sanga/sdk';
 import { Button } from '@sanga/ui/button';
 import { Dialog } from '@sanga/ui/dialog';
 import { Input, Label } from '@sanga/ui/input';
-import { balances, CAT_COLORS, CURRENCIES, type Category } from './model';
+import { balances, CAT_COLORS, CURRENCIES, kindOf, type Category } from './model';
+import { KindPicker } from './KindPicker';
 import { useLedger, useMe, useNames } from './hooks';
 import { leaveGroup, newId, save, type GroupData } from './store';
 import { download, expensesCsv } from './exportCsv';
@@ -45,6 +46,10 @@ export function GroupSettings({ g, open, onClose, onLeft }: { g: GroupData; open
         <div>
           <Label htmlFor="gn">{t('Name')}</Label>
           <Input id="gn" key={meta.name} defaultValue={meta.name} maxLength={60} onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== meta.name) set({ name: v }); }} />
+        </div>
+        <div>
+          <p id="gk" className="mb-1.5 text-sm font-medium text-ink">{t('What’s this group for?')}</p>
+          <KindPicker id="gk" value={kindOf(meta)} onChange={(k) => { const { kind: _k, ...rest } = meta; save(g.gid, k === 'spending' ? rest : { ...rest, kind: k }); }} />
         </div>
         <div>
           <Label>{t('Icon')}</Label>

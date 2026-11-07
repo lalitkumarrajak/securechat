@@ -11,8 +11,6 @@
   "Undo": "वापस लें",
   "Paid on": "चुकाने की तारीख़",
   "Mark as paid": "चुकाया हुआ मार्क करें",
-  "Sent to Split as an expense.": "स्प्लिट में ख़र्चे के रूप में भेजा गया।",
-  "Count this in your spending charts.": "इसे अपने ख़र्च के चार्ट में गिनें।",
   "Send again": "फिर से भेजें",
   "Add to Split": "स्प्लिट में जोड़ें",
   "Remove this bill?": "यह बिल हटाएँ?",
@@ -80,5 +78,7 @@
   "Due {date} · Minimum {amount}": "आख़िरी तारीख़ {date} · न्यूनतम {amount}",
   "Due {date}": "आख़िरी तारीख़ {date}",
   "⚠️ {card} bill is overdue": "⚠️ {card} बिल की तारीख़ निकल गई",
-  "{amount} was due {date}. Pay it now to avoid late fees.": "{amount} {date} तक चुकाना था। लेट फ़ीस से बचने के लिए अभी चुकाएँ।"
+  "{amount} was due {date}. Pay it now to avoid late fees.": "{amount} {date} तक चुकाना था। लेट फ़ीस से बचने के लिए अभी चुकाएँ।",
+  "Recorded in Split.": "Split में दर्ज हो गया।",
+  "Record this payment in Split. It isn’t counted as spending: what you bought with the card already is.": "यह भुगतान Split में दर्ज करें। यह खर्च में नहीं गिना जाता: कार्ड से जो खरीदा, वह पहले ही गिना जा चुका है।"
 }

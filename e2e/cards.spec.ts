@@ -1,5 +1,5 @@
 // End-to-end: credit card bills in the Calendar. Add a card, be asked for the bill on its statement day,
-// enter it, get reminders scheduled, mark it paid, and send it to Split as an expense.
+// enter it, get reminders scheduled, mark it paid, and record the payment in Split (not counted as spending).
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import { phone, signUp, tab, uname, type Phone } from './helpers';
@@ -65,17 +65,21 @@ test('mark it paid', async () => {
   await expect(cal().getByRole('region', { name: 'Bills' })).toContainText('Paid');
 });
 
-test('add it to Split: the bill arrives as your own expense', async () => {
+test('add it to Split: card payments go in a Credit card bills group, not counted as spending', async () => {
   await cal().getByRole('region', { name: 'Bills' }).getByRole('button', { name: /HDFC Millennia/ }).click();
-  await P.page.getByRole('dialog', { name: /HDFC Millennia ·/ }).getByRole('button', { name: 'Add to Split' }).click();
-  // Split opens with the bill waiting: pick where to put it (no group yet: make one)
+  const bill = P.page.getByRole('dialog', { name: /HDFC Millennia ·/ });
+  await expect(bill).toContainText('It isn’t counted as spending');
+  await bill.getByRole('button', { name: 'Add to Split' }).click();
+  // Split opens with the payment waiting; there's no card bills group yet, so it offers to make one
   const pick = P.page.getByRole('dialog', { name: 'Add this bill to Split' });
   await expect(pick).toBeVisible({ timeout: 15_000 });
   await expect(pick).toContainText('HDFC Millennia card bill');
-  await pick.getByRole('button', { name: 'New group' }).click();
+  await pick.getByRole('button', { name: 'Make a Credit card bills group' }).click();
   const ng = P.page.getByRole('dialog', { name: 'New group' });
-  await ng.getByLabel('Name').fill('My money');
+  await expect(ng.getByRole('radio', { name: /Credit card bills/ })).toHaveAttribute('aria-checked', 'true');
+  await expect(ng.getByLabel('Name')).toHaveValue('Credit card bills');
   await expect(ng.getByLabel('Currency')).toHaveValue('INR'); // the bill's currency
+  await P.page.screenshot({ path: shots('91-cards-new-group') });
   await ng.getByRole('button', { name: 'Create group' }).click();
   const ed = P.page.getByRole('dialog', { name: 'Add expense' });
   await expect(ed).toBeVisible({ timeout: 15_000 });
@@ -84,7 +88,37 @@ test('add it to Split: the bill arrives as your own expense', async () => {
   await expect(ed.getByRole('radio', { name: /Credit card bill/ })).toHaveAttribute('aria-checked', 'true');
   await P.page.screenshot({ path: shots('92-cards-split') });
   await ed.getByRole('button', { name: 'Add expense' }).click();
-  await expect(P.page.getByRole('region', { name: 'Split' }).getByText('HDFC Millennia card bill')).toBeVisible();
-  await expect(P.page.getByRole('region', { name: 'Split' }).getByText(/your own expense/).first()).toBeVisible();
+  const split = P.page.getByRole('region', { name: 'Split' });
+  await expect(split.getByText('HDFC Millennia card bill')).toBeVisible();
+  // The group says what it is, and its own insights show the payments while saying they're kept out of spending
+  await split.getByRole('tab', { name: /Insights/ }).click();
+  await expect(split.getByText('Card bills paid')).toBeVisible();
+  await expect(split.getByText(/isn’t counted in My spending/)).toBeVisible();
+  await split.getByRole('button', { name: 'Back to groups' }).click();
+  await expect(split.getByRole('button', { name: /Credit card bills/ })).toContainText('not in My spending');
+  // My spending leaves it out, and says how much it left out
+  await split.getByRole('button', { name: 'My spending' }).first().click();
+  await expect(split.getByText('Not counted as spending:')).toBeVisible();
+  await expect(split.getByText('No spending in this period.')).toBeVisible();
+  expect(P.errors).toEqual([]);
+});
+
+test('the next card payment goes straight to the Credit card bills group', async () => {
+  await tab(P, 'Calendar').click();
+  await cal().getByRole('tab', { name: 'Cards' }).click();
+  await cal().getByRole('region', { name: 'Bills' }).getByRole('button', { name: /HDFC Millennia/ }).click();
+  const bill = P.page.getByRole('dialog', { name: /HDFC Millennia ·/ });
+  await expect(bill).toContainText('Recorded in Split.');
+  await bill.getByRole('button', { name: 'Send again' }).click();
+  // No question this time: the editor opens in the one card bills group
+  const ed = P.page.getByRole('dialog', { name: 'Add expense' });
+  await expect(ed).toBeVisible({ timeout: 15_000 });
+  await expect(P.page.getByRole('dialog', { name: 'Add this bill to Split' })).toHaveCount(0);
+  await expect(ed.getByLabel('What was it for?')).toHaveValue('HDFC Millennia card bill');
+  await ed.getByRole('button', { name: 'Cancel' }).click();
+  const split = P.page.getByRole('region', { name: 'Split' });
+  await expect(split.getByRole('heading', { name: 'Credit card bills' })).toBeVisible();
+  // Card bills are yours alone: no nudge to add people
+  await expect(split.getByText(/Add people to split with/)).toHaveCount(0);
   expect(P.errors).toEqual([]);
 });

@@ -10,7 +10,7 @@ import { create } from 'zustand';
 import * as C from '@sanga/crypto';
 import { sdk } from '@sanga/sdk';
 import { prepareBill, type Bill } from './bills';
-import { ACTIVITY_KINDS, BUILTIN_CATS, moveLedger, type Activity, type Expense, type Meta, type Person, type Record_, type Settlement, validDay } from './model';
+import { ACTIVITY_KINDS, BUILTIN_CATS, moveLedger, type Activity, type Expense, type GroupKind, type Meta, type Person, type Record_, type Settlement, validDay } from './model';
 import { activityFor } from './activity';
 
 type Local<T> = T & { srv?: number; dirty?: boolean };
@@ -149,7 +149,7 @@ export { newId };
 const post = <T,>(path: string, body: unknown) => sdk().api<T>(path, body);
 
 /** Make a group. Needs a connection: the server has to know it exists before anyone can be added. */
-export async function createGroup(name: string, emoji: string, currency: string): Promise<string> {
+export async function createGroup(name: string, emoji: string, currency: string, kind: GroupKind = 'spending'): Promise<string> {
   const gid = C.randomId(12);
   const { raw, key } = C.newStoryKey();
   const wrapped = await C.wrapStoryKey(await selfKey(), raw, me(), gid, me());
@@ -159,7 +159,7 @@ export async function createGroup(name: string, emoji: string, currency: string)
   cache = [...cache, entry];
   await sdk().store.put(LIST, cache);
   patch(gid, () => blank(gid, entry.members));
-  save(gid, { type: 'meta', id: 'meta', name, emoji, currency, people: [{ id: me(), name: me(), u: me() }], cats: [], edited: 0 });
+  save(gid, { type: 'meta', id: 'meta', name, emoji, currency, ...(kind !== 'spending' && { kind }), people: [{ id: me(), name: me(), u: me() }], cats: [], edited: 0 });
   return gid;
 }
 
@@ -382,7 +382,7 @@ function valid(x: any, id: string): Record_ | null {
     const people = x.people.filter((p: any) => p && isStr(p.id, 40) && isStr(p.name, 60)).map((p: any) => ({ id: p.id, name: p.name, ...(isStr(p.u, 40) && { u: p.u }), ...(p.gone && { gone: true as const }) }));
     const cats = (Array.isArray(x.cats) ? x.cats : []).slice(0, 60).filter((c: any) => c && isStr(c.id, 40) && isStr(c.name, 40) && isStr(c.emoji, 16) && /^#[0-9a-f]{6}$/i.test(c.color))
       .map((c: any) => ({ id: c.id, name: c.name, emoji: c.emoji, color: c.color }));
-    return { type: 'meta', id: 'meta', name: x.name, emoji: x.emoji, currency: x.currency, people, cats, edited: Number(x.edited) || 0 };
+    return { type: 'meta', id: 'meta', name: x.name, emoji: x.emoji, currency: x.currency, ...((x.kind === 'cards' || x.kind === 'lending') && { kind: x.kind as GroupKind }), people, cats, edited: Number(x.edited) || 0 };
   }
   if (x.type === 'expense') {
     if (!isStr(x.desc, 200) || !isAmt(x.amount) || !isStr(x.cat, 40) || !validDay(x.date) || !isStr(x.paidBy, 40) || !['equal', 'exact', 'percent', 'shares'].includes(x.mode)
