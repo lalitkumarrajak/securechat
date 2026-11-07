@@ -28,6 +28,9 @@ describe('history lines', () => {
     const two = meta({ people: [{ id: 'a', name: 'A', u: 'a' }, { id: 'b', name: 'B', u: 'b' }, { id: 'p1', name: 'Rohan' }] });
     expect(activityFor(meta(), two, 'a', 1).map((l) => [l.kind, l.who])).toEqual([['person_add', 'b'], ['person_add', 'p1']]);
     expect(kinds(activityFor(two, { ...two, name: 'Goa 2026' }, 'a', 1))).toEqual(['group_rename']);
+    expect(activityFor(two, { ...two, kind: 'cards' }, 'a', 1)).toMatchObject([{ kind: 'group_kind', name: 'cards' }]);
+    expect(activityFor({ ...two, kind: 'cards' }, two, 'a', 1)).toMatchObject([{ kind: 'group_kind', name: 'spending' }]);
+    expect(activityFor(two, { ...two, kind: 'spending' }, 'a', 1)).toEqual([]); // spending is the default: no change
     const gone = (id: string) => ({ ...two, people: two.people.map((p) => (p.id === id ? { ...p, gone: true as const } : p)) });
     expect(kinds(activityFor(two, gone('b'), 'a', 1))).toEqual(['person_remove']);   // a removed b
     expect(kinds(activityFor(two, gone('b'), 'b', 1))).toEqual(['person_left']);     // b left

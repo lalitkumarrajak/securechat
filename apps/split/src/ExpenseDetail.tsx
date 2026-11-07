@@ -3,7 +3,7 @@ import { Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@sanga/ui/button';
 import { Dialog } from '@sanga/ui/dialog';
 import { sdk } from '@sanga/sdk';
-import { money, parseDay, type Expense } from './model';
+import { isSpending, kindOf, money, parseDay, type Expense } from './model';
 import { useLedger, useNames } from './hooks';
 import { deleteBill, removeRecord, type GroupData } from './store';
 import { BillView } from './BillView';
@@ -36,6 +36,7 @@ export function ExpenseDetail({ g, expense, onClose, onEdit }: { g: GroupData; e
               {parseDay(e.date).toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             </p>
             <p className="mt-1 text-sm text-muted">{tx('Paid by {name}', { name: <b className="text-ink">{name(person(e.paidBy))}</b> })}</p>
+            {(!isSpending(e.cat) || kindOf(meta) !== 'spending') && <p className="mt-1 text-xs text-muted">{t('Not counted in My spending')}</p>}
           </div>
           <div>
             <h3 className="mb-1.5 text-sm font-semibold">{e.mode === 'equal' ? t('Split equally') : e.mode === 'exact' ? t('Split by exact amounts') : e.mode === 'percent' ? t('Split by percentage') : t('Split by shares')}</h3>

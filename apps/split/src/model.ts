@@ -55,7 +55,7 @@ export interface Settlement {
 }
 
 /** One line of the group's history, never changed or removed: who did what, and when. */
-export type ActivityKind = 'group_create' | 'group_rename' | 'person_add' | 'person_remove' | 'person_left' | 'category_add'
+export type ActivityKind = 'group_create' | 'group_rename' | 'group_kind' | 'person_add' | 'person_remove' | 'person_left' | 'category_add'
   | 'expense_add' | 'expense_edit' | 'expense_delete' | 'settle_add' | 'settle_undo' | 'person_link' | 'person_rename' | 'settle_request' | 'settle_confirm' | 'settle_decline';
 export interface Activity {
   type: 'activity'; id: string; kind: ActivityKind;
@@ -68,7 +68,7 @@ export interface Activity {
   from?: string; to?: string;      // a payment
   name?: string;                   // a group or category name
 }
-export const ACTIVITY_KINDS: ActivityKind[] = ['group_create', 'group_rename', 'person_add', 'person_remove', 'person_left', 'category_add',
+export const ACTIVITY_KINDS: ActivityKind[] = ['group_create', 'group_rename', 'group_kind', 'person_add', 'person_remove', 'person_left', 'category_add',
   'expense_add', 'expense_edit', 'expense_delete', 'settle_add', 'settle_undo', 'person_link', 'person_rename', 'settle_request', 'settle_confirm', 'settle_decline'];
 
 export type Record_ = Meta | Expense | Settlement | Activity;

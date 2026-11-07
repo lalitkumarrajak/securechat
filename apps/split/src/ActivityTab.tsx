@@ -1,14 +1,14 @@
 import { locale, t, tx } from '@sanga/i18n';
 import { useEffect, useMemo, type ReactNode } from 'react';
-import { ArrowRight, FilePlus2, FolderPlus, HandCoins, Pencil, Tag, Trash2, Undo2, UserMinus, UserPlus, LogOut, Type, Link2, Clock, CheckCircle2, XCircle } from 'lucide-react';
-import { money, parseDay, type Activity, type Person } from './model';
+import { ArrowRight, Shapes, FilePlus2, FolderPlus, HandCoins, Pencil, Tag, Trash2, Undo2, UserMinus, UserPlus, LogOut, Type, Link2, Clock, CheckCircle2, XCircle } from 'lucide-react';
+import { GROUP_KINDS, money, parseDay, type Activity, type Person } from './model';
 import { useLedger, useNames } from './hooks';
 import { markSeen, type GroupData } from './store';
 import { Empty } from './Empty';
 import { PersonDot } from './PersonDot';
 
 const ICON: Record<Activity['kind'], { Icon: typeof Pencil; tone: string }> = {
-  group_create: { Icon: FolderPlus, tone: 'text-accent bg-accent/15' }, group_rename: { Icon: Type, tone: 'text-accent bg-accent/15' },
+  group_create: { Icon: FolderPlus, tone: 'text-accent bg-accent/15' }, group_rename: { Icon: Type, tone: 'text-accent bg-accent/15' }, group_kind: { Icon: Shapes, tone: 'text-accent bg-accent/15' },
   person_add: { Icon: UserPlus, tone: 'text-sky-600 bg-sky-500/15' }, person_remove: { Icon: UserMinus, tone: 'text-danger bg-danger/10' },
   person_left: { Icon: LogOut, tone: 'text-muted bg-panel-2' }, category_add: { Icon: Tag, tone: 'text-violet-600 bg-violet-500/15' },
   expense_add: { Icon: FilePlus2, tone: 'text-emerald-600 bg-emerald-500/15' }, expense_edit: { Icon: Pencil, tone: 'text-amber-600 bg-amber-500/15' },
@@ -48,6 +48,10 @@ export function ActivityTab({ g, onOpenExpense }: { g: GroupData; onOpenExpense:
       case 'group_rename': return a.wasDesc
         ? tx('{by} renamed the group from {old} to {name}', { by, old: b(a.wasDesc), name: b(a.name ?? '') })
         : tx('{by} renamed the group to {name}', { by, name: b(a.name ?? '') });
+      case 'group_kind': {
+        const k = GROUP_KINDS.find((x) => x.id === a.name) ?? GROUP_KINDS[0];
+        return tx('{by} marked this group as {kind}', { by, kind: b(`${k.emoji} ${t(k.name)}`) });
+      }
       case 'person_add': return tx('{by} added {who}', { by, who: sub(a.who) });
       case 'person_remove': return tx('{by} removed {who}', { by, who: sub(a.who) });
       case 'settle_request': return tx('{by} says {from} paid {to} {amount} · waiting for {to} to confirm', { by, from: sub(a.from), to: sub(a.to), amount: amt(a.amount) });

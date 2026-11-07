@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { Button } from '@sanga/ui/button';
 import { Dialog } from '@sanga/ui/dialog';
 import { Input, Label, Textarea } from '@sanga/ui/input';
-import { apportion, catName, parseAmount, splitAmount, toInput, today, validDay, type Expense, type Mode } from './model';
+import { apportion, catName, isSpending, kindOf, parseAmount, splitAmount, toInput, today, validDay, type Expense, type Mode } from './model';
 import { useLedger, useMe, useNames } from './hooks';
 import { deleteBill, save, type GroupData } from './store';
 import { BillField } from './BillField';
@@ -92,7 +92,9 @@ function Form({ g, expense, onClose }: { g: GroupData; expense: Expense; onClose
         <Label htmlFor="desc">{t('What was it for?')}</Label>
         <Input id="desc" maxLength={120} placeholder={t('e.g. Dinner, Metro card, Gym fee')} value={desc} onChange={(e) => setDesc(e.target.value)} />
       </div>
-      <div><Label>{t('Category')}</Label><CategoryPicker cats={catList} value={cat} onChange={setCat} /></div>
+      <div><Label>{t('Category')}</Label><CategoryPicker cats={catList} value={cat} onChange={setCat} />
+        {!isSpending(cat) && kindOf(meta) === 'spending' && <p className="mt-1.5 text-xs text-muted">{t('Not counted in My spending: this only moves money. It still counts in balances.')}</p>}
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="min-w-0"><Label htmlFor="date">{t('Date')}</Label><Input id="date" type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value)} /></div>
         <div className="min-w-0">

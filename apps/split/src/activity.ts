@@ -1,5 +1,5 @@
 // What changed between two versions of a record, as history lines. Pure: the store calls it on every save.
-import type { Activity, Expense, Meta, Record_, Settlement } from './model';
+import { kindOf, type Activity, type Expense, type Meta, type Record_, type Settlement } from './model';
 
 type Line = Omit<Activity, 'type' | 'id' | 'by' | 'ts'>;
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -25,6 +25,7 @@ function metaLines(prev: Meta | null | undefined, m: Meta, by: string): Line[] {
   if (!prev) return [{ kind: 'group_create', name: m.name }];
   const out: Line[] = [];
   if (prev.name !== m.name) out.push({ kind: 'group_rename', name: m.name, wasDesc: prev.name });
+  if (kindOf(prev) !== kindOf(m)) out.push({ kind: 'group_kind', name: kindOf(m) }); // what it's for: spending, card bills, lending
   const was = new Map(prev.people.map((p) => [p.id, p]));
   for (const p of m.people) {
     const before = was.get(p.id);

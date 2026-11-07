@@ -125,5 +125,8 @@
   "What’s this group for?": "हा ग्रुप कशासाठी आहे?",
   "Card bills paid": "भरलेली कार्ड बिले",
   "A credit card bills group: it isn’t counted in My spending, since what you bought with the cards already is.": "क्रेडिट कार्ड बिल ग्रुप: हा माझ्या खर्चात धरला जात नाही, कारण कार्डने जे घेतले ते आधीच धरले आहे.",
-  "A lending & borrowing group: it isn’t counted in My spending. Balances show who owes whom.": "उसने देण्या-घेण्याचा ग्रुप: हा माझ्या खर्चात धरला जात नाही. बॅलन्स दाखवतो कोणाचे किती देणे आहे."
+  "A lending & borrowing group: it isn’t counted in My spending. Balances show who owes whom.": "उसने देण्या-घेण्याचा ग्रुप: हा माझ्या खर्चात धरला जात नाही. बॅलन्स दाखवतो कोणाचे किती देणे आहे.",
+  "{by} marked this group as {kind}": "{by} यांनी हा ग्रुप {kind} केला",
+  "Not counted in My spending": "माझ्या खर्चात धरले नाही",
+  "Not counted in My spending: this only moves money. It still counts in balances.": "माझ्या खर्चात धरले जाणार नाही: हे फक्त पैसे फिरवणे आहे. बॅलन्समध्ये तरीही धरले जाते."
 }
