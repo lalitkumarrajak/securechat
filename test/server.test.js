@@ -255,6 +255,39 @@ describe('messages', () => {
     wa2.close(); wb2.close();
   });
 
+  it('syncs newest first between two points, in pages, echoing the tag', async () => {
+    const sent = [];
+    for (let i = 0; i < 250; i++) sent.push(await sendText(wa, a, b, 'n' + i));
+    const ws2 = await connect(srv, b.token);
+    const top = sent.at(-1).seq;
+    // The newest page first: newest at the front, and more to come.
+    ws2.sendJson({ t: 'sync', after: 0, before: Number.MAX_SAFE_INTEGER, tag: 'head' });
+    const head = await ws2.next('batch');
+    assert.equal(head.tag, 'head');
+    assert.equal(head.desc, true);
+    assert.equal(head.more, true);
+    assert.equal(head.msgs[0].seq, Math.max(top, ...head.msgs.map((m) => m.seq)));
+    assert.ok(head.msgs.every((m, i) => i === 0 || m.seq < head.msgs[i - 1].seq));
+    // Then what's below it, page by page, until nothing is left: every message exactly once.
+    const seen = new Set(head.msgs.map((m) => m.id));
+    let hi = head.msgs.at(-1).seq;
+    for (;;) {
+      ws2.sendJson({ t: 'sync', after: 0, before: hi, tag: 'fill' });
+      const page = await ws2.next('batch');
+      assert.equal(page.tag, 'fill');
+      for (const m of page.msgs) { assert.ok(m.seq < hi); assert.ok(!seen.has(m.id)); seen.add(m.id); }
+      if (!page.more) break;
+      hi = page.msgs.at(-1).seq;
+    }
+    for (const r of sent) assert.ok(seen.has(r.id), 'missing ' + r.id);
+    // Between two points only.
+    ws2.sendJson({ t: 'sync', after: sent[9].seq, before: sent[20].seq, tag: 'fill' });
+    const mid = await ws2.next('batch');
+    assert.deepEqual(mid.msgs.map((m) => m.id), sent.slice(10, 20).map((r) => r.id).reverse());
+    assert.equal(mid.more, false);
+    ws2.close();
+  });
+
   it('turning read receipts off hides blue ticks both ways', async () => {
     await srv.api('/api/profile', { privacy: { receipts: false } }, b.token);
     const r = await sendText(wa, a, b, 'did you read this?');

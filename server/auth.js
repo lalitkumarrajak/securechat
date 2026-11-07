@@ -105,7 +105,8 @@ export const routes = {
 
   // Sign-up: is this username free? Asked while it's typed. (Usernames aren't secret: friends search by them.)
   'POST /api/register/check': async (req, res) => {
-    if (rateLimited('check:' + clientIp(req), 60, 60e3)) return sendJson(res, 429, { error: 'Slow down' });
+    // Generous: it's one cheap lookup, and many people can share one address (a college's Wi-Fi).
+    if (rateLimited('check:' + clientIp(req), 300, 60e3)) return sendJson(res, 429, { error: 'Slow down' });
     const { u } = await readJson(req);
     if (typeof u !== 'string' || !USER_RE.test(u)) return sendJson(res, 400, { error: 'Username: 3-24 chars, a-z 0-9 _ .' });
     sendJson(res, 200, { free: !(await ctx.db.get('getUser', u)) });

@@ -40,6 +40,7 @@ export function MessageList({ peer, peerName, unreadAtOpen }: { peer: string; pe
   const [newCount, setNewCount] = useState(0);
   const lastLen = useRef(0);
   const olderLeft = useApp((s) => s.olderLeft);
+  const filling = useApp((s) => s.filling); // older messages still on their way from the server
   const edges = useRef({ first: '', last: '', height: 0, prepended: false }); // what was rendered last time, to tell older from newer
   const opened = useRef(false);
   const me = myName();
@@ -160,7 +161,7 @@ export function MessageList({ peer, peerName, unreadAtOpen }: { peer: string; pe
           </div>
         )}
         <div ref={content}>
-        {olderLeft && (
+        {(olderLeft || (filling && messages.length > 0)) && (
           <div className="flex h-10 items-center justify-center" role="status" aria-label={t('Loading older messages')}>
             <span className="size-5 animate-spin rounded-full border-2 border-muted/40 border-t-accent" />
           </div>

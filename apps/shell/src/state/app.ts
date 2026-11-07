@@ -14,6 +14,7 @@ export interface AppState {
   gifsEnabled: boolean;                  // server has a KLIPY key
   emailRequired: boolean;                // new accounts need a verified email (the server can send it)
   syncing: boolean;                      // first download of messages since opening the app
+  filling: boolean;                      // older messages still downloading behind the newest
   friendsLoaded: boolean;                // friend list known (saved on this device, or fetched)
   settingsPage: string | null;           // open Settings at this page (e.g. 'sessions' from a sign-in alert)
   conn: Conn;
@@ -53,6 +54,7 @@ export const useApp = create<AppState>(() => ({
   gifsEnabled: false,
   emailRequired: false,
   syncing: true,
+  filling: false,
   friendsLoaded: false,
   settingsPage: null,
   conn: 'connecting',

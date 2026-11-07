@@ -248,6 +248,11 @@ const SQL = {
                OR EXISTS (SELECT 1 FROM group_members gm WHERE gm.username = ? AND m.recipient = 'g:' || gm.gid AND m.seq > gm.from_seq))
              AND NOT EXISTS (SELECT 1 FROM message_hidden h WHERE h.msg_id = m.id AND h.username = ?)
              ORDER BY m.seq LIMIT ?`,
+  // The same, newest first and below a point: what a device fetches first is the latest.
+  syncMsgsDesc: `SELECT * FROM messages m WHERE m.seq > ? AND m.seq < ? AND (m.recipient = ? OR m.sender = ?
+               OR EXISTS (SELECT 1 FROM group_members gm WHERE gm.username = ? AND m.recipient = 'g:' || gm.gid AND m.seq > gm.from_seq))
+             AND NOT EXISTS (SELECT 1 FROM message_hidden h WHERE h.msg_id = m.id AND h.username = ?)
+             ORDER BY m.seq DESC LIMIT ?`,
   setStatus: `UPDATE messages SET status = ?, seq = ? WHERE id = ? AND recipient = ? AND status < ?
               RETURNING id, sender, status, seq`,
   deleteForAll: `UPDATE messages SET body = '', seq = ? WHERE id = ? AND sender = ? AND ts >= ? AND body != ''
@@ -529,6 +534,22 @@ async function openMongo(uri) {
   const pairId = (a, b) => a + '|' + b;
   const friendRow = (d) => d && { a: d.a, b: d.b, status: d.status, requester: d.requester, created: d.created };
 
+  // Messages for `me` with after < seq < before, oldest (1) or newest (-1) first.
+  async function syncPage(after, before, me, limit, dir) {
+    const mine = await groupMembers.find({ username: me }).toArray();
+    const seq = before === Infinity ? { $gt: after } : { $gt: after, $lt: before };
+    return (await messages.aggregate([
+    { $match: { seq, $or: [{ recipient: me }, { sender: me },
+      ...mine.map((m) => ({ recipient: 'g:' + m.gid, seq: { $gt: m.from_seq } }))] } },
+    { $sort: { seq: dir } },
+    { $lookup: { from: 'message_hidden', let: { id: '$_id' }, as: 'h',
+      pipeline: [{ $match: { $expr: { $and: [{ $eq: ['$msg_id', '$$id'] }, { $eq: ['$username', me] }] } } }] } },
+    { $match: { h: { $size: 0 } } },
+    { $limit: limit },
+    { $project: { h: 0 } },
+    ]).toArray()).map(msgRow);
+  }
+
   const ops = {
     getUser: async (u) => userRow(await users.findOne({ _id: u })),
     insertUser: (u, auth_hash, auth_salt, pubkey, enc_priv, created, email) =>
@@ -563,19 +584,8 @@ async function openMongo(uri) {
     getMsgById: async (id) => msgRow(await messages.findOne({ _id: id })),
     // Hidden rows are excluded before the limit (like the SQL NOT EXISTS), so a page full of
     // hidden messages can't come back empty and stall the sync.
-    syncMsgs: async (after, me, _me, _me2, _me3, limit) => {
-      const mine = await groupMembers.find({ username: me }).toArray();
-      return (await messages.aggregate([
-      { $match: { seq: { $gt: after }, $or: [{ recipient: me }, { sender: me },
-        ...mine.map((m) => ({ recipient: 'g:' + m.gid, seq: { $gt: m.from_seq } }))] } },
-      { $sort: { seq: 1 } },
-      { $lookup: { from: 'message_hidden', let: { id: '$_id' }, as: 'h',
-        pipeline: [{ $match: { $expr: { $and: [{ $eq: ['$msg_id', '$$id'] }, { $eq: ['$username', me] }] } } }] } },
-      { $match: { h: { $size: 0 } } },
-      { $limit: limit },
-      { $project: { h: 0 } },
-    ]).toArray()).map(msgRow);
-    },
+    syncMsgs: (after, me, _me, _me2, _me3, limit) => syncPage(after, Infinity, me, limit, 1),
+    syncMsgsDesc: (after, before, me, _me, _me2, _me3, limit) => syncPage(after, before, me, limit, -1),
     setStatus: async (status, seq, id, recipient, minStatus) => msgRow(await messages.findOneAndUpdate(
       { _id: id, recipient, status: { $lt: minStatus } },
       { $set: { status, seq } },

@@ -73,7 +73,7 @@ export function AuthForm({ mode }: { mode: 'signin' | 'signup' }) {
   const [code, setCode] = useState('');
   const [step, setStep] = useState<'form' | 'code'>('form'); // sign-up with email: then the code from it
   const [wait, setWait] = useState(0); // seconds until another code can be sent
-  const [free, setFree] = useState<Record<string, boolean | 'checking'>>({}); // username → still free?
+  const [free, setFree] = useState<Record<string, boolean | 'checking' | 'unknown'>>({}); // username → still free?
   const form = useRef<HTMLFormElement>(null);
   const signup = mode === 'signup';
   const needEmail = useApp((s) => s.emailRequired) && signup;
@@ -91,7 +91,8 @@ export function AuthForm({ mode }: { mode: 'signin' | 'signup' }) {
     const id = setTimeout(() => {
       setFree((f) => ({ ...f, [name]: 'checking' }));
       usernameFree(name).then((ok) => setFree((f) => ({ ...f, [name]: ok })))
-        .catch(() => setFree((f) => { const { [name]: _, ...rest } = f; return rest; }));
+        // Couldn't ask (offline, too many checks): say nothing; Create account checks it anyway.
+        .catch(() => setFree((f) => ({ ...f, [name]: 'unknown' })));
     }, 450);
     return () => clearTimeout(id);
   }, [name, signup, free]);

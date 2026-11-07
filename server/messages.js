@@ -42,10 +42,16 @@ async function groupMsg(ws, m) {
 }
 
 export const handlers = {
+  // Messages after `after`, oldest first; or, with `before`, those between the two newest first, so a
+  // device shows the latest straight away and fills in the older ones behind it. `tag` comes back as is.
   async sync(ws, m) {
     const after = Number.isSafeInteger(m.after) ? m.after : 0;
+    const desc = Number.isSafeInteger(m.before);
+    const tag = typeof m.tag === 'string' ? m.tag.slice(0, 10) : undefined;
     // Page by row count and payload size so a slow link gets small, steady batches.
-    const rows = await ctx.db.all('syncMsgs', after, ws.user, ws.user, ws.user, ws.user, 200);
+    const rows = desc
+      ? await ctx.db.all('syncMsgsDesc', after, m.before, ws.user, ws.user, ws.user, ws.user, 200)
+      : await ctx.db.all('syncMsgs', after, ws.user, ws.user, ws.user, ws.user, 200);
     const msgs = [];
     let bytes = 0;
     for (const r of rows) {
@@ -53,7 +59,7 @@ export const handlers = {
       bytes += r.body.length;
       if (bytes > 512_000) break;
     }
-    send(ws, { t: 'batch', msgs, more: msgs.length < rows.length || rows.length === 200 });
+    send(ws, { t: 'batch', msgs, more: msgs.length < rows.length || rows.length === 200, ...(desc && { desc: true }), ...(tag && { tag }) });
   },
 
   async msg(ws, m) {

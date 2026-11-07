@@ -25,6 +25,10 @@ const S = {
   ready: false,
   synced: false,
   lastSeq: 0,
+  // Parts of the history not downloaded yet: messages with lo < seq < hi. A device gets the newest
+  // messages first and fills these in behind them, newest part first (fillNext).
+  gaps: [] as { lo: number; hi: number }[],
+  fillingGap: null as { lo: number; hi: number } | null, // asked for, not answered yet
   hiddenTs: 0,
   backoff: 1000,
   reconnectTimer: 0,
@@ -78,6 +82,7 @@ export async function boot() {
   markAlive();
   Object.assign(S, { token: sess.token, me: sess.u, priv: sess.priv, pub: sess.pub });
   S.lastSeq = (await db.get('kv', 'lastSeq')) || 0;
+  S.gaps = (await db.get('kv', 'gaps')) || [];
   S.hiddenTs = (await db.get('kv', 'hiddenTs')) || 0;
   const me: Me = (await db.get('kv', 'me')) || { u: sess.u, name: '', about: '', privacy: { lastSeen: true, receipts: true }, mutes: {}, av: 0 };
   const fr = (await db.get('kv', 'friends')) || {};
@@ -306,7 +311,9 @@ async function handle(m: any) {
       setApp({ conn: 'online', syncing: true }); // what came in while away is on its way
       clearInterval(S.pingTimer);
       S.pingTimer = window.setInterval(() => wsSend({ t: 'p' }), 20000);
-      wsSend({ t: 'sync', after: S.lastSeq });
+      // Newest first: the chat list and the latest messages show at once; older ones fill in after.
+      S.fillingGap = null;
+      wsSend({ t: 'sync', after: S.lastSeq, before: Number.MAX_SAFE_INTEGER, tag: 'head' });
       wsSend({ t: 'hidden', since: S.hiddenTs });
       watchFriends();
       syncAvatar(S.me, m.av || 0).catch(() => {});
@@ -317,6 +324,8 @@ async function handle(m: any) {
       for (const f of readyHooks) f();
       break;
     case 'batch': {
+      if (m.tag === 'head') { await syncedHead(m); break; }
+      if (m.tag === 'fill') { await filledGap(m); break; }
       for (const row of m.msgs) await ingest(row, true);
       if (m.msgs.length) await saveSeq(m.msgs[m.msgs.length - 1].seq, true);
       // A long backlog: the list catches up a page at a time instead of after the very last one.
@@ -414,6 +423,56 @@ async function handle(m: any) {
       break;
   }
 }
+
+// What came in while away, newest first (sent on connecting). The page is stored oldest first, like
+// live messages; if there was more, the rest is a gap to fill in behind it.
+async function syncedHead(m: { msgs: any[]; more: boolean }) {
+  const rows = [...m.msgs].reverse();
+  // The gap is known before the page is stored, so edits and reactions to messages in it wait for them.
+  if (rows.length && m.more) await saveGaps([{ lo: S.lastSeq, hi: rows[0].seq }, ...S.gaps]);
+  for (const row of rows) await ingest(row, true);
+  if (rows.length) await saveSeq(rows[rows.length - 1].seq, true);
+  S.synced = true;
+  await reloadChats();
+  setApp({ syncing: false });
+  const active = getApp().active;
+  if (active) { await loadMessages(active); markRead(active); }
+  fillNext();
+}
+
+/** Ask for the next page of the newest gap, if any. */
+function fillNext() {
+  const g = S.gaps[0];
+  setApp({ filling: !!g });
+  if (!g || !S.ready || S.fillingGap) return;
+  S.fillingGap = g;
+  wsSend({ t: 'sync', after: g.lo, before: g.hi, tag: 'fill' });
+}
+
+async function filledGap(m: { msgs: any[]; more: boolean }) {
+  const g = S.fillingGap;
+  S.fillingGap = null;
+  if (!g) return;
+  const rows = [...m.msgs].reverse();
+  for (const row of rows) await ingest(row, true);
+  const rest = m.more && rows.length ? { lo: g.lo, hi: rows[0].seq } : null;
+  await saveGaps(S.gaps.flatMap((x) => (x === g ? (rest ? [rest] : []) : [x])));
+  await reloadChats();
+  // The open chat got older messages: show them (a short chat reloads; a long one loads them on scrolling up).
+  const active = getApp().active;
+  if (active && rows.some((r) => rowPeer(r) === active)) {
+    if (getApp().messages.length < PAGE) await loadMessages(active, true);
+    else setApp({ olderLeft: true });
+  }
+  fillNext();
+}
+
+async function saveGaps(gaps: { lo: number; hi: number }[]) {
+  S.gaps = gaps.filter((x) => x.hi - x.lo > 1);
+  await db.put('kv', S.gaps, 'gaps');
+}
+
+const rowPeer = (row: any) => (isGroup(row.to) || row.f === S.me ? row.to : row.f);
 
 // Only advance the sync cursor from live events once the initial sync finished,
 // otherwise a live event could skip us past rows we haven't fetched yet.
@@ -533,11 +592,11 @@ async function saveChat(chat: Chat) {
 // A chat opens with its newest messages; older ones load as you scroll up (loadOlder).
 const PAGE = 150;
 
-async function loadMessages(peer: string) {
+async function loadMessages(peer: string, fresh = false) {
   const s = getApp();
   // Reloading the open chat (after syncing or reconnecting): keep the older messages you scrolled
   // up to, instead of going back to the newest page and making the list jump.
-  if (s.active === peer && s.messages[0]?.peer === peer) {
+  if (!fresh && s.active === peer && s.messages[0]?.peer === peer) {
     const from = s.messages[0].ts;
     const msgs = await db.olderMessages(peer, Infinity, Infinity, from, inTab(s.topic));
     if (getApp().active === peer) setApp((st) => ({ messages: [...st.messages.filter((m) => m.ts < from), ...msgs] }));
@@ -765,6 +824,7 @@ async function ingest(row: any, fromSync: boolean): Promise<void> {
   const mn = group && Array.isArray(content?.mn) ? content.mn.filter((u: unknown) => typeof u === 'string').slice(0, 50) : undefined;
   const msg: Msg = { k, cid: row.cid, id: row.id, peer, out, ts: row.ts, s: !out && viewing ? 2 : row.s, ...pick(content), ...(mn?.length && { mn }) } as Msg;
   await db.putMsg(msg);
+  await applyWaiting(k);
   await bumpChat(peer, msg, !out && row.s < 2 && !viewing, fromSync, !out && row.s < 2 && !(viewing && (msg.tp || '') === getApp().topic));
   if (!out && row.s < 2 && !group) queueReceipt(row.id, viewing ? 2 : 1); // no read receipts in groups (yet)
   if (!out) clearTyping(peer);
@@ -973,6 +1033,8 @@ async function applyControl(c: any, from: string, ts: number, peer: string) {
     return;
   }
   const target = await db.getMsg(c.k);
+  // An edit or reaction to a message from the part of the history still being filled in: kept until it comes.
+  if (!target && S.gaps.length && (c.type === 'edit' || c.type === 'react')) return waitFor(c.k, { c, from, ts, peer });
   if (!target || target.peer !== peer) return; // controls can only touch messages in this chat
   const next = c.type === 'edit' ? applyEdit(target, from, ts, c.text) : applyReact(target, from, typeof c.e === 'string' ? c.e : '');
   if (!next) return;
@@ -982,6 +1044,19 @@ async function applyControl(c: any, from: string, ts: number, peer: string) {
     const chat = await db.getChat(peer);
     if (chat?.lastK === next.k) await saveChat({ ...chat, last: lineOf(chat, next) });
   }
+}
+
+type Waiting = { c: any; from: string; ts: number; peer: string };
+async function waitFor(k: string, w: Waiting) {
+  const list: Waiting[] = (await db.get('kv', 'ctlwait/' + k)) || [];
+  await db.put('kv', [...list, w].slice(-50), 'ctlwait/' + k);
+}
+/** A message just arrived: the edits and reactions that came before it, in the order they were made. */
+async function applyWaiting(k: string) {
+  const list: Waiting[] | undefined = await db.get('kv', 'ctlwait/' + k);
+  if (!list) return;
+  await db.del('kv', 'ctlwait/' + k);
+  for (const w of list.sort((a, b) => a.ts - b.ts)) await applyControl(w.c, w.from, w.ts, w.peer);
 }
 
 // ---------- tabs inside a chat ----------

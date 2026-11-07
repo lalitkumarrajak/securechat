@@ -5,9 +5,9 @@ import { openAuth, openChats, phone, signUp, uname, PASSWORD } from './helpers';
 
 test('sign-up explains each problem under its field, and checks the username while it is typed', async ({ browser }) => {
   fs.mkdirSync('e2e/.artifacts/screens', { recursive: true });
-  const taken = await phone(browser, uname('taken'));
+  const taken = await phone(browser, uname('sutaken'));
   await signUp(taken);
-  const p = await phone(browser, uname('newbie'));
+  const p = await phone(browser, uname('sunew'));
   await p.page.goto('/');
   await openAuth(p.page, 'Create account');
   const form = p.page.getByRole('tabpanel');
