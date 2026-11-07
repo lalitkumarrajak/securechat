@@ -107,7 +107,6 @@
   "That name is already linked.": "हे नाव आधीच लिंक केलेले आहे.",
   "Some groups can’t be opened yet. Their key needs your friend’s details; try again when you’re online.": "काही ग्रुप अजून उघडता येत नाहीत. त्यांच्या कीसाठी तुमच्या मित्राची माहिती लागते; ऑनलाइन असताना पुन्हा प्रयत्न करा.",
   "Loading your groups…": "तुमचे ग्रुप लोड होत आहेत…",
-  "Not counted as spending:": "खर्चात धरले नाही:",
   "Not counted as spending": "खर्चात धरले नाही",
   "Paying a card bill only moves money: what you bought with the card is the spending. Lent and borrowed money stays in balances.": "कार्डचे बिल भरणे म्हणजे फक्त पैसे फिरवणे: कार्डने जे घेतले तोच खर्च. दिलेले आणि घेतलेले उसने पैसे बॅलन्समध्ये राहतात.",
   "Credit card bills": "क्रेडिट कार्ड बिल",
@@ -128,5 +127,16 @@
   "A lending & borrowing group: it isn’t counted in My spending. Balances show who owes whom.": "उसने देण्या-घेण्याचा ग्रुप: हा माझ्या खर्चात धरला जात नाही. बॅलन्स दाखवतो कोणाचे किती देणे आहे.",
   "{by} marked this group as {kind}": "{by} यांनी हा ग्रुप {kind} केला",
   "Not counted in My spending": "माझ्या खर्चात धरले नाही",
-  "Not counted in My spending: this only moves money. It still counts in balances.": "माझ्या खर्चात धरले जाणार नाही: हे फक्त पैसे फिरवणे आहे. बॅलन्समध्ये तरीही धरले जाते."
+  "Not counted in My spending: this only moves money. It still counts in balances.": "माझ्या खर्चात धरले जाणार नाही: हे फक्त पैसे फिरवणे आहे. बॅलन्समध्ये तरीही धरले जाते.",
+  "Bills": "बिले",
+  "Biggest bill": "सर्वात मोठे बिल",
+  "Biggest": "सर्वात मोठे",
+  "Hide them": "लपवा",
+  "By card": "कार्डनुसार",
+  "All card bills": "सर्व कार्ड बिले",
+  "All entries": "सर्व नोंदी",
+  "Show all {n}": {
+    "one": "दाखवा",
+    "other": "सर्व {n} दाखवा"
+  }
 }

@@ -93,12 +93,17 @@ test('add it to Split: card payments go in a Credit card bills group, not counte
   // The group says what it is, and its own insights show the payments while saying they're kept out of spending
   await split.getByRole('tab', { name: /Insights/ }).click();
   await expect(split.getByText('Card bills paid')).toBeVisible();
+  await expect(split.getByRole('region', { name: 'By card' })).toContainText('HDFC Millennia card bill');
+  await expect(split.getByRole('region', { name: 'Expenses in this view' })).toContainText('All card bills');
   await expect(split.getByText(/isn’t counted in My spending/)).toBeVisible();
   await split.getByRole('button', { name: 'Back to groups' }).click();
   await expect(split.getByRole('button', { name: /Credit card bills/ })).toContainText('not in My spending');
   // My spending leaves it out, and says how much it left out
   await split.getByRole('button', { name: 'My spending' }).first().click();
-  await expect(split.getByText('Not counted as spending:')).toBeVisible();
+  const left = split.getByRole('region', { name: 'Not counted as spending' });
+  await expect(left).toContainText('₹12,345.50'); // the sum of every card bill left out
+  await left.getByRole('button', { name: 'Show it' }).click();
+  await expect(left).toContainText('HDFC Millennia card bill');
   await expect(split.getByText('No spending in this period.')).toBeVisible();
   expect(P.errors).toEqual([]);
 });
