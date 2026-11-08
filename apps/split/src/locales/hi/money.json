@@ -3,7 +3,18 @@
   "The whole {amount} comes out of it; what others owe you comes back when they pay.": "पूरे {amount} इसी से कटेंगे; दूसरों का हिस्सा उनके चुकाने पर वापस आएगा।",
   "{card} (debit card, {account})": "{card} (डेबिट कार्ड, {account})",
   "only you see this": "यह सिर्फ़ आपको दिखता है",
-  "Don’t take it from an account": "किसी अकाउंट से न काटें",
   "Paid back in {group}": "{group} में वापस चुकाया",
-  "Received into": "किसमें आया"
+  "Received into": "किसमें आया",
+  "Bank accounts": "बैंक खाते",
+  "Debit cards": "डेबिट कार्ड",
+  "Credit cards": "क्रेडिट कार्ड",
+  "Cash and wallets": "कैश और वॉलेट",
+  "Change": "बदलें",
+  "Remove link": "लिंक हटाएँ",
+  "Link to an account": "किसी खाते से जोड़ें",
+  "Optional. Bank, card or cash: it comes off that balance in Accounts. Only you see this.": "वैकल्पिक। बैंक, कार्ड या कैश: रकम Accounts में उसी बैलेंस से घटेगी। यह सिर्फ़ आपको दिखता है।",
+  "Close": "बंद करें",
+  "No accounts in this currency yet. Add your bank, cards or cash in More → Accounts.": "इस करेंसी में अभी कोई खाता नहीं है। अपना बैंक, कार्ड या कैश More → Accounts में जोड़ें।",
+  "last used": "पिछली बार इस्तेमाल किया",
+  "Don’t link it": "लिंक न करें"
 }

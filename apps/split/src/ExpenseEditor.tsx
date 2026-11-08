@@ -49,7 +49,7 @@ function Form({ g, expense, onClose }: { g: GroupData; expense: Expense; onClose
   // from the bank when it's marked paid in Accounts, so it starts as not taken from an account.
   const mine = people.find((p) => p.u === me || p.id === me)?.id;
   const ref = refOf(g.gid, expense.id);
-  const paidFrom = usePaidFrom(ref, currency, isNew, expense.cat === 'cards');
+  const paidFrom = usePaidFrom(ref, currency);
   // Lending: what's lent is owed by the others, not shared with whoever paid (until you change the split).
   const others = (payer: string) => { const o = choices.filter((p) => !p.gone && p.id !== payer).map((p) => p.id); return o.length ? o : [payer]; };
   const [splitTouched, setSplitTouched] = useState(false);
@@ -122,7 +122,7 @@ function Form({ g, expense, onClose }: { g: GroupData; expense: Expense; onClose
         </div>
       </div>
       {paidBy === mine && paidFrom.ready && (
-        <PaidFromField id="paid-from" label={t('Paid from')} value={paidFrom.choice} onChange={paidFrom.setChoice} options={paidFrom.options}
+        <PaidFromField id="paid-from" label={t('Paid from')} value={paidFrom.choice} onChange={paidFrom.setChoice} options={paidFrom.options} last={paidFrom.last}
           hint={paidFrom.choice ? t('The whole {amount} comes out of it; what others owe you comes back when they pay.', { amount: amount ? toInput(amount, currency) : '0' }) : undefined} />
       )}
       <div><Label>{t('Split')}</Label>

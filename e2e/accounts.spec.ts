@@ -162,7 +162,15 @@ test('Split: an expense paid from the bank comes out of it, and goes back when d
   const d = P.page.getByRole('dialog', { name: 'Add expense' });
   await d.getByLabel(/^Amount/).fill('900');
   await d.getByLabel('What was it for?').fill('Electricity');
-  await d.getByLabel(/Paid from/).selectOption({ label: 'HDFC Savings ••9911' });
+  // Optional: nothing is linked until you ask; then your accounts, grouped, to pick from.
+  await expect(d.getByRole('group', { name: 'Paid from' })).toHaveCount(0);
+  await d.getByRole('button', { name: /Link to an account/ }).click();
+  const pick = d.getByRole('group', { name: 'Paid from' });
+  await expect(pick.getByText('Bank accounts')).toBeVisible();
+  await P.page.screenshot({ path: shots('93-split-link-pick') });
+  await pick.getByRole('button', { name: /HDFC Savings ••9911/ }).click();
+  await expect(d.getByText('HDFC Savings ••9911')).toBeVisible();
+  await expect(d.getByRole('button', { name: 'Change' })).toBeVisible();
   await P.page.screenshot({ path: shots('93-split-paid-from') });
   await d.getByRole('button', { name: 'Add expense' }).click();
   await expect(split.getByText('Electricity')).toBeVisible();

@@ -34,7 +34,7 @@ function Form({ g, transfer, onClose }: { g: GroupData; transfer: Transfer; onCl
   const [id] = useState(newId);
   const mine = g.meta?.people.find((p) => p.u === me || p.id === me)?.id;
   const dir = transfer.from === mine ? 'out' : transfer.to === mine ? 'in' : null;
-  const acct = usePaidFrom(refOf(g.gid, id), currency, true);
+  const acct = usePaidFrom(refOf(g.gid, id), currency);
   return (
     <form className="space-y-4" onSubmit={(e) => {
       e.preventDefault();
@@ -52,7 +52,7 @@ function Form({ g, transfer, onClose }: { g: GroupData; transfer: Transfer; onCl
         <div><Label htmlFor="sd">{t('Date')}</Label><Input id="sd" type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value)} /></div>
         <div><Label htmlFor="sn" hint={t('optional')}>{t('Note')}</Label><Input id="sn" maxLength={100} placeholder={t('UPI, cash…')} value={note} onChange={(e) => setNote(e.target.value)} /></div>
       </div>
-      {dir && acct.ready && <PaidFromField id="settle-acct" label={dir === 'out' ? t('Paid from') : t('Received into')} value={acct.choice} onChange={acct.setChoice} options={acct.options} />}
+      {dir && acct.ready && <PaidFromField id="settle-acct" label={dir === 'out' ? t('Paid from') : t('Received into')} value={acct.choice} onChange={acct.setChoice} options={acct.options} last={acct.last} />}
       {confirm && <p className="rounded-xl bg-warn-bg p-3 text-sm">{t('{name} will be asked to confirm they got it. It counts once they do.', { name: name(to) })}</p>}
       <Button type="submit" className="w-full" disabled={!ok}>{confirm ? t('Send for confirmation') : t('Save payment')}</Button>
     </form>
