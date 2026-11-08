@@ -5,7 +5,7 @@ import { FileUp, Plus } from 'lucide-react';
 import { Button } from '@sanga/ui/button';
 import { cn } from '@sanga/ui/utils';
 import { t, tk, tn } from '@sanga/i18n';
-import { awaitingBill, billState, creditCards, daysToDue, liveBills, money, newBill, skipBill, todayKey, unpaid, useLedger, type CardBill, type CreditCard } from '@sanga/ledger';
+import { awaitingBill, billState, creditCards, daysToDue, liveBills, money, newBill, skipBill, todayKey, unbilled, unpaid, useLedger, type CardBill, type CreditCard } from '@sanga/ledger';
 import { CARD_BG } from '@sanga/ledger';
 import { monthTitle, shortDay } from './util';
 
@@ -27,6 +27,14 @@ export function BillsView({ onBill, onImport, onAddCard, card }: { onBill: (b: C
     for (const b of owing) { const cur = byId.get(b.card)!.currency; m.set(cur, (m.get(cur) ?? 0) + b.amount); }
     return [...m.entries()];
   }, [owing, byId]);
+
+  // Spent since each card's last statement (Split expenses paid with it too): on the next bill.
+  const next = useMemo(() => cards.map((c) => ({ c, ...unbilled(c, s, now) })).filter((x) => x.list.length), [cards, s, now]);
+  const nextTotals = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const x of next) m.set(x.c.currency, (m.get(x.c.currency) ?? 0) + x.total);
+    return [...m.entries()].filter(([, n]) => n > 0);
+  }, [next]);
 
   if (!cards.length) {
     return (
@@ -70,7 +78,9 @@ export function BillsView({ onBill, onImport, onAddCard, card }: { onBill: (b: C
       <section aria-label={t('To pay')} className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <div className="col-span-2 rounded-3xl p-4 text-white shadow-md sm:col-span-1" style={{ background: 'linear-gradient(135deg, #6366f1, #4338ca 60%, #312e81)' }}>
           <p className="text-sm text-white/80">{t('Still to pay')}</p>
-          {totals.length ? totals.map(([cur, n]) => <p key={cur} className="text-2xl font-bold tabular-nums">{money(n, cur)}</p>) : <p className="text-2xl font-bold">{t('All clear 🎉')}</p>}
+          {totals.length ? totals.map(([cur, n]) => <p key={cur} className="text-2xl font-bold tabular-nums">{money(n, cur)}</p>)
+            : nextTotals.length ? <p className="text-lg font-bold">{t('No bill due')}</p> : <p className="text-2xl font-bold">{t('All clear 🎉')}</p>}
+          {nextTotals.map(([cur, n]) => <p key={cur} className="mt-1 text-xs text-white/85">{t('+ {amount} on the next bill', { amount: money(n, cur) })}</p>)}
         </div>
         {owing.slice(0, 2).map((b) => {
           const c = byId.get(b.card)!, d = daysToDue(b, now), st = billState(b, now);
@@ -83,6 +93,35 @@ export function BillsView({ onBill, onImport, onAddCard, card }: { onBill: (b: C
           );
         })}
       </section>
+
+      {next.length > 0 && (
+        <section aria-label={t('Next bill so far')}>
+          <h3 className="mb-2 px-1 font-semibold">{t('Next bill so far')}</h3>
+          <ul className="space-y-2">
+            {next.map(({ c, since, list, total }) => (
+              <li key={c.id} className="rounded-2xl border border-line/70 bg-panel p-3 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <span className="size-3 shrink-0 rounded-full" style={{ background: CARD_BG[c.color] }} aria-hidden />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-semibold">{c.name}{c.last4 && <span className="font-normal text-muted"> ••{c.last4}</span>}</span>
+                    <span className="block truncate text-sm text-muted">{tn(list.length, '{n} charge since the statement of {date}, not billed yet', '{n} charges since the statement of {date}, not billed yet', { date: shortDay(since) })}</span>
+                  </span>
+                  <span className="shrink-0 font-bold tabular-nums">{money(total, c.currency)}</span>
+                </div>
+                <ul className="mt-2 space-y-1 border-t border-line pt-2 text-sm">
+                  {list.slice(0, 4).map((e) => (
+                    <li key={e.id} className="flex gap-2">
+                      <span className="min-w-0 flex-1 truncate">{e.desc || t('Spent')}<span className="text-muted"> · {shortDay(e.date)}{e.ref?.startsWith('split:') ? ` · ${t('from Split')}` : ''}</span></span>
+                      <span className="shrink-0 tabular-nums">{e.kind === 'in' ? '−' : ''}{money(e.amount, c.currency)}</span>
+                    </li>
+                  ))}
+                  {list.length > 4 && <li className="text-muted">{t('and {n} more', { n: list.length - 4 })}</li>}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section aria-label={t('Bills')}>
         <h3 className="mb-2 px-1 font-semibold">{t('Bills')}</h3>

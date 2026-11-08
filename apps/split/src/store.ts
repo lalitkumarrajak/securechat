@@ -9,6 +9,7 @@ import { t, tk } from '@sanga/i18n';
 import { create } from 'zustand';
 import * as C from '@sanga/crypto';
 import { sdk } from '@sanga/sdk';
+import { startLedger, unlink } from '@sanga/ledger';
 import { prepareBill, type Bill } from './bills';
 import { ACTIVITY_KINDS, BUILTIN_CATS, moveLedger, type Activity, type Expense, type GroupKind, type Meta, type Person, type Record_, type Settlement, validDay } from './model';
 import { activityFor } from './activity';
@@ -132,7 +133,10 @@ export function save(gid: string, r: Record_) {
   for (const a of activityFor(prev, rec, me(), now)) void keep(gid, { ...a, id: 'a' + C.randomId(8), dirty: true });
   void keep(gid, { ...rec, by: me(), edited: now, dirty: true } as Local<Record_>).then(soon);
 }
-export const removeRecord = (gid: string, r: Expense | Settlement) => save(gid, { ...r, deleted: true });
+/** An expense or payment deleted (here, on another device, or by anyone in the group): what it took out
+ *  of (or put into) one of your accounts in Accounts goes too. Same name as PaidFrom's refOf. */
+const unlinkRecord = (gid: string, id: string) => void startLedger().then(() => unlink(`split:${gid}:${id}`)).catch(() => {});
+export const removeRecord = (gid: string, r: Expense | Settlement) => { unlinkRecord(gid, r.id); return save(gid, { ...r, deleted: true }); };
 /** Whoever got the money says yes: from now on the payment counts. */
 export const confirmPayment = (gid: string, s: Settlement) => { const { pending: _p, ...rest } = s; save(gid, rest); };
 
@@ -362,6 +366,10 @@ async function apply(gid: string, changes: Change[]) {
     return n;
   });
   await Promise.all(done.map((c) => ('keep' in c ? sdk().store.put(REC(gid, c.keep.id), { ...c.keep, gid }) : sdk().store.del(REC(gid, c.drop.id)))));
+  for (const c of done) {
+    const r = 'keep' in c ? c.keep : c.drop;
+    if ((r.type === 'expense' || r.type === 'settle') && ('drop' in c || r.deleted)) unlinkRecord(gid, r.id);
+  }
 }
 /** Changed here while the page was being opened: this device's change wins, and goes up next. */
 const stillClean = (g: GroupData, r: Record_) => {

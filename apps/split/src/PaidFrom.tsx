@@ -138,7 +138,7 @@ export function reconcile(groups: Record<string, GroupData>, me: string) {
     const x = g.expenses[id], st = g.settles[id];
     if (x) {
       if (x.deleted || x.paidBy !== mine) { void unlink(e.ref); continue; }
-      if (x.amount !== e.amount || x.date !== e.date || x.desc !== e.desc) void link(e.ref, { account: e.account, via: e.via, kind: 'out', amount: x.amount, date: x.date, desc: x.desc, cat: x.cat });
+      if (x.amount !== e.amount || x.date !== e.date || x.desc !== e.desc || (x.cat ?? undefined) !== (e.cat ?? undefined)) void link(e.ref, { account: e.account, via: e.via, kind: 'out', amount: x.amount, date: x.date, desc: x.desc, cat: x.cat });
     } else if (st) {
       const kind = st.from === mine ? 'out' : st.to === mine ? 'in' : null;
       if (st.deleted || !kind) { void unlink(e.ref); continue; }

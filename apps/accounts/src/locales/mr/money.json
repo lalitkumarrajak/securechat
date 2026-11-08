@@ -272,5 +272,13 @@
   "Shares its limit with": "मर्यादा यांच्यासोबत सामायिक",
   "Shared limit {amount}": "सामायिक मर्यादा {amount}",
   "With {cards}: {amount} owed on them too": "{cards} सोबत: त्यांच्यावरही {amount} थकबाकी",
-  "{amount} of {limit} shared limit available": "{limit} सामायिक मर्यादेपैकी {amount} उपलब्ध"
+  "{amount} of {limit} shared limit available": "{limit} सामायिक मर्यादेपैकी {amount} उपलब्ध",
+  "No bill due": "कोणतेही बिल बाकी नाही",
+  "+ {amount} on the next bill": "+ पुढच्या बिलात {amount}",
+  "Next bill so far": "पुढचे बिल आतापर्यंत",
+  "and {n} more": "आणखी {n}",
+  "{n} charges since the statement of {date}, not billed yet": {
+    "one": "{date} च्या स्टेटमेंटनंतर {n} खर्च, अजून बिलात नाही",
+    "other": "{date} च्या स्टेटमेंटनंतर {n} खर्च, अजून बिलात नाहीत"
+  }
 }

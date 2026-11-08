@@ -6,7 +6,7 @@
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
 import * as C from '@sanga/crypto';
 import { sdk } from '@sanga/sdk';
-import { addDays, asCard, billId, MAX_TXNS, statementId, suggestedDue, todayKey, type CardBill, type CardStatement, type CreditCard, type StatementTxn } from './cards';
+import { addDays, asCard, billId, lastStatement, MAX_TXNS, statementId, suggestedDue, todayKey, type CardBill, type CardStatement, type CreditCard, type StatementTxn } from './cards';
 import { NETWORKS, type Account, type AccountKind, type DebitCard, type Entry } from './types';
 
 export type Item = Account | DebitCard | Entry | CardBill | CardStatement;
@@ -172,6 +172,17 @@ export async function removeAccount(a: Account) {
     for (const x of rest) await save({ ...x, limitWith: first.id });
   }
   await remove(a);
+}
+
+/** Spent on a credit card since its last statement, so on the next bill: purchases and Split expenses
+ *  paid with it, less refunds. Paying the bill isn't spending, so transfers don't count. */
+export function unbilled(card: CreditCard, s: LedgerState = useLedger.getState(), now = todayKey()) {
+  const imported = live(Object.values(s.statements)).filter((x) => x.card === card.id).map((x) => x.date).sort().pop();
+  const cycle = lastStatement(card, now).date;
+  const since = imported && imported > cycle ? imported : cycle;
+  const list = live(Object.values(s.entries)).filter((e) => e.account === card.id && e.date > since && (e.kind === 'out' || e.kind === 'in'))
+    .sort((a, b) => b.date.localeCompare(a.date) || b.created - a.created);
+  return { since, list, total: list.reduce((n, e) => n + (e.kind === 'out' ? e.amount : -e.amount), 0) };
 }
 
 /** The entry recording a bill's payment, if it was paid from an account here. */

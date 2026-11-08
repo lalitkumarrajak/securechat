@@ -5,7 +5,7 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-import { openApp, phone, signUp, tab, uname, type Phone } from './helpers';
+import { openApp, phone, signIn, signUp, tab, uname, type Phone } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 const LAPTOP = { viewport: { width: 1366, height: 860 }, locale: 'en-US', timezoneId: 'Asia/Kolkata' };
@@ -211,6 +211,67 @@ test('Split: an expense paid from the bank comes out of it, and goes back when d
   await expect(split.getByText('Electricity')).toHaveCount(0);
   await openApp(P, 'Accounts');
   await expect(balanceOf('HDFC Savings')).toContainText('₹43,879.50', { timeout: 15_000 });
+  expect(P.errors).toEqual([]);
+});
+
+test('a Split expense on a credit card: on its next bill, changed with it, and gone when deleted on another phone', async () => {
+  await tab(P, 'Split').click();
+  const split = P.page.getByRole('region', { name: 'Split' });
+  if (!(await split.getByRole('button', { name: 'Add expense' }).isVisible())) await split.getByRole('button', { name: /Flat/ }).click();
+  await split.getByRole('button', { name: 'Add expense' }).click();
+  const d = P.page.getByRole('dialog', { name: 'Add expense' });
+  await d.getByLabel(/^Amount/).fill('700');
+  await d.getByLabel('What was it for?').fill('Groceries');
+  await d.getByRole('button', { name: /Link to an account/ }).click();
+  await d.getByRole('group', { name: 'Paid from' }).getByRole('button', { name: /^Regalia/ }).click();
+  await d.getByRole('button', { name: 'Add expense' }).click();
+  await expect(split.getByText('Groceries')).toBeVisible();
+
+  // The card's bills: no bill due yet, but it's on the next one.
+  await openApp(P, 'Accounts');
+  await balanceOf('Regalia').click();
+  const next = acc().getByRole('region', { name: 'Next bill so far' });
+  await expect(next).toContainText('Groceries');
+  await expect(next).toContainText('from Split');
+  await expect(next).toContainText('₹700.00');
+  await expect(acc().getByRole('region', { name: 'To pay' })).toContainText('+ ₹700.00 on the next bill');
+  await P.page.screenshot({ path: shots('97-accounts-next-bill') });
+  await acc().getByRole('button', { name: 'All accounts' }).click();
+
+  // Changed in Split: the card follows.
+  await tab(P, 'Split').click();
+  await split.getByRole('button', { name: /Flat/ }).click();
+  await split.getByText('Groceries').click();
+  await P.page.getByRole('button', { name: 'Edit' }).click();
+  await P.page.getByRole('dialog').getByLabel(/^Amount/).fill('850');
+  await P.page.getByRole('dialog').getByRole('button', { name: 'Save' }).click();
+  await openApp(P, 'Accounts');
+  await balanceOf('Regalia').click();
+  await expect(acc().getByRole('region', { name: 'Next bill so far' })).toContainText('₹850.00', { timeout: 15_000 });
+  await acc().getByRole('button', { name: 'All accounts' }).click();
+
+  // Deleted on another phone: once this one's Split catches up, the card has it no more.
+  const Q = await phone(P.page.context().browser()!, P.u);
+  await signIn(Q);
+  await tab(Q, 'Split').click();
+  const qs = Q.page.getByRole('region', { name: 'Split' });
+  await qs.getByRole('button', { name: /Flat/ }).click();
+  await qs.getByText('Groceries').click();
+  await Q.page.getByRole('button', { name: 'Delete' }).click();
+  await Q.page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
+  await expect(qs.getByText('Groceries')).toHaveCount(0);
+  await Q.page.waitForResponse((r) => r.url().includes('/api/split/records') && r.request().method() === 'POST', { timeout: 10_000 }).catch(() => {});
+  await Q.page.waitForTimeout(1000);
+  await Q.ctx.close();
+
+  await tab(P, 'Split').click();
+  await split.getByRole('button', { name: /Flat/ }).click();
+  await expect(split.getByText('Groceries')).toHaveCount(0, { timeout: 15_000 });
+  await openApp(P, 'Accounts');
+  await balanceOf('Regalia').click();
+  await expect(acc().getByRole('region', { name: 'Next bill so far' })).toHaveCount(0, { timeout: 15_000 });
+  await expect(acc().getByText('Groceries')).toHaveCount(0);
+  await acc().getByRole('button', { name: 'All accounts' }).click();
   expect(P.errors).toEqual([]);
 });
 

@@ -272,5 +272,13 @@
   "Shares its limit with": "लिमिट इनके साथ साझा",
   "Shared limit {amount}": "साझा लिमिट {amount}",
   "With {cards}: {amount} owed on them too": "{cards} के साथ: उन पर भी {amount} बकाया",
-  "{amount} of {limit} shared limit available": "{limit} की साझा लिमिट में से {amount} उपलब्ध"
+  "{amount} of {limit} shared limit available": "{limit} की साझा लिमिट में से {amount} उपलब्ध",
+  "No bill due": "कोई बिल बाकी नहीं",
+  "+ {amount} on the next bill": "+ अगले बिल में {amount}",
+  "Next bill so far": "अगला बिल अब तक",
+  "and {n} more": "और {n}",
+  "{n} charges since the statement of {date}, not billed yet": {
+    "one": "{date} के स्टेटमेंट के बाद {n} ख़र्च, अभी बिल में नहीं",
+    "other": "{date} के स्टेटमेंट के बाद {n} ख़र्च, अभी बिल में नहीं"
+  }
 }
