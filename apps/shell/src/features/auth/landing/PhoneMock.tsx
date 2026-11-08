@@ -73,15 +73,13 @@ export function PhoneMock() {
           <div className="mt-3 flex gap-1.5">
             <Story name={t('My story')} bg="#64748b" me />
             <Story name="Lakshya" bg="#0ea5e9" />{/* i18n-ok: a name */}
-            <Story name="Ananya" bg="#ec4899" />{/* i18n-ok: a name */}
-            <Story name="Rohan" bg="#f59e0b" />{/* i18n-ok: a name */}
-            <Story name="Meera" bg="#8b5cf6" />{/* i18n-ok: a name */}
+            <Story name="Ayansh" bg="#ec4899" />{/* i18n-ok: a name */}
           </div>
           <div className="mt-2 divide-y divide-line/70">
             <Row avatar="L" bg="#0ea5e9" name="Lakshya" time="9:41" unread={2} text={t('Ludo tonight? 🎲')} />{/* i18n-ok: a name */}
             <Row avatar={<Users className="size-4" />} bg="linear-gradient(140deg, #10b981, #064e3b)" name={t('Goa trip')} time="9:12"
-              text={t('Lakshya added {amount} for dinner', { amount: '₹2,400' })} />
-            <Row avatar="A" bg="#ec4899" name="Ananya" time="8:30" unread={1} text={<><Mic className="size-3 shrink-0 text-accent-ink" />{t('Voice message')}</>} />{/* i18n-ok: a name */}
+              text={t('Ayansh added {amount} for dinner', { amount: '₹2,400' })} />
+            <Row avatar="A" bg="#ec4899" name="Ayansh" time="8:30" unread={1} text={<><Mic className="size-3 shrink-0 text-accent-ink" />{t('Voice message')}</>} />{/* i18n-ok: a name */}
             <Row avatar={<Users className="size-4" />} bg="linear-gradient(140deg, #f59e0b, #92400e)" name={t('Family')} time={t('Yesterday')}
               text={t('Ekadashi is on Tuesday 🙏')} />
           </div>

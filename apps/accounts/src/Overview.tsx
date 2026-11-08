@@ -23,7 +23,7 @@ export function Overview({ onOpen, onAdd }: { onOpen: (id: string) => void; onAd
         <span className="text-4xl" aria-hidden>🏦</span>
         <h3 className="mt-2 text-lg font-bold">{t('All your money in one place')}</h3>
         <p className="mx-auto mt-1 max-w-sm text-sm text-muted">{t('Add your bank accounts, credit cards and cash with what’s in them now. Split expenses and transfers keep the balances right.')}</p>
-        <div className="mt-5 grid gap-2 sm:grid-cols-2">
+        <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
           {KIND_ORDER.map((k) => { const Icon = KINDS[k].icon; return (
             <button key={k} type="button" onClick={() => onAdd(newAccount(k, k === 'cash' ? { name: t('Cash') } : {}))} className="flex items-center gap-3 rounded-2xl border border-line p-3 text-left hover:bg-hover">
               <span className="grid size-10 place-items-center rounded-xl text-white" style={{ background: CARD_BG[newAccount(k).color] }}><Icon className="size-5" /></span>
@@ -60,19 +60,19 @@ export function Overview({ onOpen, onAdd }: { onOpen: (id: string) => void; onAd
           <section key={k} aria-label={t(KINDS[k].many)}>
             <div className="mb-2 flex items-center gap-2 px-1"><Icon className="size-4 text-muted" /><h3 className="flex-1 font-semibold">{t(KINDS[k].many)}</h3>
               <Button size="sm" variant="ghost" onClick={() => onAdd(newAccount(k))}><Plus className="size-4" />{t('Add')}</Button></div>
-            <ul className="grid gap-2 sm:grid-cols-2">
+            <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {list.map((a) => {
                 const n = bal.get(a.id) ?? 0, credit = a.kind === 'credit';
                 const owe = credit ? Math.max(0, -n) : 0;
                 const line = credit ? creditLine(a, s, bal) : null, limit = line?.limit;
                 const dc = debits.filter((d) => d.account === a.id).length;
                 return (
-                  <li key={a.id}>
+                  <li key={a.id} className="min-w-0">
                     <button type="button" onClick={() => onOpen(a.id)} className={cn('flex w-full items-center gap-3 rounded-2xl border border-line/70 bg-panel p-3 text-left shadow-sm hover:bg-hover', a.archived && 'opacity-60')}>
                       <span className="grid size-11 shrink-0 place-items-center rounded-xl text-white" style={{ background: CARD_BG[a.color] }}><Icon className="size-5" /></span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-semibold">{a.name}{(a.last4 || a.acc4) && <span className="font-normal text-muted"> ••{a.last4 ?? a.acc4}</span>}</span>
-                        <span className="block truncate text-xs text-muted">
+                        <span className="block text-xs text-muted line-clamp-2 break-words">
                           {credit ? (limit ? (line!.shared ? t('{amount} of {limit} shared limit available', { amount: money(line!.available ?? 0, a.currency), limit: money(limit, a.currency) }) : t('{amount} of {limit} limit available', { amount: money(line!.available ?? 0, a.currency), limit: money(limit, a.currency) })) : a.bank ?? t('Credit card'))
                             : [a.bank, dc ? (dc === 1 ? t('1 debit card') : t('{n} debit cards', { n: dc })) : ''].filter(Boolean).join(' · ') || t(KINDS[a.kind].one)}
                         </span>

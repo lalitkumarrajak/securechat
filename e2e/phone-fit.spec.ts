@@ -20,8 +20,11 @@ test.afterAll(async () => { await P?.ctx.close(); });
 async function fits(page: Page, where: string) {
   const m = await page.evaluate(() => { const clipped = (e: Element) => { for (let a = e.parentElement; a && a !== document.body; a = a.parentElement) if (/(auto|scroll|hidden)/.test(getComputedStyle(a).overflowX)) return true; return false; }; return ({ vw: innerWidth, scroll: document.documentElement.scrollWidth,
     wide: [...document.querySelectorAll('body *')].filter((e) => { const r = e.getBoundingClientRect(); return r.right > 391 && r.width < 800 && getComputedStyle(e).position !== 'fixed' && !e.closest('[role=dialog]') && !clipped(e); })
-      .map((e) => e.tagName + '.' + e.className.toString().slice(0, 50)).slice(0, 5) }); });
-  expect(m, `${where}: the page must not be wider than the phone`).toMatchObject({ vw: 390, scroll: 390, wide: [] });
+      .map((e) => e.tagName + '.' + e.className.toString().slice(0, 50)).slice(0, 5),
+    // A list that scrolls up and down mustn't also scroll sideways (a row wider than the phone inside it).
+    sideways: [...document.querySelectorAll('.overflow-y-auto:not(.overflow-x-auto)')].filter((e) => !e.closest('[role=dialog]') && e.scrollWidth > e.clientWidth + 1)
+      .map((e) => `${e.className.toString().slice(0, 50)} ${e.scrollWidth}>${e.clientWidth}`).slice(0, 5) }); });
+  expect(m, `${where}: the page must not be wider than the phone`).toMatchObject({ vw: 390, scroll: 390, wide: [], sideways: [] });
 }
 const navBox = (page: Page) => page.getByRole('tablist', { name: 'Sanga' }).boundingBox();
 
@@ -87,11 +90,25 @@ test('the Calendar and Accounts (with a card) fit too', async () => {
   await acc.getByRole('button', { name: 'Add credit card' }).click();
   const d = P.page.getByRole('dialog', { name: 'Add credit card' });
   await d.getByLabel('Name', { exact: true }).fill('HDFC Millennia');
-  await d.getByLabel('Credit limit').fill('150000');
+  await d.getByLabel('Amount you owe now').fill('123456.78');
+  await d.getByLabel('Credit limit').fill('1500000');
   await d.getByLabel(/Statement day/).fill(String(new Date().getDate()));
   await fits(P.page, 'Accounts, add a card');
   await d.getByRole('button', { name: 'Add', exact: true }).click();
   await fits(P.page, 'Accounts, with a card');
+  // A second card with a long name, sharing the first one's limit: long rows still fit.
+  await acc.getByRole('region', { name: 'Credit cards' }).getByRole('button', { name: 'Add' }).click();
+  const d2 = P.page.getByRole('dialog', { name: 'Add credit card' });
+  await d2.getByLabel('Name', { exact: true }).fill('HDFC Regalia Gold Credit Card');
+  await d2.getByLabel('Amount you owe now').fill('98765.43');
+  await d2.getByLabel('Limit', { exact: true }).selectOption({ label: 'Shared with HDFC Millennia' });
+  await fits(P.page, 'Accounts, add a second card');
+  await d2.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect(acc.getByRole('button', { name: /^HDFC Regalia Gold/ })).toBeVisible();
+  await fits(P.page, 'Accounts, two cards with long names');
+  await acc.getByRole('button', { name: /^HDFC Regalia Gold/ }).click();
+  await fits(P.page, 'Accounts, a card');
+  await acc.getByRole('button', { name: 'All accounts' }).click();
   await acc.getByRole('tab', { name: 'Bills' }).click();
   await expect(acc.getByText('Is your HDFC Millennia bill ready?')).toBeVisible();
   await fits(P.page, 'Accounts, bills');

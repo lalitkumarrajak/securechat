@@ -18,7 +18,7 @@ export function Dialog({ open, onOpenChange, title, description, children, class
           onCloseAutoFocus={keepFocus ? (e) => e.preventDefault() : undefined}
           className={cn(
             'fixed z-50 bg-panel text-ink shadow-2xl outline-none',
-            'inset-x-0 bottom-0 max-h-[92dvh] overflow-y-auto rounded-t-3xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] animate-slide-up',
+            'inset-x-0 bottom-0 max-h-[92dvh] overflow-y-auto overflow-x-hidden rounded-t-3xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] animate-slide-up',
             'md:inset-auto md:left-1/2 md:top-1/2 md:w-full md:max-w-md md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl md:p-6 md:animate-fade-in',
             className,
           )}

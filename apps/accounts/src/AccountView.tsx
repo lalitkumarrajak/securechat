@@ -79,7 +79,7 @@ export function AccountView({ id, onBack, onEdit, onEntry, onDebit, onBill, onIm
           <div className="mb-2 flex items-center px-1"><h3 className="flex-1 font-semibold">{t('Debit cards')}</h3>
             <Button size="sm" variant="ghost" onClick={() => onDebit({ ...newDebit(id), name: a.bank ? t('{bank} Debit', { bank: a.bank }) : '' })}><Plus className="size-4" />{t('Add')}</Button></div>
           {debits.length ? (
-            <ul className="grid gap-2 sm:grid-cols-2">
+            <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {debits.map((d) => (
                 <li key={d.id}><button type="button" onClick={() => onDebit(d)} className="flex w-full items-center gap-3 rounded-2xl border border-line/70 bg-panel p-3 text-left hover:bg-hover">
                   <CardIcon className="size-5 text-muted" />
