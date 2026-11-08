@@ -1,0 +1,21 @@
+{
+  "Red car": "लाल कार",
+  "Truck {n}": "ट्रक {n}",
+  "Car {n}": "कार {n}",
+  "Moves: {n}": "चालें: {n}",
+  "Best: {n}": "सबसे अच्छा: {n}",
+  "Out! Well driven.": "बाहर! बढ़िया चलाया।",
+  "Slide the glowing car to the marked spot.": "चमकती कार को निशान वाली जगह तक खिसकाएँ।",
+  "Drag it, or tap a dot to slide it there.": "इसे खींचें, या किसी बिंदु पर टैप करके वहाँ खिसकाएँ।",
+  "Clear a way for the red car to drive out on the right.": "लाल कार के दाईं ओर बाहर निकलने का रास्ता साफ़ करें।",
+  "Parking lot": "पार्किंग",
+  "Slide here: row {r}, column {c}": "यहाँ खिसकाएँ: पंक्ति {r}, कॉलम {c}",
+  "Out in {n} moves. The fewest it can be done in: {best}.": "{n} चालों में बाहर। कम से कम {best} चालों में हो सकता है।",
+  "Car Out": "कार निकालो",
+  "Slide the cars, free the red one": "कारें खिसकाएँ, लाल कार को निकालें",
+  "Cars only move along their length: forwards and backwards, never sideways.": "कारें सिर्फ़ अपनी लंबाई की दिशा में चलती हैं: आगे-पीछे, कभी बगल में नहीं।",
+  "Drag a car to slide it, or tap it and then tap a dot.": "कार खिसकाने के लिए उसे खींचें, या उस पर टैप करके फिर किसी बिंदु पर टैप करें।",
+  "Clear a way so the red car can drive out of the gap on the right.": "रास्ता साफ़ करें ताकि लाल कार दाईं ओर के खुले हिस्से से बाहर निकल सके।",
+  "Fewer moves is better: each slide counts as one, however far.": "कम चालें बेहतर हैं: हर खिसकाना एक चाल है, चाहे कितनी भी दूर।",
+  "Stuck? Undo, start again, or ask for a hint.": "अटक गए? वापस लें, फिर से शुरू करें या सुझाव माँगें।"
+}

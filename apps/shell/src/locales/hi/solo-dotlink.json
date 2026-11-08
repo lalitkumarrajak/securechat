@@ -1,0 +1,17 @@
+{
+  "{colour} dot": "{colour} बिंदु",
+  "Filled: {p}%": "भरा: {p}%",
+  "Every pair joined, every square filled!": "हर जोड़ी जुड़ गई, हर ख़ाना भर गया!",
+  "Here’s the {colour} path.": "यह रहा {colour} रास्ता।",
+  "Every pair is joined. Now fill every square.": "हर जोड़ी जुड़ गई। अब हर ख़ाना भरें।",
+  "Drag from a dot to the other dot of its colour.": "एक बिंदु से उसी रंग के दूसरे बिंदु तक खींचें।",
+  "Board": "बोर्ड",
+  "In {n} moves.": "{n} चालों में।",
+  "Dot Link": "बिंदु जोड़ो",
+  "Join the dots, fill the board": "बिंदु जोड़ें, बोर्ड भरें",
+  "Drag from a dot to the other dot of the same colour, or tap square by square.": "एक बिंदु से उसी रंग के दूसरे बिंदु तक खींचें, या एक-एक ख़ाने पर टैप करें।",
+  "Paths can’t cross or share a square.": "रास्ते एक-दूसरे को काट नहीं सकते, न एक ख़ाना बाँट सकते हैं।",
+  "Drawing into another path cuts it back; press on a path to change it.": "दूसरे रास्ते में खींचने पर वह कट जाता है; रास्ता बदलने के लिए उस पर दबाएँ।",
+  "Finish when every pair is joined and every square is filled.": "जब हर जोड़ी जुड़ जाए और हर ख़ाना भर जाए, तब लेवल पूरा।",
+  "Stuck? A hint draws one path for you.": "अटक गए? सुझाव आपके लिए एक रास्ता बना देता है।"
+}
