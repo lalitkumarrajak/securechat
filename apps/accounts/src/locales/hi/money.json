@@ -280,5 +280,11 @@
   "{n} charges since the statement of {date}, not billed yet": {
     "one": "{date} के स्टेटमेंट के बाद {n} ख़र्च, अभी बिल में नहीं",
     "other": "{date} के स्टेटमेंट के बाद {n} ख़र्च, अभी बिल में नहीं"
-  }
+  },
+  "Cards added twice": "दो बार जोड़े गए कार्ड",
+  "These have the same last four digits. Merge each into one card, keeping its bills, statements and spending.": "इनके आख़िरी चार अंक एक जैसे हैं। हर जोड़ी को एक कार्ड में मिलाएँ, बिल, स्टेटमेंट और ख़र्च बने रहेंगे।",
+  "Keep both": "दोनों रखें",
+  "Merge": "मिलाएँ",
+  "Make them one card?": "इन्हें एक कार्ड बनाएँ?",
+  "Everything on {others} moves to {name}, then {others} is removed.": "{others} का सब कुछ {name} में चला जाएगा, फिर {others} हटा दिया जाएगा।"
 }

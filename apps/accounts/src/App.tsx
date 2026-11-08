@@ -37,6 +37,9 @@ function AccountsAppInner({ onClose, params, tab: inTab }: AppProps) {
   const [focus, setFocus] = useState<string | null>(null);
   const online = sdk().useOnline();
   const loaded = useLedger((s) => s.loaded);
+  // The account open was removed (here, merged, or on another device): back to the list, not a blank page.
+  const gone = useLedger((s) => !!open && s.loaded && (!s.accounts[open] || !!s.accounts[open].deleted));
+  useEffect(() => { if (gone) setOpen(null); }, [gone]);
 
   useEffect(() => {
     void startLedger();
@@ -68,7 +71,7 @@ function AccountsAppInner({ onClose, params, tab: inTab }: AppProps) {
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-4xl px-3 pt-1 pb-24 md:px-5 md:pb-8">
           {!loaded ? <p className="py-10 text-center text-muted" role="status">{t('Loading…')}</p> /* i18n-ok */
-            : open ? <AccountView id={open} onBack={() => setOpen(null)} onEdit={setEditing} onEntry={setEntry} onDebit={setDebit} onBill={(b, c) => setBill({ b, c })} onImport={() => setImporting({})} />
+            : open && !gone ? <AccountView id={open} onBack={() => setOpen(null)} onEdit={setEditing} onEntry={setEntry} onDebit={setDebit} onBill={(b, c) => setBill({ b, c })} onImport={() => setImporting({})} />
             : tab === 'accounts' ? <Overview onOpen={setOpen} onAdd={setEditing} />
             : tab === 'bills' ? <BillsView onBill={(b, c) => setBill({ b, c })} onImport={() => setImporting({})} onAddCard={() => setEditing(newAccount('credit'))} />
             : <SpendView focus={focus} onImport={() => setImporting({})} />}

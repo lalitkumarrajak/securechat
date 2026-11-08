@@ -1,11 +1,12 @@
 // Every account at a glance: what you have, what you owe on cards, and the two together; then the
 // accounts by kind (bank, credit cards, cash, wallets), each with its balance.
 import { useMemo, useState } from 'react';
-import { ChevronRight, Plus } from 'lucide-react';
+import { ChevronRight, Copy, Plus } from 'lucide-react';
 import { Button } from '@sanga/ui/button';
 import { cn } from '@sanga/ui/utils';
 import { t } from '@sanga/i18n';
-import { balances, CARD_BG, creditLine, live, money, netWorth, newAccount, useLedger, type Account, type AccountKind } from '@sanga/ledger';
+import { sdk } from '@sanga/sdk';
+import { balances, CARD_BG, creditLine, duplicateCards, live, mergeCards, money, netWorth, newAccount, useLedger, type Account, type AccountKind } from '@sanga/ledger';
 import { KIND_ORDER, KINDS } from './util';
 
 export function Overview({ onOpen, onAdd }: { onOpen: (id: string) => void; onAdd: (a: Account) => void }) {
@@ -51,6 +52,8 @@ export function Overview({ onOpen, onAdd }: { onOpen: (id: string) => void; onAd
           </div>
         ))}
       </section>
+
+      <Duplicates />
 
       {KIND_ORDER.map((k: AccountKind) => {
         const list = shown.filter((a) => a.kind === k);
@@ -98,5 +101,38 @@ export function Overview({ onOpen, onAdd }: { onOpen: (id: string) => void; onAd
         ))}
       </div>
     </div>
+  );
+}
+
+/** The same card added twice (same last four digits): offer to make them one. "Keep both" is remembered on this device. */
+const KEPT = 'sanga-accounts-not-same';
+const kept = (): string[] => { try { return JSON.parse(localStorage.getItem(KEPT) ?? '[]'); } catch { return []; } };
+function Duplicates() {
+  const accounts = useLedger((s) => s.accounts);
+  const [skip, setSkip] = useState(kept);
+  const groups = useMemo(() => duplicateCards().filter((g) => !skip.includes(g.map((a) => a.id).sort().join())), [accounts, skip]);
+  if (!groups.length) return null;
+  const keepBoth = (g: Account[]) => {
+    const next = [...skip, g.map((a) => a.id).sort().join()];
+    setSkip(next);
+    try { localStorage.setItem(KEPT, JSON.stringify(next)); } catch { /* private window: asked again next time */ }
+  };
+  const merge = async ([keep, ...others]: Account[]) => {
+    if (await sdk().confirm({ title: t('Make them one card?'), description: t('Everything on {others} moves to {name}, then {others} is removed.', { name: keep.name, others: others.map((o) => o.name).join(', ') }), confirmText: t('Merge') })) await mergeCards(keep, others);
+  };
+  return (
+    <section aria-label={t('Cards added twice')} className="rounded-3xl border border-amber-500/40 bg-amber-500/10 p-4">
+      <p className="flex items-center gap-2 font-semibold"><Copy className="size-4" />{t('Cards added twice')}</p>
+      <p className="mt-1 text-sm text-muted">{t('These have the same last four digits. Merge each into one card, keeping its bills, statements and spending.')}</p>
+      <ul className="mt-3 grid gap-2">
+        {groups.map((g) => (
+          <li key={g[0].id} className="flex flex-wrap items-center gap-2 rounded-2xl bg-panel p-3">
+            <span className="min-w-0 flex-1 text-sm"><span className="font-semibold">{g.map((a) => a.name || t('Credit card')).join(' · ')}</span> <span className="text-muted">••{g[0].last4}</span></span>
+            <Button size="sm" variant="ghost" onClick={() => keepBoth(g)}>{t('Keep both')}</Button>
+            <Button size="sm" onClick={() => void merge(g)}>{t('Merge')}</Button>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

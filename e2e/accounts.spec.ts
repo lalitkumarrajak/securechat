@@ -275,6 +275,39 @@ test('a Split expense on a credit card: on its next bill, changed with it, and g
   expect(P.errors).toEqual([]);
 });
 
+test('the same card added twice (same last 4): asked to merge, and it becomes one card with both bills', async () => {
+  await acc().getByRole('region', { name: 'Credit cards' }).getByRole('button', { name: 'Add' }).click();
+  const d = P.page.getByRole('dialog', { name: 'Add credit card' });
+  await d.getByLabel('Name', { exact: true }).fill('HDFC MILLENNIA');
+  await d.getByLabel('Last 4').fill('4321');
+  await d.getByRole('button', { name: 'Add', exact: true }).click();
+  const dup = acc().getByRole('region', { name: 'Cards added twice' });
+  await expect(dup).toContainText('Millennia · HDFC MILLENNIA');
+  await P.page.screenshot({ path: shots('98-accounts-duplicate') });
+  await dup.getByRole('button', { name: 'Merge' }).click();
+  await P.page.getByRole('alertdialog').getByRole('button', { name: 'Merge' }).click();
+  await expect(dup).toHaveCount(0);
+  await expect(balanceOf('HDFC MILLENNIA')).toHaveCount(0);
+  await expect(balanceOf('Millennia')).toContainText('shared limit available'); // still holds Regalia's limit
+  await acc().getByRole('tab', { name: 'Bills' }).click();
+  await expect(acc().getByText(/Millennia/).first()).toBeVisible();
+  await acc().getByRole('tab', { name: 'Accounts' }).click();
+});
+
+test('removing the card you have open goes back to the list, not a blank page', async () => {
+  await acc().getByRole('region', { name: 'Credit cards' }).getByRole('button', { name: 'Add' }).click();
+  const d = P.page.getByRole('dialog', { name: 'Add credit card' });
+  await d.getByLabel('Name', { exact: true }).fill('Old card');
+  await d.getByRole('button', { name: 'Add', exact: true }).click();
+  await balanceOf('Old card').click();
+  await acc().getByRole('button', { name: 'Edit' }).click();
+  await P.page.getByRole('dialog').getByRole('button', { name: 'Remove' }).click();
+  await P.page.getByRole('alertdialog').getByRole('button', { name: 'Remove' }).click();
+  await expect(acc().getByRole('region', { name: 'Credit cards' })).toBeVisible();
+  await expect(balanceOf('Old card')).toHaveCount(0);
+  await expect(balanceOf('Millennia')).toBeVisible();
+});
+
 test('the Calendar has no Cards tab; it shows card bills and opens Accounts', async () => {
   await tab(P, 'Calendar').click();
   const cal = P.page.getByRole('region', { name: 'Calendar' });

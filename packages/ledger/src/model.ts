@@ -174,6 +174,51 @@ export async function removeAccount(a: Account) {
   await remove(a);
 }
 
+// ---------- one card, added twice ----------
+/** Credit cards with the same last four digits: the same card added twice (once by hand, once moved
+ *  from the Calendar, say). Each group starts with the one to keep: the one with the most on it. */
+export function duplicateCards(s: LedgerState = useLedger.getState()): Account[][] {
+  const by = new Map<string, Account[]>();
+  for (const a of live(Object.values(s.accounts))) if (a.kind === 'credit' && a.last4) by.set(a.last4, [...(by.get(a.last4) ?? []), a]);
+  const entries = live(Object.values(s.entries)), bills = live(Object.values(s.bills)), stmts = live(Object.values(s.statements)), accts = live(Object.values(s.accounts));
+  const weight = (a: Account) => entries.filter((e) => e.account === a.id || e.to === a.id).length + bills.filter((b) => b.card === a.id).length
+    + stmts.filter((x) => x.card === a.id).length + 2 * accts.filter((x) => x.limitWith === a.id).length + (a.limit || a.limitWith ? 2 : 0) + (a.opening ? 1 : 0);
+  return [...by.values()].filter((g) => g.length > 1).map((g) => g.sort((a, b) => weight(b) - weight(a) || a.created - b.created));
+}
+
+/** Make the others one card with `keep`: their entries, bills, statements and shared limits move to it,
+ *  and what it doesn't have yet (limit, network, expiry…) is taken from them. Then they go. */
+export async function mergeCards(keep: Account, others: Account[]) {
+  let k: Account = { ...keep };
+  for (const o of others) {
+    const s = useLedger.getState();
+    for (const f of ['bank', 'network', 'expiry', 'nameOnCard', 'pdfPass', 'notes'] as const) if (!k[f] && o[f]) k = { ...k, [f]: o[f] };
+    if (k.limitWith === o.id) { k.limit = k.limit ?? o.limit; delete k.limitWith; }
+    if (!k.limit && !k.limitWith) { if (o.limitWith && o.limitWith !== k.id) k.limitWith = o.limitWith; else if (o.limit) k.limit = o.limit; }
+    if (!k.opening && o.opening) k.opening = o.opening;
+    for (const e of live(Object.values(s.entries))) {
+      if (e.account === o.id || e.to === o.id) await save({ ...e, account: e.account === o.id ? k.id : e.account, to: e.to === o.id ? k.id : e.to });
+    }
+    for (const b of live(Object.values(s.bills)).filter((b) => b.card === o.id)) {
+      const id = billId(k.id, b.month);
+      if (!s.bills[id] || s.bills[id].deleted) {
+        await save({ ...b, id, card: k.id });
+        const pay = live(Object.values(useLedger.getState().entries)).find((e) => e.ref === `bill:${b.id}`);
+        if (pay) await save({ ...pay, ref: `bill:${id}` });
+      }
+      await remove(b);
+    }
+    for (const x of live(Object.values(s.statements)).filter((x) => x.card === o.id)) {
+      const id = statementId(k.id, x.month);
+      if (!s.statements[id] || s.statements[id].deleted) await save({ ...x, id, card: k.id });
+      await remove(x);
+    }
+    for (const a of live(Object.values(useLedger.getState().accounts))) if (a.limitWith === o.id && a.id !== k.id && !others.some((x) => x.id === a.id)) await save({ ...a, limitWith: k.id });
+    await remove(o);
+  }
+  await save(k);
+}
+
 /** Spent on a credit card since its last statement, so on the next bill: purchases and Split expenses
  *  paid with it, less refunds. Paying the bill isn't spending, so transfers don't count. */
 export function unbilled(card: CreditCard, s: LedgerState = useLedger.getState(), now = todayKey()) {
@@ -274,13 +319,18 @@ export async function adopt(cards: Partial<Account>[], bills: CardBill[]) {
   await syncLedger();
   const s = useLedger.getState();
   const took: string[] = [];
+  // A card already added here by hand (same last four digits) isn't added again: its bills go to that one.
+  const same = new Map<string, string>();
   for (const c of cards) {
     if (!c.id) continue;
-    if (!s.accounts[c.id]) await save(newAccount('credit', { ...c, type: 'account', kind: 'credit', opening: 0, created: c.created ?? now() } as Partial<Account>));
+    const had = !s.accounts[c.id] && c.last4 ? live(Object.values(s.accounts)).find((a) => a.kind === 'credit' && a.last4 === c.last4) : undefined;
+    if (had) same.set(c.id, had.id);
+    else if (!s.accounts[c.id]) await save(newAccount('credit', { ...c, type: 'account', kind: 'credit', opening: 0, created: c.created ?? now() } as Partial<Account>));
     took.push(c.id);
   }
   for (const b of bills) {
-    if (!s.bills[b.id]) await save({ ...b, type: 'bill' });
+    const card = same.get(b.card), id = card ? billId(card, b.month) : b.id;
+    if (!s.bills[id]) await save({ ...b, id, card: card ?? b.card, type: 'bill' });
     took.push(b.id);
   }
   return took;
