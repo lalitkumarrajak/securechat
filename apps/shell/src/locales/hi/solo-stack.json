@@ -1,0 +1,15 @@
+{
+  "Score {n}": "स्कोर {n}",
+  "Best {n}": "सबसे अच्छा {n}",
+  "Tap to start": "शुरू करने के लिए टैप करें",
+  "New best!": "नया रिकॉर्ड!",
+  "Perfect!": "एकदम सही!",
+  "Stack Up": "मीनार बनाओ",
+  "Build the tallest tower you can": "जितनी ऊँची हो सके, मीनार बनाइए",
+  "Drop each block right on top of the last.": "हर ब्लॉक को पिछले वाले के ठीक ऊपर गिराएँ।",
+  "A block slides back and forth above the tower.": "मीनार के ऊपर एक ब्लॉक इधर-उधर सरकता है।",
+  "Tap anywhere to drop it.": "उसे गिराने के लिए कहीं भी टैप करें।",
+  "Whatever hangs over the edge is cut off, so the next block is smaller.": "किनारे से बाहर लटकता हिस्सा कट जाता है, इसलिए अगला ब्लॉक छोटा होता है।",
+  "Drop it exactly on top to keep it whole. Do that a few times in a row and it grows back.": "ठीक ऊपर गिराएँ तो ब्लॉक पूरा रहता है। लगातार कुछ बार ऐसा करें तो वह फिर बड़ा होने लगता है।",
+  "Miss the tower completely and the game is over. It gets faster as you climb.": "मीनार से पूरी तरह चूके तो खेल ख़त्म। जितना ऊपर जाएँगे, उतना तेज़ होगा।"
+}

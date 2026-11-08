@@ -1,0 +1,15 @@
+{
+  "Score {n}": "गुण {n}",
+  "Best {n}": "सर्वोत्तम {n}",
+  "Tap to start": "सुरू करण्यासाठी टॅप करा",
+  "New best!": "नवा विक्रम!",
+  "Perfect!": "अगदी अचूक!",
+  "Stack Up": "मनोरा रचा",
+  "Build the tallest tower you can": "जमेल तितका उंच मनोरा रचा",
+  "Drop each block right on top of the last.": "प्रत्येक ठोकळा आधीच्याच्या अगदी वर टाका.",
+  "A block slides back and forth above the tower.": "मनोऱ्याच्या वर एक ठोकळा इकडे-तिकडे सरकतो.",
+  "Tap anywhere to drop it.": "तो टाकण्यासाठी कुठेही टॅप करा.",
+  "Whatever hangs over the edge is cut off, so the next block is smaller.": "कडेच्या बाहेर लोंबणारा भाग कापला जातो, म्हणून पुढचा ठोकळा लहान होतो.",
+  "Drop it exactly on top to keep it whole. Do that a few times in a row and it grows back.": "अगदी वर टाकला तर ठोकळा पूर्ण राहतो. सलग काही वेळा असे केले तर तो पुन्हा मोठा होतो.",
+  "Miss the tower completely and the game is over. It gets faster as you climb.": "मनोरा पूर्ण चुकला तर खेळ संपतो. जसजसे वर जाल तसतसा वेग वाढतो."
+}
