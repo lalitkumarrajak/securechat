@@ -169,10 +169,12 @@ function Review({ p, password, onSaved }: { p: Parsed; password?: string; onSave
     if (update || !card) {
       if (day) next.statementDay = day;
       if (gap !== null && gap >= 0 && gap <= 60) next.dueAfter = gap;
-      if (p.limit) next.limit = p.limit;
+      if (p.limit && !next.limitWith) next.limit = p.limit;
       if (p.last4 && !next.last4) next.last4 = p.last4;
     }
     if (password) next.pdfPass = password;
+    const holder = (update || !card) && p.limit && next.limitWith ? useLedger.getState().accounts[next.limitWith] : undefined;
+    if (holder && !holder.deleted && holder.limit !== p.limit) await save({ ...holder, limit: p.limit }); // a shared limit is kept on the card holding it
     const r = await saveStatement({ card: next, date, due: due || undefined, from: p.from, total: credit ? -total : total, minDue: minDue ?? undefined, limit: p.limit, txns, setOutstanding: setOwed });
     onSaved(r.statement);
   };

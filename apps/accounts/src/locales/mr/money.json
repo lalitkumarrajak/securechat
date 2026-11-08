@@ -261,5 +261,16 @@
   "Balance corrected": "शिल्लक दुरुस्त केली",
   "From {name}": "{name} कडून",
   "To {name}": "{name} ला",
-  "All accounts": "सर्व खाती"
+  "All accounts": "सर्व खाती",
+  "Shared credit limit": "सामायिक क्रेडिट मर्यादा",
+  "Its limit is shared with {cards}: what you owe on all of them uses it up.": "याची मर्यादा {cards} सोबत सामायिक आहे: या सर्वांवरील थकबाकी यातूनच वापरली जाते.",
+  "Limit": "मर्यादा",
+  "Its own limit": "याची स्वतःची मर्यादा",
+  "Shared with {card}": "{card} सोबत सामायिक",
+  "One limit for both cards: what you owe on either uses it up.": "दोन्ही कार्डसाठी एकच मर्यादा: कोणत्याही कार्डवरील थकबाकी यातूनच वापरली जाते.",
+  "Some banks give all your cards one limit. Pick the card that shares it.": "काही बँका तुमच्या सर्व कार्डना एकच मर्यादा देतात. ज्या कार्डसोबत मर्यादा सामायिक आहे ते निवडा.",
+  "Shares its limit with": "मर्यादा यांच्यासोबत सामायिक",
+  "Shared limit {amount}": "सामायिक मर्यादा {amount}",
+  "With {cards}: {amount} owed on them too": "{cards} सोबत: त्यांच्यावरही {amount} थकबाकी",
+  "{amount} of {limit} shared limit available": "{limit} सामायिक मर्यादेपैकी {amount} उपलब्ध"
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { balances, effect, netWorth, valid, type LedgerState } from './model';
+import { balances, creditLine, effect, netWorth, valid, type LedgerState } from './model';
 import { awaitingBill, billState, cardReminders, unpaid, type CardBill, type CreditCard } from './cards';
 import type { Account, Entry } from './types';
 
@@ -57,5 +57,35 @@ describe('no bill this month', () => {
   it('isn’t owed, and says so', () => {
     expect(unpaid([none])).toEqual([]);
     expect(billState(none, '2026-11-30')).toBe('none');
+  });
+});
+
+describe('a shared credit limit', () => {
+  // Millennia holds a ₹2,00,000 limit; Regalia shares it; Amex has its own.
+  const s = state([
+    acc('mil', 'credit', -3000000, { limit: 20000000 }),
+    acc('reg', 'credit', -5000000, { limitWith: 'mil' }),
+    acc('amex', 'credit', -1000000, { limit: 5000000 }),
+  ], []);
+  it('what is owed on every card sharing it uses it up, seen from either card', () => {
+    for (const id of ['mil', 'reg']) {
+      const l = creditLine(s.accounts[id], s);
+      expect(l.limit).toBe(20000000);
+      expect(l.owe).toBe(8000000);
+      expect(l.available).toBe(12000000);
+      expect(l.shared).toBe(true);
+    }
+    expect(creditLine(s.accounts.reg, s).others.map((x) => x.id)).toEqual(['mil']);
+  });
+  it('a card with its own limit is on its own', () => {
+    const l = creditLine(s.accounts.amex, s);
+    expect([l.limit, l.owe, l.available, l.shared]).toEqual([5000000, 1000000, 4000000, false]);
+  });
+  it('sharing with a card that is gone: its own limit again', () => {
+    const gone = { ...s, accounts: { ...s.accounts, mil: { ...s.accounts.mil, deleted: true } } };
+    expect(creditLine(gone.accounts.reg, gone).shared).toBe(false);
+  });
+  it('the link survives sync', () => {
+    expect((valid({ ...s.accounts.reg }, 'reg') as Account).limitWith).toBe('mil');
   });
 });

@@ -151,6 +151,28 @@ test('a payment SMS marks the September bill paid', async () => {
   await expect(balanceOf('HDFC Savings')).toContainText('₹43,879.50'); // not from a Sanga account
 });
 
+test('a second card sharing the first one’s limit: what you owe on both uses up one limit', async () => {
+  await acc().getByRole('tab', { name: 'Accounts' }).click();
+  await acc().getByRole('region', { name: 'Credit cards' }).getByRole('button', { name: 'Add' }).click();
+  const d = P.page.getByRole('dialog', { name: 'Add credit card' });
+  await d.getByLabel('Name', { exact: true }).fill('Regalia');
+  await d.getByLabel('Amount you owe now').fill('10000');
+  await d.getByLabel('Limit', { exact: true }).selectOption({ label: 'Shared with Millennia ••4321' });
+  await expect(d.getByLabel('Shared credit limit')).toHaveValue('200000.00');
+  await P.page.screenshot({ path: shots('95-accounts-shared-limit') });
+  await d.getByRole('button', { name: 'Add', exact: true }).click();
+  // Both cards show the same room left on the one limit.
+  const left = async (name: string) => (await balanceOf(name).textContent())!.match(/(₹[\d,.]+) of ₹200,000\.00 shared limit available/)?.[1];
+  await expect(balanceOf('Regalia')).toContainText('shared limit available');
+  await expect(balanceOf('Millennia')).toContainText('shared limit available');
+  expect(await left('Regalia')).toBe(await left('Millennia'));
+  await balanceOf('Regalia').click();
+  await expect(acc().getByText('Shared limit ₹200,000.00')).toBeVisible();
+  await expect(acc().getByText(/^With Millennia:|^Shared with Millennia$/)).toBeVisible();
+  await P.page.screenshot({ path: shots('96-accounts-shared-card') });
+  await acc().getByRole('button', { name: 'All accounts' }).click();
+});
+
 test('Split: an expense paid from the bank comes out of it, and goes back when deleted', async () => {
   await tab(P, 'Split').click();
   const split = P.page.getByRole('region', { name: 'Split' });

@@ -58,6 +58,18 @@ export const liveAccounts = (s: LedgerState = useLedger.getState()) => live(Obje
 /** Credit card accounts, with their bill settings filled in. */
 export const creditCards = (s: LedgerState = useLedger.getState()) => liveAccounts(s).filter((a) => a.kind === 'credit').map(asCard);
 
+/** A credit card's credit line: its own limit, or the one it shares with other cards of the bank
+ *  (one card holds the limit; the others point at it). What's owed on all of them uses it up. */
+export function creditLine(a: Account, s: LedgerState = useLedger.getState(), bal: Map<string, number> = balances(s)) {
+  const w = a.limitWith && s.accounts[a.limitWith];
+  const root = w && !w.deleted && w.kind === 'credit' ? w : a;
+  const cards = liveAccounts(s).filter((x) => x.kind === 'credit' && (x.id === root.id || x.limitWith === root.id));
+  if (!cards.some((x) => x.id === a.id)) cards.push(a);
+  const owe = cards.reduce((n, x) => n + Math.max(0, -(bal.get(x.id) ?? 0)), 0);
+  const limit = root.limit;
+  return { limit, owe, available: limit ? Math.max(0, limit - owe) : undefined, root, others: cards.filter((x) => x.id !== a.id), shared: cards.length > 1 };
+}
+
 /** Each account's balance now: what it started with, plus everything since. A card's is negative while you owe. */
 export function balances(s: LedgerState = useLedger.getState()): Map<string, number> {
   const m = new Map<string, number>();
@@ -152,6 +164,13 @@ export async function removeAccount(a: Account) {
   }
   for (const b of live(Object.values(s.bills))) if (b.card === a.id) await remove(b);
   for (const x of live(Object.values(s.statements))) if (x.card === a.id) await remove(x);
+  // Cards that shared this one's limit: the first one holds it now, the others share with that one.
+  const sharing = live(Object.values(s.accounts)).filter((x) => x.limitWith === a.id);
+  if (sharing.length) {
+    const [first, ...rest] = sharing;
+    await save({ ...first, limitWith: undefined, limit: first.limit ?? a.limit });
+    for (const x of rest) await save({ ...x, limitWith: first.id });
+  }
   await remove(a);
 }
 
@@ -357,7 +376,7 @@ export function valid(o: any, id: string): Item | null {
       color: COLORS.includes(o.color) ? o.color : 'blue', opening: int(o.opening), notes: opt(o.notes, 1000), archived: o.archived ? true : undefined,
       acc4: four(o.acc4), ifsc: /^[A-Z]{4}0[A-Z0-9]{6}$/.test(o.ifsc) ? o.ifsc : undefined, holder: opt(o.holder, 80),
       accType: ['savings', 'current', 'salary', 'nre', 'nro', 'other'].includes(o.accType) ? o.accType : undefined,
-      limit: amt(o.limit), last4: four(o.last4), network: NETWORKS.includes(o.network) ? o.network : undefined,
+      limit: amt(o.limit), limitWith: opt(o.limitWith, 40), last4: four(o.last4), network: NETWORKS.includes(o.network) ? o.network : undefined,
       expiry: typeof o.expiry === 'string' && /^(0[1-9]|1[0-2])\/\d\d$/.test(o.expiry) ? o.expiry : undefined, nameOnCard: opt(o.nameOnCard, 80),
       statementDay: day >= 1 && day <= 31 ? day : undefined, dueAfter: Number.isInteger(o.dueAfter) && o.dueAfter >= 0 && o.dueAfter <= 60 ? o.dueAfter : undefined,
       remind: Array.isArray(o.remind) ? [...new Set<number>(o.remind.filter((n: unknown) => Number.isInteger(n) && (n as number) >= 0 && (n as number) <= 30))].slice(0, 6) : undefined,

@@ -5,7 +5,7 @@ import { ArrowDownLeft, ArrowLeft, ArrowLeftRight, ArrowUpRight, CreditCard as C
 import { Button, IconButton } from '@sanga/ui/button';
 import { cn } from '@sanga/ui/utils';
 import { t } from '@sanga/i18n';
-import { asCard, openBill, balances, CARD_BG, effect, entriesOf, live, money, newDebit, newEntry, useLedger, type Account, type CardBill, type CreditCard, type DebitCard, type Entry } from '@sanga/ledger';
+import { asCard, creditLine, openBill, balances, CARD_BG, effect, entriesOf, live, money, newDebit, newEntry, useLedger, type Account, type CardBill, type CreditCard, type DebitCard, type Entry } from '@sanga/ledger';
 import { BillsView } from './BillsView';
 import { ACC_TYPES, entryTitle, KINDS, label, NETWORK_NAMES, ordinalDay, shortDay } from './util';
 
@@ -24,13 +24,16 @@ export function AccountView({ id, onBack, onEdit, onEntry, onDebit, onBill, onIm
   const fmt = (n: number) => money(n, cur);
   const name = (x: string) => s.accounts[x]?.name ?? t('Removed account');
   const owe = credit ? Math.max(0, -bal) : 0;
-  const used = credit && a.limit ? Math.min(1, owe / a.limit) : 0;
+  const line = credit ? creditLine(a, s) : null;
+  const limit = line?.limit;
+  const used = limit ? Math.min(1, line!.owe / limit) : 0;
   const Icon = KINDS[a.kind].icon;
   const details: [string, string][] = [
     [t('Bank'), a.bank ?? ''], [t('Account type'), a.accType ? t(ACC_TYPES[a.accType]) : ''], [t('Account no.'), a.acc4 ? `•••• ${a.acc4}` : ''], ['IFSC', a.ifsc ?? ''], // i18n-ok
     [t('Account holder'), a.holder ?? ''], [t('Network'), a.network ? (a.network === 'other' ? t(NETWORK_NAMES.other) : NETWORK_NAMES[a.network]) : ''],
     [t('Card number'), a.last4 ? `•••• •••• •••• ${a.last4}` : ''], [t('Expiry'), a.expiry ?? ''], [t('Name on card'), a.nameOnCard ?? ''],
-    [t('Credit limit'), a.limit ? fmt(a.limit) : ''], [t('Statement'), credit ? t('on the {day} of each month, due {n} days later', { day: ordinalDay(asCard(a).statementDay), n: asCard(a).dueAfter }) : ''],
+    [line?.shared ? t('Shared credit limit') : t('Credit limit'), limit ? fmt(limit) : ''],
+    [t('Shares its limit with'), line?.shared ? line.others.map((x) => x.name).join(', ') : ''], [t('Statement'), credit ? t('on the {day} of each month, due {n} days later', { day: ordinalDay(asCard(a).statementDay), n: asCard(a).dueAfter }) : ''],
     [t('Notes'), a.notes ?? ''],
   ].filter(([, v]) => v) as [string, string][];
   const add = (kind: Entry['kind'], o: Partial<Entry> = {}) => onEntry(newEntry(kind, id, o));
@@ -49,10 +52,11 @@ export function AccountView({ id, onBack, onEdit, onEntry, onDebit, onBill, onIm
           {a.network && <span className="ml-auto font-semibold tracking-wide">{a.network === 'other' ? '' : NETWORK_NAMES[a.network]}</span>}</div>
         <p className="relative mt-5 text-sm text-white/80">{credit ? (bal > 0 ? t('Credit balance') : t('You owe')) : t('Balance')}</p>
         <p className="relative text-3xl font-bold tabular-nums">{fmt(credit ? Math.abs(bal) : bal)}</p>
-        {credit && a.limit ? (
+        {line && limit ? (
           <div className="relative mt-3">
             <div className="h-1.5 rounded-full bg-white/25"><div className="h-1.5 rounded-full bg-white" style={{ width: `${used * 100}%` }} /></div>
-            <p className="mt-1.5 flex text-xs text-white/85"><span className="flex-1">{t('{amount} available', { amount: fmt(Math.max(0, a.limit - owe)) })}</span><span>{t('Limit {amount}', { amount: fmt(a.limit) })}</span></p>
+            <p className="mt-1.5 flex text-xs text-white/85"><span className="flex-1">{t('{amount} available', { amount: fmt(line.available ?? 0) })}</span><span>{line.shared ? t('Shared limit {amount}', { amount: fmt(limit) }) : t('Limit {amount}', { amount: fmt(limit) })}</span></p>
+            {line.shared && <p className="mt-1 text-xs text-white/75">{line.owe > owe ? t('With {cards}: {amount} owed on them too', { cards: line.others.map((x) => x.name).join(', '), amount: fmt(line.owe - owe) }) : t('Shared with {card}', { card: line.others.map((x) => x.name).join(', ') })}</p>}
           </div>
         ) : null}
         {(a.last4 || a.acc4) && <p className="relative mt-4 font-mono tracking-widest text-white/90">•••• {a.last4 ?? a.acc4}{a.expiry && <span className="ml-4 text-xs tracking-normal">{a.expiry}</span>}</p>}

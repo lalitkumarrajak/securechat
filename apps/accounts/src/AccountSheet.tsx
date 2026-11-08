@@ -7,7 +7,7 @@ import { Input, Label, Textarea } from '@sanga/ui/input';
 import { sdk } from '@sanga/sdk';
 import { cn } from '@sanga/ui/utils';
 import { t, tn } from '@sanga/i18n';
-import { balances, CARD_BG, COLORS, CURRENCIES, NETWORKS, removeAccount, save, setBalance, useLedger, type Account } from '@sanga/ledger';
+import { balances, CARD_BG, COLORS, CURRENCIES, liveAccounts, NETWORKS, removeAccount, save, setBalance, useLedger, type Account } from '@sanga/ledger';
 import { ACC_TYPES, KINDS, NETWORK_NAMES, parseAmount, parseSigned, SELECT, toInput } from './util';
 
 const DAYS_BEFORE = [7, 3, 1, 0];
@@ -25,7 +25,14 @@ function Form({ a0, onClose }: { a0: Account; onClose: () => void }) {
   const now = exists ? (balances().get(a.id) ?? a.opening) : a.opening;
   // A card shows what you owe (positive); everything else what's in it (can go below zero: an overdraft).
   const [balText, setBalText] = useState(() => (credit ? (now <= 0 ? toInput(-now, cur) : `-${toInput(now, cur)}`) : (now ? toInput(now, cur) : '')));
-  const [limitText, setLimitText] = useState(a.limit ? toInput(a.limit, cur) : '');
+  // Cards of one bank often share one limit: one card holds it, the others point at it.
+  const all = useLedger.getState().accounts;
+  const sharedBy = liveAccounts().filter((x) => x.limitWith === a.id);
+  const holders = credit && !sharedBy.length ? liveAccounts().filter((x) => x.kind === 'credit' && x.id !== a.id && !x.limitWith && x.currency === cur) : [];
+  const [share, setShare] = useState(a.limitWith && all[a.limitWith] && !all[a.limitWith].deleted ? a.limitWith : '');
+  const holder = share ? all[share] : undefined;
+  const [limitText, setLimitText] = useState(() => { const l = holder ? holder.limit : a.limit; return l ? toInput(l, cur) : ''; });
+  const pickShare = (id: string) => { setShare(id); const l = id ? all[id]?.limit : a.limit; setLimitText(l ? toInput(l, cur) : ''); };
   const bal = balText.trim() ? parseSigned(balText, cur) : 0;
   const limit = limitText.trim() ? parseAmount(limitText, cur) : undefined;
   const expiryOk = !a.expiry || /^(0[1-9]|1[0-2])\/\d\d$/.test(a.expiry);
@@ -36,7 +43,8 @@ function Form({ a0, onClose }: { a0: Account; onClose: () => void }) {
   const submit = async () => {
     if (!ok || bal === null) return;
     const target = credit ? -bal : bal;
-    const rec: Account = { ...a, name: a.name.trim(), limit: limit ?? undefined, ifsc: a.ifsc?.toUpperCase() || undefined };
+    const rec: Account = { ...a, name: a.name.trim(), limit: holder ? undefined : limit ?? undefined, limitWith: holder ? holder.id : undefined, ifsc: a.ifsc?.toUpperCase() || undefined };
+    if (holder && (limit ?? undefined) !== holder.limit) await save({ ...holder, limit: limit ?? undefined }); // the shared limit is kept on the card that holds it
     if (!exists) { await save({ ...rec, opening: target }); }
     else { await save(rec); if (target !== now) await setBalance(rec, target); }
     onClose();
@@ -63,10 +71,21 @@ function Form({ a0, onClose }: { a0: Account; onClose: () => void }) {
           <div><Label htmlFor="a-bal">{credit ? t('Amount you owe now') : t('Balance now')}</Label>
             <Input id="a-bal" inputMode="decimal" placeholder="0.00" value={balText} onChange={(e) => setBalText(e.target.value)} className="tabular-nums" /></div>
           {credit
-            ? <div><Label htmlFor="a-limit">{t('Credit limit')}</Label><Input id="a-limit" inputMode="decimal" placeholder="0.00" value={limitText} onChange={(e) => setLimitText(e.target.value)} className="tabular-nums" /></div>
+            ? <div><Label htmlFor="a-limit">{share || sharedBy.length ? t('Shared credit limit') : t('Credit limit')}</Label><Input id="a-limit" inputMode="decimal" placeholder="0.00" value={limitText} onChange={(e) => setLimitText(e.target.value)} className="tabular-nums" /></div>
             : <div><Label htmlFor="a-cur">{t('Currency')}</Label><select id="a-cur" className={SELECT} value={cur} onChange={(e) => set({ currency: e.target.value })}>{CURRENCIES.map((x) => <option key={x}>{x}</option>)}</select></div>}
         </div>
         {bal === null && <p className="-mt-2 text-sm text-danger" role="alert">{t('That isn’t an amount.')}</p>}
+        {credit && (sharedBy.length ? (
+          <p className="-mt-2 text-xs text-muted">{t('Its limit is shared with {cards}: what you owe on all of them uses it up.', { cards: sharedBy.map((x) => x.name).join(', ') })}</p>
+        ) : holders.length > 0 && (
+          <div><Label htmlFor="a-share">{t('Limit')}</Label>
+            <select id="a-share" className={SELECT} value={share} onChange={(e) => pickShare(e.target.value)}>
+              <option value="">{t('Its own limit')}</option>
+              {holders.map((x) => <option key={x.id} value={x.id}>{t('Shared with {card}', { card: x.name + (x.last4 ? ` ••${x.last4}` : '') })}</option>)}
+            </select>
+            <p className="mt-1 text-xs text-muted">{share ? t('One limit for both cards: what you owe on either uses it up.') : t('Some banks give all your cards one limit. Pick the card that shares it.')}</p>
+          </div>
+        ))}
         {exists && bal !== null && (credit ? -bal : bal) !== now && <p className="-mt-2 text-xs text-muted">{t('The difference is kept as a correction in its history.')}</p>}
 
         {a.kind === 'bank' && (

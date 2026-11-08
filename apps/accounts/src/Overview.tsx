@@ -5,7 +5,7 @@ import { ChevronRight, Plus } from 'lucide-react';
 import { Button } from '@sanga/ui/button';
 import { cn } from '@sanga/ui/utils';
 import { t } from '@sanga/i18n';
-import { balances, CARD_BG, live, money, netWorth, newAccount, useLedger, type Account, type AccountKind } from '@sanga/ledger';
+import { balances, CARD_BG, creditLine, live, money, netWorth, newAccount, useLedger, type Account, type AccountKind } from '@sanga/ledger';
 import { KIND_ORDER, KINDS } from './util';
 
 export function Overview({ onOpen, onAdd }: { onOpen: (id: string) => void; onAdd: (a: Account) => void }) {
@@ -64,6 +64,7 @@ export function Overview({ onOpen, onAdd }: { onOpen: (id: string) => void; onAd
               {list.map((a) => {
                 const n = bal.get(a.id) ?? 0, credit = a.kind === 'credit';
                 const owe = credit ? Math.max(0, -n) : 0;
+                const line = credit ? creditLine(a, s, bal) : null, limit = line?.limit;
                 const dc = debits.filter((d) => d.account === a.id).length;
                 return (
                   <li key={a.id}>
@@ -72,10 +73,10 @@ export function Overview({ onOpen, onAdd }: { onOpen: (id: string) => void; onAd
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-semibold">{a.name}{(a.last4 || a.acc4) && <span className="font-normal text-muted"> ••{a.last4 ?? a.acc4}</span>}</span>
                         <span className="block truncate text-xs text-muted">
-                          {credit ? (a.limit ? t('{amount} of {limit} limit available', { amount: money(Math.max(0, a.limit - owe), a.currency), limit: money(a.limit, a.currency) }) : a.bank ?? t('Credit card'))
+                          {credit ? (limit ? (line!.shared ? t('{amount} of {limit} shared limit available', { amount: money(line!.available ?? 0, a.currency), limit: money(limit, a.currency) }) : t('{amount} of {limit} limit available', { amount: money(line!.available ?? 0, a.currency), limit: money(limit, a.currency) })) : a.bank ?? t('Credit card'))
                             : [a.bank, dc ? (dc === 1 ? t('1 debit card') : t('{n} debit cards', { n: dc })) : ''].filter(Boolean).join(' · ') || t(KINDS[a.kind].one)}
                         </span>
-                        {credit && a.limit ? <span className="mt-1.5 block h-1 rounded-full bg-panel-2"><span className="block h-1 rounded-full bg-accent" style={{ width: `${Math.min(100, (owe / a.limit) * 100)}%` }} /></span> : null}
+                        {limit ? <span className="mt-1.5 block h-1 rounded-full bg-panel-2"><span className="block h-1 rounded-full bg-accent" style={{ width: `${Math.min(100, (line!.owe / limit) * 100)}%` }} /></span> : null}
                       </span>
                       <span className="shrink-0 text-right">
                         <span className={cn('block font-bold tabular-nums', !credit && n < 0 && 'text-danger')}>{money(credit ? owe : n, a.currency)}</span>

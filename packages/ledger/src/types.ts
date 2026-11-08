@@ -25,6 +25,7 @@ export interface Account extends Synced {
   accType?: 'savings' | 'current' | 'salary' | 'nre' | 'nro' | 'other';
   // A credit card: never the full number or the CVV.
   limit?: number;              // credit limit, in paise
+  limitWith?: string;          // shares its limit with this card (cards of one bank often have one limit for all)
   last4?: string;
   network?: Network;
   expiry?: string;             // MM/YY

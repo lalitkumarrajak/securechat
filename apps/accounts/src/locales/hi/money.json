@@ -261,5 +261,16 @@
   "Balance corrected": "बैलेंस सुधारा",
   "From {name}": "{name} से",
   "To {name}": "{name} को",
-  "All accounts": "सभी अकाउंट"
+  "All accounts": "सभी अकाउंट",
+  "Shared credit limit": "साझा क्रेडिट लिमिट",
+  "Its limit is shared with {cards}: what you owe on all of them uses it up.": "इसकी लिमिट {cards} के साथ साझा है: इन सब पर जो बकाया है, वह इसी से घटता है।",
+  "Limit": "लिमिट",
+  "Its own limit": "इसकी अपनी लिमिट",
+  "Shared with {card}": "{card} के साथ साझा",
+  "One limit for both cards: what you owe on either uses it up.": "दोनों कार्ड की एक ही लिमिट: किसी पर भी बकाया हो, इसी से घटता है।",
+  "Some banks give all your cards one limit. Pick the card that shares it.": "कुछ बैंक आपके सभी कार्ड को एक ही लिमिट देते हैं। जिस कार्ड के साथ लिमिट साझा है, उसे चुनें।",
+  "Shares its limit with": "लिमिट इनके साथ साझा",
+  "Shared limit {amount}": "साझा लिमिट {amount}",
+  "With {cards}: {amount} owed on them too": "{cards} के साथ: उन पर भी {amount} बकाया",
+  "{amount} of {limit} shared limit available": "{limit} की साझा लिमिट में से {amount} उपलब्ध"
 }
