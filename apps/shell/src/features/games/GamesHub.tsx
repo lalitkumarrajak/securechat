@@ -7,6 +7,7 @@ import { AppTabs } from '../nav/AppTabs';
 import { GAME_UI } from './registry';
 import { GamesList } from './GamesStrip';
 import { listed, openPicker, useGames } from './store';
+import { SoloGames } from '../solo/SoloGames';
 
 export function GamesHub() {
   const any = useGames((s) => listed(s.games).length > 0);
@@ -52,6 +53,8 @@ export function GamesHub() {
             </article>
           ))}
         </div>
+
+        <SoloGames />
 
         <h2 className="mt-8 mb-3 text-lg font-semibold">{t('Your games')}</h2>
         <div className="overflow-hidden rounded-3xl border border-line bg-panel">

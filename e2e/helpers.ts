@@ -14,6 +14,7 @@ export interface Phone { ctx: BrowserContext; page: Page; cdp: CDPSession; error
 export async function phone(browser: Browser, u: string, opts: object = PHONE): Promise<Phone> {
   const ctx = await browser.newContext(opts);
   // The "How to play" guide opens by itself the first time a game starts; tests see it only when they ask (games.spec).
+  await ctx.addInitScript(() => { try { if (!localStorage.getItem('sanga-solo-howto')) localStorage.setItem('sanga-solo-howto', '["*"]'); } catch { /* opaque origin */ } });
   await ctx.addInitScript(() => { try { if (!localStorage.getItem('sanga-games-howto')) localStorage.setItem('sanga-games-howto', '["ludo","uno","snakes","connect4","tictactoe"]'); } catch { /* opaque origin */ } });
   const p = { ctx, errors: [] as string[], u } as Phone;
   await newTab(p);
@@ -191,4 +192,15 @@ export async function makeFriends(a: Phone, b: Phone) {
   await expect(b.page.getByText(`You and ${a.u} are now friends`)).toBeVisible();
   await b.page.keyboard.press('Escape');
   await tab(b, 'Chats').click();
+}
+
+/** Games page → a game you play on your own (puzzles, arcade, cards). `seed` fixes its levels; test mode
+ *  lets arcade games be stepped. Returns the game's full-screen dialog. */
+export async function openSolo(p: Phone, name: string, seed = 1) {
+  await p.page.evaluate((s) => { localStorage.setItem('sanga-solo-seed', String(s)); localStorage.setItem('sanga-solo-test', '1'); }, seed);
+  const solo = p.page.getByRole('region', { name: 'On your own' });
+  if (!(await solo.isVisible().catch(() => false))) await openApp(p, 'Games');
+  await solo.getByRole('button', { name, exact: true }).click();
+  await p.page.locator(`[role="dialog"][aria-label="${name}"]`).waitFor(); // (by CSS: the first-time guide hides it from getByRole)
+  return p.page.getByRole('dialog', { name, exact: true });
 }

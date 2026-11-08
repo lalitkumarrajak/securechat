@@ -3,7 +3,9 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 
-const PORT = 4321;
+// E2E_PORT lets two copies of the repo (git worktrees) run their tests at once: the fake services sit on the next port.
+const PORT = Number(process.env.E2E_PORT || 4321);
+const FAKE = PORT + 1;
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'chattrix-e2e-'));
 
 // Runs the built app (npm run build first) against a throwaway SQLite database, in the system Chrome.
@@ -32,7 +34,8 @@ export default defineConfig({
   webServer: [{
     command: 'node e2e/fake-services.mjs',
     cwd: path.join(import.meta.dirname, '..'),
-    url: 'http://localhost:4322/article',
+    url: `http://localhost:${FAKE}/article`,
+    env: { FAKE_PORT: String(FAKE) },
     reuseExistingServer: false,
   }, {
     command: 'node server/index.js',
@@ -41,8 +44,8 @@ export default defineConfig({
     reuseExistingServer: false,
     env: {
       PORT: String(PORT), DATA_DIR: dataDir, SIGNUPS_PER_HOUR: '1000', PRESENCE_SWEEP_MS: '500', // real 45 s presence timeout
-      KLIPY_API_KEY: 'test', KLIPY_BASE_URL: 'http://localhost:4322', ITUNES_BASE_URL: 'http://localhost:4322', PREVIEW_ALLOW_PRIVATE: '1',
-      GEOIP_URL: 'http://localhost:4322/geo/{ip}', GEOIP_ALLOW_PRIVATE: '1',
+      KLIPY_API_KEY: 'test', KLIPY_BASE_URL: `http://localhost:${FAKE}`, ITUNES_BASE_URL: `http://localhost:${FAKE}`, PREVIEW_ALLOW_PRIVATE: '1',
+      GEOIP_URL: `http://localhost:${FAKE}/geo/{ip}`, GEOIP_ALLOW_PRIVATE: '1',
       GAME_TEST_DICE: '6,3,2,6,4,6,5', // e2e/games.spec.ts plays these in order
       REMINDER_SCAN_MS: '1000', // calendar.spec.ts waits for a reminder
     },

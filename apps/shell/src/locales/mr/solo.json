@@ -1,0 +1,20 @@
+{
+  "Puzzle": "कोडे",
+  "Arcade": "आर्केड",
+  "Brain": "बुद्धी",
+  "Cards": "पत्ते",
+  "Strategy": "डावपेच",
+  "Casual": "हलकेफुलके",
+  "Adventure": "साहस",
+  "On your own": "एकट्याने खेळा",
+  "Puzzles, arcade and card games. Each one downloads when you first play it.": "कोडी, आर्केड आणि पत्त्यांचे खेळ. प्रत्येक खेळ पहिल्यांदा खेळताना डाउनलोड होतो.",
+  "Kinds of game": "खेळांचे प्रकार",
+  "Loading {game}": "{game} लोड होत आहे",
+  "Undo": "मागे घ्या",
+  "Start again": "पुन्हा सुरू करा",
+  "Hint": "सूचना",
+  "Level {n}": "लेव्हल {n}",
+  "Level {n} done!": "लेव्हल {n} पूर्ण!",
+  "Next level": "पुढची लेव्हल",
+  "empty": "रिकामी"
+}

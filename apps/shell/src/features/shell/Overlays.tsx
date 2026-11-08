@@ -8,9 +8,11 @@ import { NewGameDialog } from '../games/NewGameDialog';
 import { useGames } from '../games/store';
 import { CallScreen } from '../calls/CallScreen';
 import { useStories } from '../../lib/stories';
+import { useSolo } from '../solo/store';
 
 // Loaded when a game is opened, so the app starts faster.
 const GameScreen = lazy(() => import('../games/GameScreen').then((m) => ({ default: m.GameScreen })));
+const SoloScreen = lazy(() => import('../solo/SoloScreen').then((m) => ({ default: m.SoloScreen })));
 const FriendsPanel = lazy(() => import('../friends/FriendsPanel').then((m) => ({ default: m.FriendsPanel })));
 const SettingsPanel = lazy(() => import('../settings/SettingsPanel').then((m) => ({ default: m.SettingsPanel })));
 const GroupInfoPanel = lazy(() => import('../groups/GroupInfoPanel').then((m) => ({ default: m.GroupInfoPanel })));
@@ -20,6 +22,7 @@ const StoryComposer = lazy(() => import('../stories/StoryComposer').then((m) => 
 
 export function Overlays() {
   const gameOpen = useGames((s) => !!s.open);
+  const soloOpen = useSolo((s) => !!s.open);
   const panel = useApp((s) => s.panel);
   const storyOpen = useStories((s) => !!s.viewer);
   const composing = useStories((s) => !!s.composer);
@@ -39,6 +42,7 @@ export function Overlays() {
       <PhotoViewer />
       <PhotoGallery />
       {gameOpen && <Suspense fallback={null}><GameScreen /></Suspense>}
+      {soloOpen && <Suspense fallback={null}><SoloScreen /></Suspense>}
       <CallScreen />
     </>
   );
