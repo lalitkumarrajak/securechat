@@ -1,0 +1,48 @@
+{
+  "spades": "इस्पिक",
+  "hearts": "बदाम",
+  "diamonds": "चौकट",
+  "clubs": "किलवर",
+  "Ace": "एक्का",
+  "Jack": "गुलाम",
+  "Queen": "राणी",
+  "King": "राजा",
+  "{rank} of {suit}": "{suit} चा {rank}",
+  "Easy": "सोपे",
+  "Hard": "कठीण",
+  "Choose how hard a game you want.": "खेळ किती कठीण हवा ते निवडा.",
+  "All eight runs done!": "आठही क्रम पूर्ण!",
+  "Deal a row from the stock.": "गठ्ठ्यातून एक ओळ वाटा.",
+  "Move the {card} from column {a} to column {b}.": "{card} स्तंभ {a} मधून स्तंभ {b} मध्ये न्या.",
+  "No useful moves left. Undo or start a new game.": "उपयोगी चाल उरली नाही. मागे घ्या किंवा नवा खेळ सुरू करा.",
+  "The {card} can’t move anywhere.": "{card} कुठेही जाऊ शकत नाही.",
+  "Fill every empty column before dealing.": "वाटण्याआधी प्रत्येक रिकामा स्तंभ भरा.",
+  "A full run! {n} of {total} done.": "पूर्ण क्रम! {total} पैकी {n} पूर्ण.",
+  "Tap a card to move it, or drag it. Build King to Ace in one suit.": "पत्ता हलवण्यासाठी टॅप करा किंवा ओढा. एकाच प्रकारात राजा ते एक्का रचा.",
+  "Score {n}": "गुण {n}",
+  "New game": "नवा खेळ",
+  "Empty column {n}": "रिकामा स्तंभ {n}",
+  "{card}, column {n}": "{card}, स्तंभ {n}",
+  "Runs done: {n} of {total}": "पूर्ण क्रम: {total} पैकी {n}",
+  "Deal a row ({n} left)": "एक ओळ वाटा ({n} उरल्या)",
+  "More suits make it harder.": "जास्त प्रकार, जास्त कठीण.",
+  "{n} moves": {
+    "one": "{n} चाल",
+    "other": "{n} चाली"
+  },
+  "{n} suits": {
+    "one": "{n} प्रकार",
+    "other": "{n} प्रकार"
+  },
+  "{n} wins at this level": {
+    "one": "या लेव्हलवर {n} विजय",
+    "other": "या लेव्हलवर {n} विजय"
+  },
+  "Spider Solitaire": "स्पायडर सॉलिटेअर",
+  "Two decks, ten columns, eight runs": "दोन गठ्ठे, दहा स्तंभ, आठ क्रम",
+  "Put a card on any card one higher, like a 7 on an 8.": "पत्ता त्याच्यापेक्षा एकने मोठ्या कोणत्याही पत्त्यावर ठेवा, जसे 8 वर 7.",
+  "A run of the same suit going down moves together.": "एकाच प्रकाराचा उतरता क्रम एकत्र हलतो.",
+  "Tap a card to send it where it fits best, or drag it.": "पत्त्यावर टॅप करा, तो सर्वात योग्य जागी जाईल, किंवा तो ओढा.",
+  "Stuck? Tap the stock to deal a card onto every column. No column can be empty.": "अडकलात? गठ्ठ्यावर टॅप करा, प्रत्येक स्तंभावर एक पत्ता येईल. कोणताही स्तंभ रिकामा नसावा.",
+  "Build King down to Ace in one suit and it leaves the table. Clear all eight to win.": "एकाच प्रकारात राजा ते एक्का रचा, तो क्रम टेबलावरून जातो. जिंकण्यासाठी आठही काढा."
+}
