@@ -136,7 +136,17 @@ test('leaving: the last one left wins', async () => {
   }
   await expect(A.page.getByRole('heading', { name: 'You won!' })).toBeVisible({ timeout: 10_000 });
   await A.page.screenshot({ path: shots('25-ludo-results') });
-  await A.page.getByRole('button', { name: 'Close', exact: true }).click();
+  for (const p of [A, B, C]) expect(p.errors).toEqual([]);
+});
+
+test('Play again: the same people are invited to a new game, even if they aren’t friends', async () => {
+  await A.page.getByRole('button', { name: 'Play again' }).click();
+  await expect(A.page.getByRole('heading', { name: 'Waiting for players' })).toBeVisible();
+  await expect(B.page.getByText(/invited you to play Ludo/)).toBeVisible({ timeout: 10_000 });
+  await B.page.getByRole('button', { name: 'Join', exact: true }).first().click();
+  await expect(A.page.getByRole('listitem').filter({ hasText: B.u }).getByText('Ready').first()).toBeVisible({ timeout: 10_000 });
+  await A.page.getByRole('button', { name: 'Cancel game' }).last().click();
+  await A.page.getByRole('alertdialog').getByRole('button', { name: 'Cancel game' }).click();
   await expect(A.page.getByRole('img', { name: 'Ludo board' })).toHaveCount(0);
   for (const p of [A, B, C]) expect(p.errors).toEqual([]);
 });

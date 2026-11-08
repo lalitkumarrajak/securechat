@@ -1,7 +1,7 @@
 // End-to-end: Tic-Tac-Toe, Connect Four and Snakes & Ladders, each against a computer player. (Named so it runs after games.spec.ts: the test server hands its fixed dice rolls to whichever game rolls first.)
 import { test, expect, type Locator } from '@playwright/test';
 import fs from 'node:fs';
-import { newGame, phone, signUp, uname, type Phone } from './helpers';
+import { newGame, phone, signUp, tab, uname, type Phone } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 let P: Phone;
@@ -54,8 +54,13 @@ test('Tic-Tac-Toe: play until it ends; marks appear, the computer replies', asyn
     }
   }
   await expect(status()).toHaveText(/won|draw/, { timeout: 30_000 });
-  await expect(P.page.getByRole('heading', { name: /You won|You came|draw/i })).toBeVisible({ timeout: 10_000 }); // results
-  await P.page.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(P.page.getByRole('heading', { name: /You won|You came|draw/i })).toBeVisible({ timeout: 4_000 }); // results, soon after the last move
+  // Play again: a new game with the same computer player, straight away
+  await P.page.getByRole('button', { name: 'Play again' }).click();
+  await expect(P.page.getByRole('heading', { name: /You won|You came|draw/i })).toHaveCount(0);
+  await expect(P.page.getByRole('grid', { name: 'Tic-Tac-Toe board' }).getByRole('gridcell', { name: /, [XO]$/ })).toHaveCount(0, { timeout: 10_000 });
+  await expect(status()).toHaveText(/Your turn|’s turn/, { timeout: 10_000 });
+  await leave();
 });
 
 test('Connect Four: the guide opens the first time, tips say where to drop; discs fall, the computer answers', async () => {
@@ -64,8 +69,9 @@ test('Connect Four: the guide opens the first time, tips say where to drop; disc
   const guide = P.page.getByRole('dialog', { name: 'How to play Connect Four' });
   await expect(guide).toContainText('Get four of your discs in a line to win');
   await P.page.screenshot({ path: shots('61a-connect4-how-to') });
-  await guide.getByRole('button', { name: 'Got it' }).click();
+  await P.page.keyboard.press('Escape'); // closed without "Got it": still counts as seen
   await expect(guide).toHaveCount(0);
+  expect(await P.page.evaluate(() => localStorage.getItem('sanga-games-howto'))).toContain('connect4');
   const board = P.page.getByRole('grid', { name: 'Connect Four board' });
   await expect(board).toBeVisible();
   await expect(P.page.getByRole('note', { name: 'Tip' })).toContainText('Start in the middle (column 4)');
@@ -94,4 +100,21 @@ test('Snakes & Ladders: roll, walk, the computer rolls, back to me', async () =>
   await expect(P.page.getByRole('button', { name: 'Roll dice' })).toBeVisible({ timeout: 30_000 }); // computer played, my turn (or a six again)
   await P.page.screenshot({ path: shots('62-snakes') });
   await leave();
+});
+
+test('a game going on shows as a small card on Chats, with See all to the Games page', async () => {
+  await start('Tic-Tac-Toe');
+  await expect(P.page.getByRole('grid', { name: 'Tic-Tac-Toe board' })).toBeVisible();
+  await P.page.getByRole('button', { name: 'Back to chats' }).click();
+  await tab(P, 'Chats').click();
+  const card = P.page.getByRole('region', { name: 'Games' });
+  await expect(card).toContainText('Tic-Tac-Toe');
+  await expect(card.getByRole('listitem')).toHaveCount(1);
+  await P.page.screenshot({ path: shots('63-games-on-chats') });
+  await card.getByRole('button', { name: /^See all/ }).click();
+  await expect(P.page.getByRole('heading', { name: 'Games', exact: true })).toBeVisible();
+  await expect(P.page.getByRole('list', { name: 'Playing now' })).toContainText('Tic-Tac-Toe');
+  await P.page.getByRole('list', { name: 'Playing now' }).getByRole('button', { name: /Tic-Tac-Toe/ }).first().click();
+  await leave();
+  expect(P.errors).toEqual([]);
 });

@@ -1,7 +1,6 @@
 import { Avatar } from '../../../components/Avatar';
 import { Button } from '@sanga/ui/button';
-import { useApp } from '../../../state/app';
-import { createGame, dismiss, type Game } from '../store';
+import { dismiss, nameOf, rematch, useGames, type Game } from '../store';
 import { Confetti } from './Confetti';
 import { t } from '@sanga/i18n';
 
@@ -14,12 +13,12 @@ const cameIn = (n: number) => {
 };
 
 export function Results({ g, me }: { g: Game; me: string }) {
-  const friends = useApp((s) => s.friends);
+  const next = useGames((s) => (g.again ? s.games[g.again] : undefined));
+  const asked = next && next.status === 'lobby' && next.host !== me && next.players.find((p) => p.u === me)?.state === 'invited';
   const ranked = [...g.players].sort((a, b) => (a.rank || 99) - (b.rank || 99));
   const mine = g.players.find((p) => p.u === me);
   const cancelled = g.ev.some((e) => e.k === 'cancelled' || e.k === 'expired');
   const draw = g.ev.some((e) => e.k === 'draw');
-  const again = g.players.filter((p) => p.u !== me && friends[p.u]).map((p) => p.u);
   return (
     <div className="absolute inset-0 z-30 grid place-items-center overflow-hidden bg-black/60 p-5 animate-fade-in">
       {mine?.rank === 1 && !cancelled && !draw && <Confetti />}
@@ -43,9 +42,10 @@ export function Results({ g, me }: { g: Game; me: string }) {
             </ol>
           </>
         )}
+        {asked && <p className="mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800" role="status">{t('{name} wants to play again', { name: nameOf(next!, next!.host) })}</p>}
         <div className="mt-5 flex gap-3">
           <Button variant="secondary" className="flex-1" onClick={() => dismiss(g.id)}>{t('Close')}</Button>
-          {again.length > 0 && <Button className="flex-1" onClick={() => { dismiss(g.id); createGame(g.type, again); }}>{t('Play again')}</Button>}
+          {!cancelled && <Button className="flex-1 bg-emerald-500 hover:bg-emerald-600" onClick={() => rematch(g)}>{asked ? t('Join') : t('Play again')}</Button>}
         </div>
       </div>
     </div>

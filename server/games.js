@@ -4,7 +4,7 @@
 //
 // Anyone with a game's link can join it while it's in the lobby, friends or not ("open" games).
 //
-// Client → server: gnew {type, to, ref} · gjoin · gdecline · gstart · gleave · gact {a} · gsay {x} · glist
+// Client → server: gnew {type, to, ref} · grematch {id, ref} · gjoin · gdecline · gstart · gleave · gact {a} · gsay {x} · glist
 //                  gtease {to, k} (throw something at a player: not kept) · glink (share by link) · gjoinlink (join from a link) · gbot {add | drop} (computer players)
 //
 // Computer players sit in seats like people (u "bot:<id>"); the server plays their turns.
@@ -284,6 +284,44 @@ export const handlers = {
   },
 
   // The host adds or removes a computer player while waiting for people.
+  // "Play again" on a finished game: a new game of the same kind with the same people. The computer
+  // players sit down again straight away; the others are invited (they just played together, so they
+  // needn't be friends). If someone already asked for a rematch, you join that one instead.
+  async grematch(ws, m) {
+    const g0 = find(ws, m);
+    const ref = typeof m.ref === 'string' ? m.ref.slice(0, 40) : undefined;
+    const fail = (e) => send(ws, { t: 'gerr', ref, id: g0?.id, e });
+    if (!g0 || g0.status !== 'over') return;
+    const next = g0.again && games.get(g0.again);
+    if (next && next.status === 'lobby' && seat(next, ws.user) >= 0) {
+      const pl = next.players[seat(next, ws.user)];
+      if (pl.state === 'invited' || pl.state === 'declined') { pl.state = 'joined'; next.ev = [{ k: 'joined', s: seat(next, ws.user) }]; }
+      return settleLobby(next);
+    }
+    const d = def(g0);
+    const played = g0.players.filter((pl) => pl.state !== 'declined' && pl.state !== 'invited');
+    const people = played.filter((pl) => !core.isBot(pl) && pl.u !== ws.user);
+    for (const pl of people) if (await blockedBetween(pl.u, ws.user)) return fail('You can’t join this game');
+    if (mine(ws.user).filter(isOpen).length >= MAX_OPEN) return fail('Finish or leave one of your games first');
+    if (rateLimited('gnew:' + ws.user, 10, 60e3)) return fail('Slow down');
+    const now = Date.now();
+    const g = {
+      id: crypto.randomBytes(9).toString('base64url'), type: d.type, host: ws.user, status: 'lobby', created: now,
+      players: [{ u: ws.user, n: (await getProfile(ws.user)).name || '', state: 'joined' },
+        ...people.map((pl) => ({ u: pl.u, n: pl.n, state: 'invited' })),
+        ...played.filter(core.isBot).map((pl) => ({ u: 'bot:' + crypto.randomBytes(4).toString('base64url'), n: pl.n, state: 'joined', bot: true }))],
+      ev: [{ k: 'lobby' }], chat: [], deadline: now + config.gameLobbyMs, open: false,
+    };
+    games.set(g.id, g);
+    await commit(g, ref); // the new game first, so the asker's app has it before the old one points at it
+    g0.again = g.id;
+    g0.ev = [{ k: 'again' }];
+    await commit(g0);
+    if (!people.length) await start(g); // only computer players: play now
+    const host = g.players[0].n || ws.user;
+    for (const pl of people) if (!isActive(pl.u)) notify(pl.u, { t: 'game', from: ws.user, name: host, game: d.name }, `${pl.u}|g|${ws.user}`).catch(() => {});
+  },
+
   async gbot(ws, m) {
     const g = find(ws, m);
     if (!g || g.status !== 'lobby' || g.host !== ws.user) return;

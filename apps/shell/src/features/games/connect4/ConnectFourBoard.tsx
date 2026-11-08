@@ -12,7 +12,7 @@ import { turnLine } from '../common/turnLine';
 
 interface State { cells: number[]; line: number[] | null; draw: boolean }
 const COLOR = ['#ef4444', '#facc15'];
-const TIPS = 'sanga-c4-tips';
+const TIPS = 'sanga-c4-tips', PLAYED = 'sanga-c4-played';
 
 export default function ConnectFourBoard({ g: game, me, act, bubble }: GameBoardProps) {
   const g = game as Game<State>;
@@ -28,10 +28,15 @@ export default function ConnectFourBoard({ g: game, me, act, bubble }: GameBoard
     before.current = count;
     if (g.status === 'over' && s.line && s.cells[s.line[0]] === meIdx) playSound('win');
   }, [count, g.status, s.line, s.cells, meIdx]);
+  useEffect(() => { // count the games you've finished, so the tips step back once you know the game
+    if (g.status !== 'over' || meIdx < 0) return;
+    try { const k = `${PLAYED}:${g.id}`; if (!sessionStorage.getItem(k)) { sessionStorage.setItem(k, '1'); localStorage.setItem(PLAYED, String(Number(localStorage.getItem(PLAYED) ?? 0) + 1)); } } catch { /* not counted */ }
+  }, [g.status, g.id, meIdx]);
 
   const open = (c: number) => myTurn && landing(s.cells, c) >= 0;
   // Tips for a new player: where to win, where to block, which columns hand the other player a win.
-  const [tips, setTipsState] = useState(() => { try { return localStorage.getItem(TIPS) !== 'off'; } catch { return true; } });
+  // On for your first few games; after that only if you turn them on.
+  const [tips, setTipsState] = useState(() => { try { const v = localStorage.getItem(TIPS); return v ? v === 'on' : Number(localStorage.getItem(PLAYED) ?? 0) < 3; } catch { return true; } });
   const setTips = (on: boolean) => { setTipsState(on); try { localStorage.setItem(TIPS, on ? 'on' : 'off'); } catch { /* this visit only */ } };
   const tip = myTurn && tips && meIdx >= 0 ? advice(s.cells, meIdx) as { why: 'win' | 'block' | 'middle'; c: number; traps: number[] } | null : null;
   const them = meIdx === 0 ? t('Yellow') : t('Red');

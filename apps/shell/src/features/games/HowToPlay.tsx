@@ -97,7 +97,8 @@ export function HowToPlay({ type, open, onOpenChange }: { type: string; open: bo
 /** The ? button for the game screen's header; opens the guide by itself the first time a game starts. */
 export function HowToPlayButton({ type, playing }: { type: string; playing: boolean }) {
   const [open, setOpen] = useState(false);
-  useEffect(() => { if (playing && STEPS[type] && !seen().includes(type)) setOpen(true); }, [playing, type]);
+  // Once only: it counts as seen as soon as it opens, however it's closed (button, swipe, tap outside).
+  useEffect(() => { if (playing && STEPS[type] && !seen().includes(type)) { markSeen(type); setOpen(true); } }, [playing, type]);
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} aria-label={t('How to play')} title={t('How to play')}

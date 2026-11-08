@@ -15,6 +15,7 @@ export interface Game<S = any> {
   id: string; type: string; host: string; status: 'lobby' | 'play' | 'over';
   players: GamePlayer[]; turn: number; s: S; ev: GameEvent[]; v: number;
   open?: boolean;   // anyone with the link may join while in the lobby
+  again?: string;   // finished: the rematch someone started
   deadline: number; // local clock: when the current turn (or the invite) runs out
 }
 export interface ChatLine { f: string; x: string; ts: number }
@@ -33,8 +34,12 @@ interface GamesState {
   dismissed: string[];       // finished games whose results were closed
 }
 
+/** Finished games you closed, kept on this device so they don't come back when the list reloads. */
+const CLOSED = 'sanga-games-closed';
+function closedBefore(): string[] { try { return JSON.parse(localStorage.getItem(CLOSED) ?? '[]'); } catch { return []; } }
+
 export const useGames = create<GamesState>(() => ({
-  games: {}, chat: {}, unread: {}, bubble: {}, open: null, chatOpen: false, picker: null, dismissed: [],
+  games: {}, chat: {}, unread: {}, bubble: {}, open: null, chatOpen: false, picker: null, dismissed: closedBefore(),
 }));
 const set = useGames.setState;
 const get = useGames.getState;
@@ -59,6 +64,7 @@ export const hasPendingLink = () => !!linkPending();
 export const shareLink = (id: string) => `${location.origin}/?play=${id}`;
 
 function ingest(raw: any): Game | null {
+  if (raw.status === 'over' && get().dismissed.includes(raw.id)) return null; // closed: stays closed
   const prev = get().games[raw.id];
   if (prev && prev.v >= raw.v) return null;
   const { left, ...rest } = raw;
@@ -76,7 +82,12 @@ frameHooks.g = (m) => {
   const g = ingest(m.g);
   if (linkPending() === m.g.id && get().games[m.g.id]) { setLinkPending(null); set({ open: m.g.id }); } // opened from a link
   if (!g) return;
-  if (m.ref && pending.delete(m.ref)) set({ open: g.id, picker: null });
+  if (m.ref && pending.delete(m.ref)) {
+    set({ open: g.id, picker: null });
+    const old = replaces.get(m.ref);
+    if (old) { replaces.delete(m.ref); wantAgain.delete(old); dismiss(old); }
+  }
+  if (g.again && wantAgain.delete(g.id)) { set({ open: g.again }); dismiss(g.id); } // someone had already started one: into that
   const me = meIn(g);
   if (!before && g.status === 'lobby' && me?.state === 'invited') {
     playSound('invite');
@@ -93,7 +104,7 @@ frameHooks.gl = (m) => {
   for (const raw of m.games) {
     const { left, chat: lines, ...rest } = raw;
     const g: Game = { ...rest, deadline: Date.now() + (left || 0) };
-    if (meIn(g)?.state === 'declined') continue;
+    if (meIn(g)?.state === 'declined' || (g.status === 'over' && get().dismissed.includes(g.id))) continue;
     games[g.id] = g;
     chat[g.id] = lines || [];
   }
@@ -162,6 +173,17 @@ export function createGame(type: string, to: string[]) {
   pending.set(ref, true);
   sendOrWarn({ t: 'gnew', type, to, ref });
 }
+/** Play a finished game again with the same people (computer players sit down again by themselves). */
+const wantAgain = new Set<string>();
+const replaces = new Map<string, string>(); // rematch ref → the finished game it replaces (closed once the new one opens)
+export function rematch(g: Game) {
+  const ref = randomId();
+  pending.set(ref, true);
+  sendOrWarn({ t: 'grematch', id: g.id, ref });
+  if (g.again) { set({ open: g.again }); dismiss(g.id); return; } // someone already asked: into theirs
+  wantAgain.add(g.id);
+  replaces.set(ref, g.id);
+}
 export const join = (id: string) => sendOrWarn({ t: 'gjoin', id });
 export const decline = (id: string) => sendOrWarn({ t: 'gdecline', id });
 export const startNow = (id: string) => sendOrWarn({ t: 'gstart', id });
@@ -185,7 +207,9 @@ export function dismiss(id: string) {
   set((s) => {
     const games = { ...s.games };
     delete games[id];
-    return { games, dismissed: [...s.dismissed, id], open: s.open === id ? null : s.open };
+    const dismissed = [...s.dismissed, id].slice(-50);
+    try { localStorage.setItem(CLOSED, JSON.stringify(dismissed)); } catch { /* this visit only */ }
+    return { games, dismissed, open: s.open === id ? null : s.open };
   });
 }
 

@@ -5,7 +5,7 @@ import { t } from '@sanga/i18n';
 import { back } from '../../lib/nav';
 import { AppTabs } from '../nav/AppTabs';
 import { GAME_UI } from './registry';
-import { GamesStrip } from './GamesStrip';
+import { GamesList } from './GamesStrip';
 import { listed, openPicker, useGames } from './store';
 
 export function GamesHub() {
@@ -55,7 +55,7 @@ export function GamesHub() {
 
         <h2 className="mt-8 mb-3 text-lg font-semibold">{t('Your games')}</h2>
         <div className="overflow-hidden rounded-3xl border border-line bg-panel">
-          {any ? <GamesStrip /> : <p className="px-4 py-8 text-center text-sm text-muted">{t('No games yet. Pick one above to start.')}</p>}
+          {any ? <GamesList /> : <p className="px-4 py-8 text-center text-sm text-muted">{t('No games yet. Pick one above to start.')}</p>}
         </div>
         <p className="mt-3 text-center text-xs text-muted">{t('Tip: in the waiting room, tap “Add computer player” to play even when your friends are busy.')}</p>
       </div>

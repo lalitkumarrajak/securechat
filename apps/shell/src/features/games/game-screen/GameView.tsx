@@ -36,9 +36,9 @@ export function GameView({ g }: { g: Game }) {
     const iv = setInterval(() => tick((n) => n + 1), 1000);
     return () => clearInterval(iv);
   }, []);
-  useEffect(() => { // let the last moves play before the results
+  useEffect(() => { // let the last move land (and the winning line flash) before the results
     if (g.status !== 'over') return;
-    const tm = setTimeout(() => setShowResults(true), 3500);
+    const tm = setTimeout(() => setShowResults(true), g.ev.some((e) => e.k === 'cancelled' || e.k === 'expired') ? 0 : 1200);
     return () => clearTimeout(tm);
   }, [g.status]);
 
@@ -99,7 +99,7 @@ export function GameView({ g }: { g: Game }) {
       </header>
 
       <main className="relative min-h-0 flex-1" onClick={onBoardClick}>
-        {g.status === 'lobby' ? <Lobby g={g} me={me} onLeave={leaveGame} /> : ui ? (
+        {g.status === 'lobby' ? <Lobby g={g} me={me} onLeave={leaveGame} /> : !g.s ? null /* called off before it began: just the results */ : ui ? (
           <Suspense fallback={<div className="grid h-full place-items-center"><Spinner /></div>}>
             <ui.Board g={g} me={me} act={(a) => act(g.id, a)} bubble={bubble} />
           </Suspense>
