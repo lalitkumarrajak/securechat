@@ -6,9 +6,9 @@ import { makeFriends, phone, signUp, testPng, testWav, uname, type Phone } from 
 test.describe.configure({ mode: 'serial' });
 
 let P: Phone, Q: Phone, R: Phone;
-// The Stories tab of the chat list (opened if it isn't the one showing).
+// The stories along the top of Chats (Chats opened if it isn't the one showing).
 async function stories(p: Phone) {
-  const tab = p.page.getByRole('tab', { name: /Stories$/ });
+  const tab = p.page.getByRole('tab', { name: /Chats$/ });
   if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.click();
   return p.page.getByRole('region', { name: 'Stories' });
 }

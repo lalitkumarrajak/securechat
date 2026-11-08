@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import type { Chat, Friend, Group, Me, Msg, Presence, Request } from '../lib/types';
 
 export type Status = 'loading' | 'auth' | 'app';
-export type Section = 'chat' | 'stories' | 'games' | 'diary' | 'calendar' | 'split' | 'accounts' | 'more';
+export type Section = 'chat' | 'profile' | 'games' | 'diary' | 'calendar' | 'split' | 'accounts' | 'more';
 export type Conn = 'online' | 'connecting' | 'offline';
 export type Panel = null | 'settings' | 'friends' | 'contact' | 'archived' | 'group' | 'newgroup';
 
@@ -49,7 +49,7 @@ export interface AppState {
 
 export const useApp = create<AppState>(() => ({
   status: 'loading',
-  section: location.hash === '#stories' ? 'stories' : location.hash === '#games' ? 'games' : location.hash === '#diary' ? 'diary' : location.hash === '#calendar' ? 'calendar' : location.hash === '#split' ? 'split' : location.hash === '#more' ? 'more' : 'chat',
+  section: location.hash === '#profile' ? 'profile' : location.hash === '#games' ? 'games' : location.hash === '#diary' ? 'diary' : location.hash === '#calendar' ? 'calendar' : location.hash === '#split' ? 'split' : location.hash === '#accounts' ? 'accounts' : location.hash === '#more' ? 'more' : 'chat',
   signupOpen: true,
   gifsEnabled: false,
   emailRequired: false,

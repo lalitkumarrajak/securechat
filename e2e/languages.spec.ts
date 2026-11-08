@@ -75,7 +75,7 @@ for (const L of LANGS) test.describe(L.english, () => {
     const html = P.page.locator('html');
     await expect(html).toHaveAttribute('lang', 'en');
     await expect(tab(P, 'Chats')).toBeVisible();
-    await P.page.getByRole('button', { name: 'Profile and settings' }).click();
+    await tab(P, 'Account').click();
     await P.page.getByRole('button', { name: /Language/ }).click();
     await expect(P.page.getByRole('radio', { name: /English/ })).toHaveAttribute('aria-checked', 'true');
     await P.page.getByRole('radio', { name: L.name }).click();
@@ -84,17 +84,17 @@ for (const L of LANGS) test.describe(L.english, () => {
     await expect(P.page.getByRole('radio', { name: L.name })).toHaveAttribute('aria-checked', 'true');
     await clean(P.page, 'Settings → Language');
     await P.page.screenshot({ path: shots(`60-${L.english.toLowerCase()}-language`) });
-    await P.page.getByRole('button', { name: tr('Back') }).first().click();
-    await expect(P.page.getByRole('banner').getByRole('heading', { name: tr('Settings') })).toBeVisible();
-    await clean(P.page, 'Settings');
-    await P.page.keyboard.press('Escape');
+    await P.page.getByRole('button', { name: tr('Back') }).first().click(); // back on the Profile tab
+    await expect(P.page.getByRole('heading', { name: tr('Account'), level: 1 })).toBeVisible();
+    await clean(P.page, 'Account');
+    await tab(P, tr('Chats')).click();
   });
 
-  test(`every app in ${L.english}: chats, stories, games, diary, calendar, split`, async () => {
+  test(`every app in ${L.english}: chats, account, games, diary, calendar, split`, async () => {
     await expect(tab(P, tr('Chats'))).toBeVisible();
     await clean(P.page, 'Chats');
     await P.page.screenshot({ path: shots(`61-${L.english.toLowerCase()}-chats`) });
-    for (const [en, shot] of [['Stories', `62-${L.english.toLowerCase()}-stories`], ['Games', `63-${L.english.toLowerCase()}-games`], ['Diary', `64-${L.english.toLowerCase()}-diary`], ['Calendar', `65-${L.english.toLowerCase()}-calendar`], ['Split', `66-${L.english.toLowerCase()}-split`]] as const) {
+    for (const [en, shot] of [['Account', `62-${L.english.toLowerCase()}-account`], ['Games', `63-${L.english.toLowerCase()}-games`], ['Diary', `64-${L.english.toLowerCase()}-diary`], ['Calendar', `65-${L.english.toLowerCase()}-calendar`], ['Split', `66-${L.english.toLowerCase()}-split`]] as const) {
       const inMore = en === 'Games' || en === 'Diary';
       if (inMore) await openApp(P, tr(en), tr('More')); else await tab(P, tr(en)).click();
       await expect(tab(P, tr(inMore ? 'More' : en))).toHaveAttribute('aria-selected', 'true');
@@ -120,9 +120,8 @@ for (const L of LANGS) test.describe(L.english, () => {
     await clean(P.page, 'Split → add expense');
     await P.page.screenshot({ path: shots(`67-${L.english.toLowerCase()}-add-expense`) });
     await P.page.keyboard.press('Escape');
-    // Accounts (from More), and its Bills.
-    await tab(P, tr('More')).click();
-    await P.page.getByRole('region', { name: tr('More') }).getByRole('button', { name: new RegExp(`^${tr('Accounts')}`) }).click();
+    // Accounts (More → Money), and its Bills.
+    await openApp(P, tr('Money'), tr('More'));
     const acc = P.page.getByRole('region', { name: tr('Accounts') });
     await expect(acc.getByRole('heading', { name: tr('Accounts'), exact: true })).toBeVisible({ timeout: 15_000 });
     await clean(P.page, 'Accounts');
@@ -135,7 +134,7 @@ for (const L of LANGS) test.describe(L.english, () => {
     await expect(P.page.locator('html')).toHaveAttribute('lang', L.id);
     await expect(tab(P, tr('Chats'))).toBeVisible({ timeout: 20_000 });
     await tab(P, tr('Chats')).click();
-    await P.page.getByRole('button', { name: tr('Profile and settings') }).click();
+    await tab(P, tr('Account')).click();
     await P.page.getByRole('button', { name: new RegExp(tr('Language')) }).click();
     // Straight to the other language: its words, none of this one's left behind.
     await P.page.getByRole('radio', { name: L.other.name }).click();

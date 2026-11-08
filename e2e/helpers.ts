@@ -38,11 +38,13 @@ export async function openAuth(page: Page, tab: 'Sign in' | 'Create account') {
 /** Signed out: the landing page (or the sign-in screen) is showing. */
 export const signedOutView = (page: Page) => page.getByRole('button', { name: /Get started/ }).or(page.getByRole('tab', { name: 'Sign in' })).first();
 
-/** One of the tabs along the bottom: Chats, Stories, Calendar, Split or More. */
+/** One of the tabs along the bottom: Chats, Calendar, Account, Split or More. */
 export const tab = (p: Phone, name: string) => p.page.getByRole('tab', { name: new RegExp(`${name}$`) });
 
-/** Games or Diary: the More tab, then the app's tile on its page. `more` is "More" in the language showing. */
+/** Games, the Diary or Accounts (its tile is "Money"): the More tab, then the app's tile on its page.
+ *  `more` is "More" in the language showing. */
 export async function openApp(p: Phone, name: string, more = 'More') {
+  if (name === 'Accounts') name = 'Money';
   await tab(p, more).click();
   await p.page.getByRole('region', { name: more }).getByRole('button', { name: new RegExp(`^${name}`) }).click();
 }
@@ -168,15 +170,23 @@ export async function stubExternalImages(p: Phone) {
     route.fulfill({ status: 200, contentType: 'image/png', body: png }));
 }
 
-/** Make two signed-in phones friends (a sends the request, b accepts). */
+/** Friends (and requests, and adding one): in the Account tab. */
+export async function openFriends(p: Phone) {
+  await tab(p, 'Account').click();
+  await p.page.getByRole('region', { name: 'Account' }).getByRole('button', { name: /^Friends/ }).click();
+}
+
+/** Make two signed-in phones friends (a sends the request, b accepts); both end up back on Chats. */
 export async function makeFriends(a: Phone, b: Phone) {
-  await a.page.getByRole('button', { name: 'Friends' }).click();
+  await openFriends(a);
   await a.page.getByRole('tab', { name: 'Add' }).click();
   await a.page.getByPlaceholder('Search by username').fill(b.u);
   await a.page.locator('li').filter({ hasText: '@' + b.u }).getByRole('button', { name: 'Add', exact: true }).click();
   await a.page.keyboard.press('Escape');
-  await b.page.getByRole('button', { name: 'Friends' }).click();
+  await tab(a, 'Chats').click();
+  await openFriends(b);
   await b.page.locator('li').filter({ hasText: a.u }).getByRole('button', { name: 'Accept' }).click();
   await expect(b.page.getByText(`You and ${a.u} are now friends`)).toBeVisible();
   await b.page.keyboard.press('Escape');
+  await tab(b, 'Chats').click();
 }

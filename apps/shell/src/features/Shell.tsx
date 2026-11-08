@@ -4,6 +4,7 @@ import { DiaryPage } from './notes/DiaryPage';
 import { CalendarPage } from './calendar/CalendarPage';
 import { SplitPage } from './split/SplitPage';
 import { AccountsPage } from './accounts/AccountsPage';
+import { ProfilePage } from './profile/ProfilePage';
 import { getApp, setApp, useApp } from '../state/app';
 import { go } from '../lib/nav';
 import { MorePage } from './nav/MorePage';
@@ -22,11 +23,12 @@ export function Main() {
   useKeyboardHeight();
   return (
     <>
-      {(section === 'chat' || section === 'stories') && <Shell />}
+      {section === 'chat' && <Shell />}
       {section === 'diary' && <DiaryPage />}
       {section === 'calendar' && <CalendarPage />}
       {section === 'split' && <SplitPage />}
       {section === 'accounts' && <AccountsPage />}
+      {section === 'profile' && <ProfilePage />}
       {section === 'more' && <MorePage />}
       {section === 'games' && <Suspense fallback={<GamesSkeleton />}><GamesHub /></Suspense>}
       <Overlays />

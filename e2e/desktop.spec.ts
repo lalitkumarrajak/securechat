@@ -1,7 +1,7 @@
 // End-to-end: Sanga on a laptop. The chat list stays a column on the left with the chat beside it,
 // whichever tab you've been on (the diary once broke this), and everything opens where it should.
 import { test, expect, type Locator } from '@playwright/test';
-import { openApp, makeFriends, phone, signUp, tab, uname, type Phone } from './helpers';
+import { openApp, makeFriends, phone, signUp, tab, uname, type Phone, openFriends } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -37,9 +37,7 @@ test('after the diary, Chats and Stories are still two columns', async () => {
 
   await tab(P, 'Chats').click();
   await twoColumns(P);
-  await tab(P, 'Stories').click();
-  await twoColumns(P);
-  await expect(P.page.getByRole('region', { name: 'Stories' })).toBeVisible();
+  await expect(P.page.getByRole('region', { name: 'Stories' })).toBeVisible(); // at the top of Chats
   await openApp(P, 'Games');
   await expect(P.page.getByRole('button', { name: 'Play Ludo' })).toBeVisible();
   await tab(P, 'Chats').click();
@@ -48,7 +46,7 @@ test('after the diary, Chats and Stories are still two columns', async () => {
 });
 
 test('a friend from Friends opens their chat beside the list', async () => {
-  await P.page.getByRole('button', { name: 'Friends' }).click();
+  await openFriends(P);
   await P.page.getByRole('dialog').locator('li').filter({ hasText: Q.u }).first().click();
   await expect(P.page.getByRole('dialog')).toHaveCount(0);
   await expect(P.page.locator('#composer-input')).toBeVisible();
@@ -61,11 +59,11 @@ test('a friend from Friends opens their chat beside the list', async () => {
   await twoColumns(Q);
 });
 
-test('from the Stories and Games tabs, a friend still opens their chat', async () => {
-  for (const t of ['Stories', 'Games', 'Diary']) {
-    if (t === 'Stories') await tab(P, t).click(); else await openApp(P, t);
+test('from Games and the Diary, a friend still opens their chat', async () => {
+  for (const t of ['Games', 'Diary']) {
+    await openApp(P, t);
     await tab(P, 'Chats').click(); // Friends is above the chat list
-    await P.page.getByRole('button', { name: 'Friends' }).click();
+    await openFriends(P);
     await P.page.getByRole('dialog').locator('li').filter({ hasText: Q.u }).first().click();
     await expect(P.page.locator('#composer-input')).toBeVisible();
     await twoColumns(P);
@@ -99,14 +97,13 @@ test('an emoji-only reply is big and animated, with the message it answers', asy
   await Q.page.screenshot({ path: shots('62-emoji-reply') });
 });
 
-test('Stories has no top bar: no title, photo, Friends or menu', async () => {
-  await tab(P, 'Stories').click();
-  await expect(P.page.locator('aside header')).toHaveCount(0);
-  for (const name of ['Profile and settings', 'Friends', 'Menu']) await expect(P.page.getByRole('button', { name })).toHaveCount(0);
-  await expect(P.page.getByRole('region', { name: 'Stories' }).getByText('My story')).toBeVisible();
-  await P.page.screenshot({ path: shots('63-stories-header') });
+test('no Stories tab: stories sit at the top of Chats; no top bar (it’s all in Account)', async () => {
   await tab(P, 'Chats').click();
-  await expect(P.page.getByRole('button', { name: 'Profile and settings' })).toBeVisible();
+  await expect(P.page.getByRole('tab', { name: /Stories$/ })).toHaveCount(0);
+  for (const name of ['Profile and settings', 'Menu']) await expect(P.page.getByRole('button', { name })).toHaveCount(0);
+  await expect(tab(P, 'Account')).toBeVisible();
+  await expect(P.page.getByRole('region', { name: 'Stories' }).getByRole('button', { name: /Your story|Add to your story/ })).toBeVisible();
+  await P.page.screenshot({ path: shots('63-stories-header') });
 });
 
 test('a newer Sanga on the server: the app switches to it by itself', async () => {

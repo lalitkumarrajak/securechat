@@ -2,7 +2,7 @@
 // yet read each other's (end-to-end encrypted) group messages. G4 joins with the invite link.
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
-import { PASSWORD, phone, signUp, uname, type Phone } from './helpers';
+import { PASSWORD, phone, signUp, uname, type Phone, tab, openFriends } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -13,15 +13,17 @@ const box = (p: Phone) => p.page.getByRole('textbox', { name: 'Message' });
 const bubbleWith = (p: Phone, text: string) => p.page.locator('[data-k]').filter({ hasText: text }).last();
 
 async function befriend(a: Phone, b: Phone) {
-  await a.page.getByRole('button', { name: 'Friends' }).click();
+  await openFriends(a);
   await a.page.getByRole('tab', { name: 'Add' }).click();
   await a.page.getByPlaceholder('Search by username').fill(b.u);
   await a.page.locator('li').filter({ hasText: '@' + b.u }).getByRole('button', { name: 'Add', exact: true }).click();
   await a.page.keyboard.press('Escape');
-  await b.page.getByRole('button', { name: 'Friends' }).click();
+  await tab(a, 'Chats').click();
+  await openFriends(b);
   await b.page.locator('li').filter({ hasText: a.u }).getByRole('button', { name: 'Accept' }).click();
   await expect(b.page.getByText(`You and ${a.u} are now friends`)).toBeVisible();
   await b.page.keyboard.press('Escape');
+  await tab(b, 'Chats').click();
 }
 
 test.beforeAll(async ({ browser }) => {
@@ -38,8 +40,8 @@ test('set up: three people, two of them friends with the host only', async () =>
 });
 
 test('create a group with friends', async () => {
-  await G1.page.getByRole('button', { name: 'Menu' }).click();
-  await G1.page.getByRole('menuitem', { name: 'New group' }).click();
+  await tab(G1, 'Account').click();
+  await G1.page.getByRole('region', { name: 'Account' }).getByRole('button', { name: 'New group' }).click();
   const panel = G1.page.getByRole('dialog', { name: 'New group' });
   await expect(panel.getByRole('heading', { name: 'Add group members' })).toBeVisible();
   await panel.getByRole('button', { name: new RegExp('@' + G2.u) }).click();

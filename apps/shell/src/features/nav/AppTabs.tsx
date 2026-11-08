@@ -1,11 +1,11 @@
-// The tabs along the bottom once signed in: Chats, Stories, Calendar and Split, then More, a page with
-// Sanga's other apps (Games, the Diary, Accounts). Five tabs fit a phone.
+// The tabs along the bottom once signed in: Chats (stories are at its top), Calendar, Account (your Sanga
+// account: profile, friends, settings) in the middle, Split, then More, a page with Sanga's other apps (Games, the Diary,
+// Money). Five tabs fit a phone.
 import type { ReactNode } from 'react';
-import { CalendarDays, CircleDashed, LayoutGrid, MessageCircle, Wallet } from 'lucide-react';
+import { CalendarDays, CircleUserRound, LayoutGrid, MessageCircle, Wallet } from 'lucide-react';
 import { cn } from '@sanga/ui/utils';
 import { myName } from '../../lib/engine';
 import { go } from '../../lib/nav';
-import { useStories } from '../../lib/stories';
 import { useApp, type Section } from '../../state/app';
 import { listed, useGames } from '../games/store';
 import { Count } from './Count';
@@ -20,9 +20,8 @@ export function useGamesDue() {
 
 export function AppTabs() {
   const section = useApp((s) => s.section);
-  const me = useApp((s) => s.me!.u);
   const unread = useApp((s) => s.chats.filter((c) => c.unread && !c.archived).length);
-  const fresh = useStories((s) => s.list.some((x) => x.u !== me && !x.seen));
+  const requests = useApp((s) => s.incoming.length);
   const gamesDue = useGamesDue();
 
   const tab = (label: string, icon: ReactNode, selected: boolean, onClick: () => void, badge?: ReactNode) => (
@@ -38,11 +37,10 @@ export function AppTabs() {
   return (
     <nav role="tablist" aria-label="Sanga" className="flex shrink-0 justify-center border-t border-line bg-panel pb-[env(safe-area-inset-bottom)] [&>*]:max-w-40">
       {tab(tk('Chats'), <MessageCircle />, section === 'chat', to('chat'), unread > 0 && <Count n={unread} />)}
-      {tab(tk('Stories'), <CircleDashed />, section === 'stories', to('stories'),
-        fresh && <span className="absolute top-0 right-3 size-2.5 rounded-full border-2 border-panel bg-accent" aria-label={t('New stories')} />)}
       {tab(tk('Calendar'), <CalendarDays />, section === 'calendar', to('calendar'))}
+      {tab(tk('Account'), <CircleUserRound />, section === 'profile', to('profile'), requests > 0 && <Count n={requests} />)}
       {tab(tk('Split'), <Wallet />, section === 'split', to('split'))}
-      {/* Games and the Diary are opened from More's page, and More stays lit while you're in them. */}
+      {/* Games, the Diary and Money are opened from More's page, and More stays lit while you're in them. */}
       {tab(tk('More'), <LayoutGrid />, section === 'more' || section === 'games' || section === 'diary' || section === 'accounts', to('more'), gamesDue > 0 && <Count n={gamesDue} />)}
     </nav>
   );

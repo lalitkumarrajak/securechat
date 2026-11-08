@@ -1,14 +1,14 @@
 // End-to-end: voice and video calls between two friends, over real WebRTC (Chrome's fake camera and
 // microphone). Answering, muting, hanging up, declining, cancelling, and the calls in the chat.
 import { test, expect } from '@playwright/test';
-import { makeFriends, phone, signUp, uname, type Phone } from './helpers';
+import { makeFriends, phone, signUp, uname, type Phone, openFriends } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
 let P: Phone, Q: Phone;
 const callScreen = (p: Phone) => p.page.getByRole('dialog', { name: /^Call with/ });
 const openChat = async (p: Phone, other: Phone) => {
-  await p.page.getByRole('button', { name: 'Friends' }).click();
+  await openFriends(p);
   await p.page.getByRole('dialog').locator('li').filter({ hasText: other.u }).first().click();
   await expect(p.page.getByRole('button', { name: 'Voice call' })).toBeVisible();
 };

@@ -1,6 +1,6 @@
 // End-to-end: app lock with a PIN.
 import { test, expect } from '@playwright/test';
-import { phone, signUp, uname, type Phone } from './helpers';
+import { phone, signUp, uname, type Phone, tab } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 let P: Phone;
@@ -13,7 +13,7 @@ test.afterAll(async () => { await P?.ctx.close(); });
 
 test('turn on app lock with a PIN', async () => {
   await signUp(P);
-  await P.page.getByRole('button', { name: 'Profile and settings' }).click();
+  await tab(P, 'Account').click();
   await P.page.getByRole('button', { name: /^Privacy/ }).click();
   await P.page.getByRole('switch', { name: 'Lock with a PIN' }).click();
   const pin = P.page.getByLabel('PIN', { exact: true });
@@ -27,6 +27,7 @@ test('turn on app lock with a PIN', async () => {
   await expect(P.page.getByText('App lock on').first()).toBeVisible();
   await expect(P.page.getByRole('radio', { name: 'Immediately' })).toHaveAttribute('aria-checked', 'true');
   await P.page.keyboard.press('Escape');
+  await tab(P, 'Chats').click();
 });
 
 test('Lock hides everything; a wrong PIN is refused, the right one unlocks', async () => {
@@ -61,7 +62,7 @@ test('5 wrong PINs mean a wait', async () => {
 });
 
 test('turning it off needs the PIN', async () => {
-  await P.page.getByRole('button', { name: 'Profile and settings' }).click();
+  await tab(P, 'Account').click();
   await P.page.getByRole('button', { name: /^Privacy/ }).click();
   await P.page.getByRole('switch', { name: 'Lock with a PIN' }).click();
   await P.page.getByLabel('PIN', { exact: true }).fill('9999');

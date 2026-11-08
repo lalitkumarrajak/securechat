@@ -1,15 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Archive, ArrowLeft, CirclePlus, Clock, Loader2, Lock, LogOut, MessageSquarePlus, MoreVertical, Search, Settings, UserPlus, Users, WifiOff, X } from 'lucide-react';
-import { Avatar } from '../../components/Avatar';
+import { Archive, ArrowLeft, Clock, Loader2, Lock, Search, WifiOff, X } from 'lucide-react';
 import { IconButton } from '@sanga/ui/button';
-import { confirm } from '@sanga/ui/confirm';
-import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '@sanga/ui/menu';
-import { logout } from '../../lib/engine';
 import { cn } from '@sanga/ui/utils';
 import { setApp, useApp } from '../../state/app';
 import { GamesStrip } from '../games/GamesStrip';
-import { StoriesList } from '../stories/StoriesList';
-import { openComposer } from '../../lib/stories';
+import { StoriesBar } from '../stories/StoriesBar';
 import { ChatListSkeleton } from '../../components/skeleton/ChatListSkeleton';
 import { useSettings } from '../../state/settings';
 import { lockNow } from '../../lib/applock';
@@ -24,7 +19,6 @@ export function Sidebar() {
   const conn = useApp((s) => s.conn);
   const chats = useApp((s) => s.chats);
   const friends = useApp((s) => s.friends);
-  const incoming = useApp((s) => s.incoming.length);
   const panel = useApp((s) => s.panel);
   const syncing = useApp((s) => s.syncing);
   const [waited, setWaited] = useState(false); // stop showing placeholders if the server is slow to answer
@@ -40,12 +34,11 @@ export function Sidebar() {
   const banner = conn === 'offline' || (conn === 'connecting' && slow);
   // What this device had shows at once; what came in meanwhile is still on its way.
   const updating = !banner && (conn === 'connecting' || syncing);
-  const headerTitle = useSettings((s) => s.headerTitle);
+  const privacyScreen = useSettings((s) => !!s.privacyScreen);
   const appLock = useSettings((s) => !!s.appLock);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const archivedView = panel === 'archived';
-  const storiesTab = useApp((s) => s.section === 'stories') && !archivedView;
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -64,19 +57,17 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Stories has no top bar: "My story" is the first thing on it. */}
-      {!storiesTab && (archivedView ? (
+      {archivedView ? (
         <header className="flex h-14 shrink-0 items-center gap-2 px-3 md:h-16">
           <IconButton label={t('Back')} onClick={() => setApp({ panel: null })}><ArrowLeft /></IconButton>
           <h1 className="flex-1 text-lg font-semibold">{t('Archived')}</h1>
         </header>
       ) : (
-        <header className="flex h-14 shrink-0 items-center gap-2 px-3 md:h-16">
-          <button onClick={() => setApp({ panel: 'settings' })} aria-label={t('Profile and settings')} className="rounded-full">
-            <Avatar u={me.u} name={me.name} size={40} />
-          </button>
-          <div className="flex min-w-0 flex-1 items-center gap-2 pl-1">
-            <h1 className="min-w-0 truncate text-xl font-bold tracking-tight">{headerTitle.trim() || me.u}</h1>
+        // No top bar: your name, friends and settings are in the Account tab. The heading is for screen
+        // readers; the lock, the privacy screen's eye and "Updating…" get a slim row only when there's one to show.
+        <header className={cn('flex shrink-0 items-center gap-2 px-3', updating || appLock || privacyScreen ? 'h-11 pt-1' : 'h-2')}>
+          <h1 className="sr-only">{me.u}</h1>
+          <div className="flex min-w-0 flex-1 items-center pl-2">
             {updating && (
               <span data-testid="chats-updating" role="status" className="flex shrink-0 animate-fade-in items-center gap-1 text-xs text-muted">
                 <Loader2 className="size-3.5 animate-spin" aria-hidden />{t('Updating…')}
@@ -86,32 +77,9 @@ export function Sidebar() {
           <div className="flex items-center">
             <PeekButton />
             {appLock && <IconButton label={t('Lock Sanga')} onClick={lockNow}><Lock /></IconButton>}
-            <div className="relative">
-              <IconButton label={t('Friends')} onClick={() => setApp({ panel: 'friends', friendsTab: incoming ? 'requests' : 'friends' })}>
-                <UserPlus />
-              </IconButton>
-              {incoming > 0 && (
-                <span className="pointer-events-none absolute top-0.5 right-0.5 grid min-w-[18px] place-items-center rounded-full bg-danger px-1 text-[11px] font-bold leading-[18px] text-white">{incoming}</span>
-              )}
-            </div>
-            <Menu>
-              <MenuTrigger asChild><IconButton label={t('Menu')}><MoreVertical /></IconButton></MenuTrigger>
-              <MenuContent>
-                <MenuItem icon={<MessageSquarePlus />} onSelect={() => setApp({ panel: 'friends', friendsTab: 'friends' })}>{t('New chat')}</MenuItem>
-                <MenuItem icon={<Users />} onSelect={() => setApp({ panel: 'newgroup' })}>{t('New group')}</MenuItem>
-                <MenuItem icon={<CirclePlus />} onSelect={() => openComposer()}>{t('New story')}</MenuItem>
-                <MenuItem icon={<UserPlus />} onSelect={() => setApp({ panel: 'friends', friendsTab: 'add' })}>{t('Add friend')}</MenuItem>
-                <MenuItem icon={<Archive />} onSelect={() => setApp({ panel: 'archived' })}>{t('Archived chats')}</MenuItem>
-                <MenuItem icon={<Settings />} onSelect={() => setApp({ panel: 'settings' })}>{t('Settings')}</MenuItem>
-                <MenuSeparator />
-                <MenuItem icon={<LogOut />} danger onSelect={async () => {
-                  if (await confirm({ title: t('Sign out?'), description: t('Messages stored on this device will be removed. You can sign in again any time.'), confirmText: t('Sign out'), destructive: true })) logout();
-                }}>{t('Sign out')}</MenuItem>
-              </MenuContent>
-            </Menu>
           </div>
         </header>
-      ))}
+      )}
 
       {banner && (
         <div className="mx-3 mb-2 flex items-center gap-2 rounded-xl bg-warn px-3 py-2 text-sm" role="status">
@@ -120,10 +88,10 @@ export function Sidebar() {
         </div>
       )}
 
-      {/* Only the header stays put: search and games scroll away with the chats, so on a
+      {/* Only the header stays put: stories, search and games scroll away with the chats, so on a
           phone the list gets nearly the whole screen. */}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {storiesTab ? <StoriesList /> : <>
+        {!archivedView && <StoriesBar />}
         <div className="px-3 pb-2">
           <div className="relative">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" />
@@ -157,7 +125,6 @@ export function Sidebar() {
         <ul>{visible.map((c) => <ChatRow key={c.peer} chat={c} />)}</ul>
         {!visible.length && syncing && !waited && conn !== 'offline' && !query && !archivedView ? <ChatListSkeleton rows={6} />
           : !visible.length && <EmptyList archived={archivedView} searching={!!query || filter !== 'all'} />}
-        </>}
       </div>
       {!archivedView && <AppTabs />}
     </>

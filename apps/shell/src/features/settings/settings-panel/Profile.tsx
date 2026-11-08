@@ -11,7 +11,6 @@ import { confirm } from '@sanga/ui/confirm';
 import { Input, Label, Textarea } from '@sanga/ui/input';
 import { removeAvatar, setAvatar, updateProfile } from '../../../lib/engine';
 import { useApp } from '../../../state/app';
-import { setSettings, useSettings } from '../../../state/settings';
 import { Section } from './Section';
 import { t, tx } from '@sanga/i18n';
 
@@ -21,20 +20,17 @@ export function Profile() {
   const hasPhoto = !!photo;
   const [name, setName] = useState(me.name);
   const [about, setAbout] = useState(me.about);
-  const savedTitle = useSettings((s) => s.headerTitle);
-  const [title, setTitle] = useState(savedTitle);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [picked, setPicked] = useState<File | null>(null); // photo being cropped
   const file = useRef<HTMLInputElement>(null);
   const profileDirty = name.trim() !== me.name || about.trim() !== me.about;
-  const dirty = profileDirty || title.trim() !== savedTitle;
+  const dirty = profileDirty;
 
   async function save(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     try {
-      setSettings({ headerTitle: title.trim() });
       if (profileDirty) await updateProfile({ name: name.trim(), about: about.trim() });
       toast.success(t('Profile saved'));
     }
@@ -83,11 +79,6 @@ export function Profile() {
           <div>
             <Label htmlFor="p-about" hint={`${about.length}/140`}>{t('About')}</Label>
             <Textarea id="p-about" value={about} maxLength={140} rows={2} onChange={(e) => setAbout(e.target.value)} placeholder={t('Hey there! I’m using Sanga.')} />
-          </div>
-          <div>
-            <Label htmlFor="p-title" hint={`${title.length}/30`}>{t('Title at the top')}</Label>
-            <Input id="p-title" value={title} maxLength={30} onChange={(e) => setTitle(e.target.value)} placeholder={me.u} />
-            <p className="mt-1 text-xs text-muted">{t('Shown above your chats, only to you. Leave it empty to show your username.')}</p>
           </div>
           <div className="flex items-center justify-between text-sm text-muted">
             <span>{tx('Username: {u}', { u: <b className="text-ink">@{me.u}</b> })}</span>

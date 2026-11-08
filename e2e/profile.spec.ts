@@ -2,7 +2,7 @@
 // keyboard already focused, keeping messages above the keyboard, and the privacy screen.
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
-import { bubble, longPress, phone, signedOutView, signUp, swipeRight, testPng, uname, type Phone } from './helpers';
+import { bubble, longPress, phone, signedOutView, signUp, swipeRight, testPng, uname, type Phone, tab, openFriends } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -17,15 +17,17 @@ test.afterAll(async () => { for (const p of [P, Q]) await p?.ctx.close(); });
 
 test('set up: two friends with a few messages', async () => {
   await Promise.all([signUp(P), signUp(Q)]);
-  await P.page.getByRole('button', { name: 'Friends' }).click();
+  await openFriends(P);
   await P.page.getByRole('tab', { name: 'Add' }).click();
   await P.page.getByPlaceholder('Search by username').fill(Q.u);
   await P.page.locator('li').filter({ hasText: '@' + Q.u }).getByRole('button', { name: 'Add', exact: true }).click();
   await P.page.keyboard.press('Escape');
-  await Q.page.getByRole('button', { name: 'Friends' }).click();
+  await tab(P, 'Chats').click();
+  await openFriends(Q);
   await Q.page.locator('li').filter({ hasText: P.u }).getByRole('button', { name: 'Accept' }).click();
   await expect(Q.page.getByText(`You and ${P.u} are now friends`)).toBeVisible();
   await Q.page.keyboard.press('Escape');
+  await tab(Q, 'Chats').click();
   await Q.page.locator('aside').getByRole('button', { name: new RegExp(P.u) }).first().click(); // "Say hi to your friend"
   for (let i = 1; i <= 14; i++) {
     await box(Q).fill(i === 7 ? 'Want a banana split later?' : `Message number ${i}`);
@@ -38,7 +40,7 @@ test('set up: two friends with a few messages', async () => {
 
 test('profile photo: choose the part to keep, then view it', async () => {
   await P.page.getByRole('button', { name: 'Back' }).click(); // to the chat list
-  await P.page.getByRole('button', { name: 'Profile and settings' }).click();
+  await tab(P, 'Account').click();
   await P.page.getByRole('button', { name: new RegExp(P.u) }).first().click(); // the profile row
   await P.page.locator('input[type=file][accept="image/*"]').first().setInputFiles({ name: 'me.png', mimeType: 'image/png', buffer: testPng(400, 300) });
   const crop = P.page.getByRole('dialog', { name: 'Profile photo' });
@@ -73,6 +75,7 @@ test('profile photo: choose the part to keep, then view it', async () => {
   await expect(P.page.getByRole('dialog', { name: 'Photo' }).locator('img')).toBeVisible();
   await P.page.keyboard.press('Escape');
   await P.page.keyboard.press('Escape');
+  await tab(P, 'Chats').click();
   await P.page.locator('aside li').filter({ hasText: Q.u }).click();
 });
 
@@ -91,13 +94,13 @@ test("friends' profiles: tap their photo, or Contact info in the chat menu", asy
 
   // Q sees P's new (cropped) photo full size from the friends list
   await Q.page.getByRole('button', { name: 'Back' }).click();
-  await Q.page.getByRole('button', { name: 'Friends' }).click();
+  await openFriends(Q);
   await Q.page.getByRole('button', { name: `${P.u}’s profile` }).click();
   await Q.page.getByRole('button', { name: `View ${P.u}’s photo` }).click();
   await expect(Q.page.getByRole('dialog', { name: 'Photo' }).locator('img')).toBeVisible();
   await Q.page.keyboard.press('Escape');
   await Q.page.keyboard.press('Escape');
-  await Q.page.keyboard.press('Escape');
+  await Q.page.keyboard.press('Escape');  await tab(Q, 'Chats').click();
 });
 
 test('camera photos without a file type still send', async () => {
@@ -235,11 +238,12 @@ test('games: the chat offers every game, not just Ludo', async () => {
 
 test('privacy screen blurs names and older messages; tap or the eye shows them', async () => {
   await P.page.getByRole('button', { name: 'Back' }).first().click(); // to the chat list
-  await P.page.getByRole('button', { name: 'Profile and settings' }).click();
+  await tab(P, 'Account').click();
   await P.page.getByRole('button', { name: /Privacy/ }).click();
   await P.page.getByRole('switch', { name: 'Blur my chats' }).click();
   await P.page.getByRole('radio', { name: 'Last 5' }).click();
   await P.page.keyboard.press('Escape');
+  await tab(P, 'Chats').click();
 
   const row = P.page.locator('aside li').filter({ hasText: Q.u }).locator('.priv').last();
   await expect.poll(() => blurred(row)).toBe(true);

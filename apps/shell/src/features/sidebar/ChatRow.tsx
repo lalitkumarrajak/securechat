@@ -8,6 +8,8 @@ import { cn } from '@sanga/ui/utils';
 import { useApp } from '../../state/app';
 import { groupIdOf, isGroup } from '../../lib/types';
 import { showProfile } from '../friends/ProfileCard';
+import { openStories, useStories } from '../../lib/stories';
+import { StoryRing } from '../stories/StoryRing';
 import { t } from '@sanga/i18n';
 
 export function ChatRow({ chat }: { chat: Chat }) {
@@ -19,6 +21,8 @@ export function ChatRow({ chat }: { chat: Chat }) {
   const typingWho = useApp((s) => s.typingWho[chat.peer]);
   const friendsMap = useApp((s) => s.friends);
   useApp((s) => s.me?.mutes); // re-render when mutes change
+  // A friend with a story: a ring round their photo (colourful while there's something new), and the photo opens it.
+  const story = useStories((s) => { let has = false; for (const x of s.list) if (x.u === chat.peer) { if (!x.seen) return 'new'; has = true; } return has ? 'seen' : 'none'; });
   const muted = isMuted(chat.peer);
   const name = isGroup(chat.peer) ? group?.name || t('Group') : displayName(friend, chat.peer);
   const whoName = typingWho && (friendsMap[typingWho]?.name || group?.members.find((m) => m.u === typingWho)?.n || typingWho);
@@ -32,10 +36,16 @@ export function ChatRow({ chat }: { chat: Chat }) {
 
   return (
     <li className={cn('priv-scope relative flex items-center transition hover:bg-hover', active && 'bg-hover')}>
-      {/* the photo opens their profile card; the rest of the row opens the chat */}
-      <button onClick={() => showProfile(chat.peer)} aria-label={t('{name}’s profile', { name })} className="absolute top-1/2 left-3 z-10 -translate-y-1/2 rounded-full">
-        <Avatar u={chat.peer} name={name} size={50} online={online} className="priv" />
-      </button>
+      {/* the photo opens their story if they have one, else their profile card; the rest of the row opens the chat */}
+      {story !== 'none' ? (
+        <button onClick={() => openStories(chat.peer)} aria-label={story === 'new' ? t('{name}’s story, new', { name }) : t('{name}’s story', { name })} className="absolute top-1/2 left-3 z-10 -translate-y-1/2 rounded-full">
+          <StoryRing state={story}><Avatar u={chat.peer} name={name} size={42} online={online} className="priv" /></StoryRing>
+        </button>
+      ) : (
+        <button onClick={() => showProfile(chat.peer)} aria-label={t('{name}’s profile', { name })} className="absolute top-1/2 left-3 z-10 -translate-y-1/2 rounded-full">
+          <Avatar u={chat.peer} name={name} size={50} online={online} className="priv" />
+        </button>
+      )}
       <button onClick={() => openChat(chat.peer)} className="flex w-full items-center gap-3 py-2.5 pr-3 pl-[74px] text-left">
         <span className="priv min-w-0 flex-1 border-b border-line/0 py-0.5">
           <span className="flex items-center gap-2">

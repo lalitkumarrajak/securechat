@@ -1,7 +1,7 @@
 // End-to-end: two (sometimes three) phones using Sanga the way people do.
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
-import { bubble, longPress, newTab, openChats, phone, signIn, signedOutView, signUp, stubExternalImages, swipeRight, testPdf, testPng, uname, type Phone } from './helpers';
+import { bubble, longPress, newTab, openChats, phone, signIn, signedOutView, signUp, stubExternalImages, swipeRight, testPdf, testPng, uname, type Phone, tab, openFriends } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -62,7 +62,7 @@ test('three people sign up', async () => {
 
 test('friend request: send, receive live, accept', async () => {
   // A searches for B and sends a request
-  await A.page.getByRole('button', { name: 'Friends' }).click();
+  await openFriends(A);
   await A.page.getByRole('tab', { name: 'Add' }).click();
   await A.page.getByPlaceholder('Search by username').fill(B.u);
   const row = A.page.locator('li').filter({ hasText: '@' + B.u });
@@ -72,7 +72,7 @@ test('friend request: send, receive live, accept', async () => {
 
   // B gets a live toast and a badge, and accepts
   await expect(B.page.getByText(`${A.u} sent you a friend request`)).toBeVisible();
-  await B.page.getByRole('button', { name: 'Friends' }).click();
+  await openFriends(B);
   await expect(B.page.getByRole('tab', { name: /Requests/ })).toHaveAttribute('data-state', 'active');
   await settle(B);
   await B.page.screenshot({ path: shots('03-request-received') });
@@ -80,22 +80,25 @@ test('friend request: send, receive live, accept', async () => {
   await expect(B.page.getByText(`You and ${A.u} are now friends`)).toBeVisible();
   await expect(row.getByRole('button', { name: 'Message' })).toBeVisible(); // A's search result updates live
   await B.page.keyboard.press('Escape');
+  await tab(B, 'Chats').click();
 
   // A and C become friends too (for forwarding later)
   await A.page.getByPlaceholder('Search by username').fill(C.u);
   await A.page.locator('li').filter({ hasText: '@' + C.u }).getByRole('button', { name: 'Add', exact: true }).click();
-  await C.page.getByRole('button', { name: 'Friends' }).click();
+  await openFriends(C);
   await C.page.locator('li').filter({ hasText: A.u }).getByRole('button', { name: 'Accept' }).click();
   await C.page.keyboard.press('Escape');
+  await tab(C, 'Chats').click();
 });
 
 test('non-friends cannot chat', async () => {
   // B and C aren't friends: C's search shows "Add", and there's no way to message.
-  await C.page.getByRole('button', { name: 'Friends' }).click();
+  await openFriends(C);
   await C.page.getByRole('tab', { name: 'Add' }).click();
   await C.page.getByPlaceholder('Search by username').fill(B.u);
   await expect(C.page.locator('li').filter({ hasText: '@' + B.u }).getByRole('button', { name: 'Add', exact: true })).toBeVisible();
   await C.page.keyboard.press('Escape');
+  await tab(C, 'Chats').click();
 });
 
 test('chatting keeps the keyboard open after Send', async () => {
@@ -306,7 +309,7 @@ test('select messages; delete for me and for everyone', async () => {
 
 test('settings: theme, accent, text size persist; profile name reaches friends', async () => {
   await A.page.getByRole('button', { name: 'Back' }).first().click();
-  await A.page.getByRole('button', { name: 'Profile and settings' }).click();
+  await tab(A, 'Account').click();
   await A.page.getByRole('button', { name: /Appearance/ }).click();
   await A.page.getByRole('radio', { name: 'Dark' }).click();
   await A.page.getByRole('radio', { name: 'Violet' }).click();
@@ -322,7 +325,7 @@ test('settings: theme, accent, text size persist; profile name reaches friends',
   await expect(html).toHaveAttribute('data-theme', 'dark');
   await expect(html).toHaveAttribute('data-accent', 'violet');
 
-  await A.page.getByRole('button', { name: 'Profile and settings' }).click();
+  await tab(A, 'Account').click();
   await A.page.getByRole('button', { name: new RegExp(A.u) }).click();
   await A.page.getByLabel('Name').fill('Lalit Rajak');
   await A.page.getByLabel('About').fill('Building Sanga 🚀');
@@ -330,6 +333,7 @@ test('settings: theme, accent, text size persist; profile name reaches friends',
   await expect(A.page.getByText('Profile saved')).toBeVisible();
   await expect(B.page.locator('header').getByText('Lalit Rajak')).toBeVisible();
   await A.page.keyboard.press('Escape');
+  await tab(A, 'Chats').click();
 });
 
 test('dark mode chat screen and desktop layout', async ({ browser }) => {
@@ -355,7 +359,7 @@ test('dark mode chat screen and desktop layout', async ({ browser }) => {
 
   // Active sessions: B sees both devices and signs the desktop out from the phone
   await B.page.getByRole('button', { name: 'Back' }).first().click();
-  await B.page.getByRole('button', { name: 'Profile and settings' }).click();
+  await tab(B, 'Account').click();
   await B.page.getByRole('button', { name: /Active sessions/ }).click();
   await expect(B.page.getByText('This device · active now')).toBeVisible();
   const other = B.page.locator('li').filter({ hasText: 'Chrome on Linux' }).filter({ has: B.page.getByRole('button', { name: 'Sign out' }) });
@@ -370,6 +374,7 @@ test('dark mode chat screen and desktop layout', async ({ browser }) => {
   await expect(signedOutView(D.page)).toBeVisible({ timeout: 10_000 }); // the desktop is back at the landing page
   await D.ctx.close();
   await B.page.keyboard.press('Escape');
+  await tab(B, 'Chats').click();
   await B.page.locator('li').filter({ hasText: 'Lalit Rajak' }).first().click();
 });
 

@@ -1,7 +1,7 @@
 // End-to-end: the diary. Notes filed under days, personal or about a chat, end-to-end encrypted
 // and synced to the account's other devices.
 import { test, expect } from '@playwright/test';
-import { openApp, phone, signIn, signUp, uname, type Phone } from './helpers';
+import { openApp, phone, signIn, signUp, uname, type Phone, openFriends } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -16,12 +16,12 @@ test.afterAll(async () => { for (const p of [P, Q, P2]) await p?.ctx.close(); })
 
 test('set up: two friends', async () => {
   await Promise.all([signUp(P), signUp(Q)]);
-  await P.page.getByRole('button', { name: 'Friends' }).click();
+  await openFriends(P);
   await P.page.getByRole('tab', { name: 'Add' }).click();
   await P.page.getByPlaceholder('Search by username').fill(Q.u);
   await P.page.locator('li').filter({ hasText: '@' + Q.u }).getByRole('button', { name: 'Add', exact: true }).click();
   await P.page.keyboard.press('Escape');
-  await Q.page.getByRole('button', { name: 'Friends' }).click();
+  await openFriends(Q);
   await Q.page.locator('li').filter({ hasText: P.u }).getByRole('button', { name: 'Accept' }).click();
   await expect(Q.page.getByText(`You and ${P.u} are now friends`)).toBeVisible();
 });

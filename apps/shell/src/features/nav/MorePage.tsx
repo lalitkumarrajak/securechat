@@ -36,7 +36,7 @@ export function MorePage() {
             gamesDue > 0 && <span className="absolute top-5 right-5 grid min-w-6 place-items-center rounded-full bg-white px-1.5 text-xs leading-6 font-bold text-indigo-700">{gamesDue}</span>)}
           {tile(t('Diary'), t('Notes and your daily diary'), <NotebookPen />, 'linear-gradient(140deg, #f59e0b, #92400e)',
             () => { setApp({ notesChat: null }); go('diary'); })}
-          {tile(t('Accounts'), t('Banks, cards, cash and bills'), <Landmark />, 'linear-gradient(140deg, #0ea5e9, #1e3a8a)', () => go('accounts'))}
+          {tile(t('Money'), t('Banks, cards, cash and bills'), <Landmark />, 'linear-gradient(140deg, #0ea5e9, #1e3a8a)', () => go('accounts'))}
         </ul>
       </div>
       <AppTabs />

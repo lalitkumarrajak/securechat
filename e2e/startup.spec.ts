@@ -3,7 +3,7 @@
 // flash a "Connecting…" banner when the connection comes up quickly. Split's first page doesn't flash
 // an empty "make a group" screen or numbers that jump while the groups load.
 import { test, expect, type Page } from '@playwright/test';
-import { makeFriends, openAuth, PASSWORD, phone, signUp, tab, testPng, uname, type Phone } from './helpers';
+import { makeFriends, openAuth, PASSWORD, phone, signUp, tab, testPng, uname, type Phone, openFriends } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 let A: Phone, B: Phone;
@@ -40,7 +40,7 @@ test('chats: what came in while away shows soon, with a note while it catches up
   test.setTimeout(180_000);
   await Promise.all([signUp(A), signUp(B)]);
   await makeFriends(A, B);
-  await A.page.getByRole('button', { name: 'Friends' }).click();
+  await openFriends(A);
   await A.page.getByRole('button', { name: `Message ${B.u}` }).click();
   const input = A.page.getByRole('textbox', { name: 'Message' });
   await input.fill('before you left');
@@ -76,16 +76,18 @@ test('chats: what came in while away shows soon, with a note while it catches up
   await A.page.getByRole('button', { name: 'Send photo' }).click();
   const row = page.locator('li').filter({ hasText: A.u });
   await expect(row).toContainText('📷 Photo');
-  await page.getByRole('button', { name: 'Profile and settings' }).click();
+  await page.getByRole('tab', { name: /Account$/ }).click();
   await page.getByRole('button', { name: /Language/ }).click();
   await page.getByRole('radio', { name: 'मराठी' }).click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'mr');
   await page.keyboard.press('Escape');
+  await page.getByRole('tab', { name: /चॅट$/ }).click();
   await expect(row).toContainText('📷 फोटो');
-  await page.getByRole('button', { name: 'प्रोफाइल आणि सेटिंग्ज' }).click();
+  await page.getByRole('tab', { name: /अकाउंट$/ }).click();
   await page.getByRole('button', { name: /भाषा/ }).click();
   await page.getByRole('radio', { name: /English/ }).click();
   await page.keyboard.press('Escape');
+  await page.getByRole('tab', { name: /Chats$/ }).click();
   await expect(row).toContainText('📷 Photo');
 });
 

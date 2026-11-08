@@ -18,15 +18,17 @@ import { t, tk } from '@sanga/i18n';
 
 const TITLES: Record<Page, string> = {
   main: tk('Settings'), profile: tk('Profile'), appearance: tk('Appearance'), privacy: tk('Privacy'), notifications: tk('Notifications'),
-  chats: tk('Chats'), account: tk('Account'), sessions: tk('Active sessions'), about: tk('About Sanga'), language: tk('Language'),
+  chats: tk('Chats'), account: tk('Sign-in and security'), sessions: tk('Active sessions'), about: tk('About Sanga'), language: tk('Language'),
 };
 
 export function SettingsPanel() {
   const open = useApp((s) => s.panel === 'settings');
   const [page, setPage] = useState<Page>('main');
+  const [entry, setEntry] = useState<Page>('main'); // opened at one part (from the Account tab): Back from it closes
   useEffect(() => {
     if (!open) return;
-    setPage((getApp().settingsPage as Page) || 'main');
+    const first = (getApp().settingsPage as Page) || 'main';
+    setPage(first); setEntry(first);
     setApp({ settingsPage: null });
   }, [open]);
   const close = () => setApp({ panel: null });
@@ -34,7 +36,7 @@ export function SettingsPanel() {
   return (
     <Panel open={open} onOpenChange={(o) => !o && close()} title={t('Settings')}>
       <header className="flex h-16 shrink-0 items-center gap-2 bg-panel px-3">
-        <IconButton label={t('Back')} onClick={() => (page === 'main' ? close() : setPage(page === 'sessions' ? 'account' : 'main'))}><ArrowLeft /></IconButton>
+        <IconButton label={t('Back')} onClick={() => (page === 'main' || page === entry ? close() : setPage(page === 'sessions' ? 'account' : 'main'))}><ArrowLeft /></IconButton>
         <h2 className="text-lg font-semibold">{t(TITLES[page])}</h2>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto pb-8">

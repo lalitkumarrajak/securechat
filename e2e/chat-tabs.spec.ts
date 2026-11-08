@@ -1,14 +1,14 @@
 // End-to-end: tabs inside a chat. One person adds "House", both see it, its messages stay out of
 // the main chat (and the main chat's out of it), unread counts per tab, rename, and removing it.
 import { test, expect } from '@playwright/test';
-import { bubble, makeFriends, phone, signUp, uname, type Phone } from './helpers';
+import { bubble, makeFriends, phone, signUp, uname, type Phone, openFriends } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
 let P: Phone, Q: Phone;
 const chatTab = (p: Phone, name: string | RegExp) => p.page.getByRole('tablist', { name: 'Chat tabs' }).getByRole('tab', { name });
 const open = async (p: Phone, other: Phone) => {
-  await p.page.getByRole('button', { name: 'Friends' }).click();
+  await openFriends(p);
   await p.page.getByRole('dialog').locator('li').filter({ hasText: other.u }).first().click();
   await expect(p.page.locator('#composer-input')).toBeVisible();
 };

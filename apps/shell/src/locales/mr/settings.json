@@ -64,7 +64,6 @@
   "Devices signed in to your account": "तुमच्या अकाउंटमध्ये साइन इन असलेले डिव्हाइस",
   "Enter to send, archived chats": "Enter ने पाठवा, आर्काइव्ह चॅट",
   "Last seen, read receipts, app lock, privacy screen, blocked": "लास्ट सीन, रीड रिसीट, ॲप लॉक, प्रायव्हसी स्क्रीन, ब्लॉक केलेले",
-  "Password, sign out": "पासवर्ड, साइन आउट",
   "Push notifications, sounds": "पुश नोटिफिकेशन, आवाज",
   "Theme, colour, wallpaper, text size": "थीम, रंग, वॉलपेपर, टेक्स्टचा आकार",
   "About": "माहिती",
@@ -130,8 +129,6 @@
   "Remove profile photo?": "प्रोफाइल फोटो काढायचा?",
   "Remove": "काढा",
   "Save": "सेव्ह करा",
-  "Shown above your chats, only to you. Leave it empty to show your username.": "तुमच्या चॅटच्या वर दिसते, फक्त तुम्हाला. यूजरनेम दाखवण्यासाठी हे रिकामे सोडा.",
-  "Title at the top": "वरचे टायटल",
   "Username: {u}": "यूजरनेम: {u}",
   "View profile photo": "प्रोफाइल फोटो पाहा",
   "Your photo, name and about are visible to your friends.": "तुमचा फोटो, नाव आणि माहिती तुमच्या मित्रांना दिसते.",
@@ -160,5 +157,7 @@
   "Add an email to sign in with it. We’ll send a code to check it’s yours.": "त्याने साइन इन करण्यासाठी ईमेल जोडा. तो तुमचाच आहे हे तपासण्यासाठी आम्ही एक कोड पाठवू.",
   "New email": "नवीन ईमेल",
   "Send code": "कोड पाठवा",
-  "Verify": "निश्चित करा"
+  "Verify": "निश्चित करा",
+  "Sign-in and security": "साइन-इन आणि सुरक्षा",
+  "Password, email, sign out": "पासवर्ड, ईमेल, साइन आउट"
 }

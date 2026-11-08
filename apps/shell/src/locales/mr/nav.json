@@ -10,7 +10,6 @@
     "one": "{n} गेम तुमची वाट पाहत आहे",
     "other": "{n} गेम तुमची वाट पाहत आहेत"
   },
-  "New stories": "नवीन स्टोरी",
   "Split": "स्प्लिट",
   "Stories": "स्टोरी",
   "Check your connection and try again.": "तुमचे कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
@@ -40,7 +39,6 @@
   },
   "Blur chats": "चॅट धूसर करा",
   "Show chats for 30 seconds": "30 सेकंदांसाठी चॅट दाखवा",
-  "Add friend": "मित्र जोडा",
   "All": "सर्व",
   "Archived chats": "आर्काइव्ह चॅट",
   "Archived": "आर्काइव्ह",
@@ -49,15 +47,20 @@
   "Updating…": "अपडेट होत आहे…",
   "Friends": "मित्र",
   "Lock Sanga": "Sanga लॉक करा",
-  "Menu": "मेन्यू",
   "Messages stored on this device will be removed. You can sign in again any time.": "या डिव्हाइसवर सेव्ह केलेले मेसेज काढले जातील. तुम्ही कधीही पुन्हा साइन इन करू शकता.",
   "New chat": "नवीन चॅट",
   "New group": "नवीन ग्रुप",
   "New story": "नवीन स्टोरी",
-  "Profile and settings": "प्रोफाइल आणि सेटिंग्ज",
   "Search chats": "चॅट शोधा",
   "Unread": "न वाचलेले",
   "You’re offline. Messages will send when you reconnect.": "तुम्ही ऑफलाइन आहात. पुन्हा कनेक्ट होताच मेसेज जातील.",
   "A new version of Sanga is ready": "Sanga चे नवीन व्हर्जन तयार आहे",
-  "Reload": "रीलोड करा"
+  "Reload": "रीलोड करा",
+  "Money": "पैसे",
+  "Chats and friends": "चॅट आणि मित्र",
+  "Add a friend, see your friends": "मित्र जोडा, तुमचे मित्र पाहा",
+  "{n} friend requests": {
+    "one": "{n} मैत्री विनंती",
+    "other": "{n} मैत्री विनंत्या"
+  }
 }

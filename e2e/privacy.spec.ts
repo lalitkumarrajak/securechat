@@ -1,6 +1,6 @@
 // End-to-end: "sign out when I close the tab", and "join me on Sanga" invite links.
 import { test, expect } from '@playwright/test';
-import { PASSWORD, newTab, phone, signedOutView, signUp, uname, type Phone } from './helpers';
+import { PASSWORD, newTab, phone, signedOutView, signUp, uname, type Phone, tab, openFriends } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -17,7 +17,7 @@ test.afterAll(async () => { for (const p of [P, Q]) await p?.ctx.close(); });
 
 test('invite link: someone signs up from it and sends a friend request', async () => {
   await signUp(P);
-  await P.page.getByRole('button', { name: 'Friends' }).click();
+  await openFriends(P);
   await P.page.getByRole('tab', { name: /Add/ }).click();
   await expect(P.page.getByText('Invite someone to Sanga')).toBeVisible();
   await P.page.getByRole('button', { name: 'Copy link' }).click();
@@ -39,7 +39,7 @@ test('invite link: someone signs up from it and sends a friend request', async (
   await expect(dlg).toContainText(`Add @${P.u} as a friend?`);
   await dlg.getByRole('button', { name: 'Send friend request' }).click();
   await expect(Q.page.getByText('Friend request sent').first()).toBeVisible();
-  await P.page.getByRole('button', { name: 'Friends' }).click(); // P has the request
+  await openFriends(P); // P has the request
   await P.page.getByRole('tab', { name: /Requests/ }).click();
   await expect(P.page.getByText('@' + Q.u).first()).toBeVisible();
   await P.page.keyboard.press('Escape');
@@ -53,10 +53,12 @@ test('normally, closing the tab keeps you signed in', async () => {
 });
 
 test('with the setting on: reloads and extra tabs keep you in, closing the tab signs you out', async () => {
-  await P.page.getByRole('button', { name: 'Profile and settings' }).click();
+  await tab(P, 'Account').click();
   await P.page.getByRole('button', { name: /^Privacy/ }).click();
   await P.page.getByRole('switch', { name: 'Sign out when I close the tab' }).click();
   await expect(P.page.getByText('You’ll be signed out when you close this tab')).toBeVisible();
+  await P.page.keyboard.press('Escape');
+  await tab(P, 'Chats').click();
 
   await P.page.reload();
   await signedIn(P);

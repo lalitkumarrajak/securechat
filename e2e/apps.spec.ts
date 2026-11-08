@@ -2,7 +2,7 @@
 // the shell downloads it only when it's opened, it also runs on its own page, and a failed download
 // can be retried without breaking the rest.
 import { test, expect } from '@playwright/test';
-import { openApp, PHONE, phone, signUp, uname, type Phone } from './helpers';
+import { openApp, PHONE, phone, signUp, uname, type Phone, tab } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -18,8 +18,8 @@ test.afterAll(async () => { await P?.ctx.close(); });
 
 test('nothing from the diary is downloaded until it is opened', async () => {
   await signUp(P);
-  await P.page.getByRole('button', { name: 'Menu' }).click(); // look around the app first
-  await P.page.keyboard.press('Escape');
+  await tab(P, 'Account').click(); // look around the app first
+  await tab(P, 'Chats').click();
   await P.page.waitForTimeout(5000); // past the shell's own quiet preloading of its screens
   expect(appRequests()).toEqual([]);
 
@@ -82,7 +82,7 @@ test('if an app can’t be downloaded, Sanga keeps working and it can be retried
 test('with an app lock on, its own page goes to Sanga’s lock screen instead of showing the diary', async ({ browser }) => {
   const Q = await phone(browser, uname('applock'));
   await signUp(Q);
-  await Q.page.getByRole('button', { name: 'Profile and settings' }).click(); // as in lock.spec.ts
+  await tab(Q, 'Account').click(); // as in lock.spec.ts
   await Q.page.getByRole('button', { name: /^Privacy/ }).click();
   await Q.page.getByRole('switch', { name: 'Lock with a PIN' }).click();
   const pin = Q.page.getByLabel('PIN', { exact: true });
@@ -107,7 +107,7 @@ test('with an app lock on, its own page goes to Sanga’s lock screen instead of
 test('with “sign out when I close the tab” on, its own page goes to Sanga, which decides', async ({ browser }) => {
   const Q = await phone(browser, uname('appclose'));
   await signUp(Q);
-  await Q.page.getByRole('button', { name: 'Profile and settings' }).click();
+  await tab(Q, 'Account').click();
   await Q.page.getByRole('button', { name: /^Privacy/ }).click();
   await Q.page.getByRole('switch', { name: 'Sign out when I close the tab' }).click();
   await Q.page.keyboard.press('Escape');

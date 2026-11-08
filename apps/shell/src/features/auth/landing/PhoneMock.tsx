@@ -1,4 +1,4 @@
-import { CalendarDays, CircleDashed, Gamepad2, LayoutGrid, Lock, MessageCircle, Mic, Users, Wallet } from 'lucide-react';
+import { CalendarDays, CircleUserRound, Gamepad2, LayoutGrid, Lock, MessageCircle, Mic, Users, Wallet } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { t } from '@sanga/i18n';
 
@@ -87,8 +87,8 @@ export function PhoneMock() {
         </div>
         <div className="flex border-t border-line bg-panel px-1 pt-1.5 pb-3">
           <Tab icon={<MessageCircle />} label={t('Chats')} on />
-          <Tab icon={<CircleDashed />} label={t('Stories')} />
           <Tab icon={<CalendarDays />} label={t('Calendar')} />
+          <Tab icon={<CircleUserRound />} label={t('Account')} />
           <Tab icon={<Wallet />} label={t('Split')} />
           <Tab icon={<LayoutGrid />} label={t('More')} />
         </div>
