@@ -14,6 +14,7 @@ import { QuickTray } from './QuickTray';
 import { ChatSheet } from './ChatSheet';
 import { Lobby } from './Lobby';
 import { Results } from './Results';
+import { HowToPlayButton } from '../HowToPlay';
 
 const BUBBLE_MS = 4000;
 
@@ -84,6 +85,7 @@ export function GameView({ g }: { g: Game }) {
       <header className="flex h-14 shrink-0 items-center gap-1 px-2 pt-[env(safe-area-inset-top)]">
         <IconButton label={t('Back to chats')} className="text-white hover:bg-white/10" onClick={() => openGame(null)}><ArrowLeft /></IconButton>
         <h1 className="flex-1 truncate text-lg font-bold tracking-wide">{ui?.emoji} {ui && t(ui.name)}</h1>
+        <HowToPlayButton type={g.type} playing={g.status === 'play' && !!mePl && mePl.state === 'playing'} />
         <IconButton label={sound ? t('Mute game sounds') : t('Unmute game sounds')} className="text-white hover:bg-white/10"
           onClick={() => setSettings({ gameSound: !sound })}>{sound ? <Volume2 /> : <VolumeX />}</IconButton>
         <Menu>

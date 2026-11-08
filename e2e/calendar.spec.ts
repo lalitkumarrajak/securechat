@@ -133,3 +133,30 @@ test('everything reaches my other device, still sealed on the way', async ({ bro
   expect(raw).not.toContain('Only water');
   expect([...P.errors, ...P2.errors]).toEqual([]);
 });
+
+test('on a phone, swiping the month sideways changes it', async ({ browser }) => {
+  const Q = await phone(browser, P.u); // a touch phone
+  await signIn(Q);
+  await tab(Q, 'Calendar').click();
+  const month = cal(Q).getByRole('region', { name: 'Month' });
+  const title = month.getByRole('heading', { level: 2 });
+  const now = await title.textContent();
+  const swipe = async (dx: number) => {
+    const b = (await month.getByRole('grid', { name: 'Days' }).boundingBox())!;
+    const x = b.x + b.width / 2, y = b.y + b.height / 2;
+    const pt = (px: number) => [{ x: px, y, id: 1 }];
+    await Q.cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pt(x) });
+    for (let i = 1; i <= 5; i++) await Q.cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: pt(x + (dx * i) / 5) });
+    await Q.cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  };
+  await swipe(-150); // to the left: next month
+  await expect(title).not.toHaveText(now!);
+  const next = await title.textContent();
+  await swipe(150); // back
+  await expect(title).toHaveText(now!);
+  await swipe(150); // the month before
+  await expect(title).not.toHaveText(now!);
+  await expect(title).not.toHaveText(next!);
+  expect(Q.errors).toEqual([]);
+  await Q.ctx.close();
+});

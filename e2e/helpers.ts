@@ -13,6 +13,8 @@ export interface Phone { ctx: BrowserContext; page: Page; cdp: CDPSession; error
 /** A fresh "phone": its own browser context (separate storage), touch screen, console error capture. */
 export async function phone(browser: Browser, u: string, opts: object = PHONE): Promise<Phone> {
   const ctx = await browser.newContext(opts);
+  // The "How to play" guide opens by itself the first time a game starts; tests see it only when they ask (games.spec).
+  await ctx.addInitScript(() => { try { if (!localStorage.getItem('sanga-games-howto')) localStorage.setItem('sanga-games-howto', '["ludo","uno","snakes","connect4","tictactoe"]'); } catch { /* opaque origin */ } });
   const p = { ctx, errors: [] as string[], u } as Phone;
   await newTab(p);
   return p;

@@ -78,6 +78,25 @@ export function pick(cells, me, rand) {
   return middle[rand(middle.length)];
 }
 
+/** A tip for a new player: { why: 'win' | 'block' | 'middle', c: the column to try, traps: columns that
+ *  would let the other player win on top of your disc }. */
+export function advice(cells, me) {
+  const open = [...Array(COLS).keys()].filter((c) => landing(cells, c) >= 0);
+  const traps = open.filter((c) => {
+    const r = landing(cells, c);
+    if (r === 0) return false;
+    const t = [...cells]; t[r * COLS + c] = me;
+    return wouldWin(t, 1 - me, c);
+  });
+  const win = open.find((c) => wouldWin(cells, me, c)); if (win !== undefined) return { why: 'win', c: win, traps };
+  const block = open.find((c) => wouldWin(cells, 1 - me, c)); if (block !== undefined) return { why: 'block', c: block, traps };
+  const pool = open.filter((c) => !traps.includes(c));
+  const from = pool.length ? pool : open;
+  if (!from.length) return null;
+  const c = from.reduce((b, x) => (Math.abs(x - 3) < Math.abs(b - 3) ? x : b));
+  return { why: 'middle', c, traps };
+}
+
 export default {
   type: 'connect4',
   name: 'Connect Four',

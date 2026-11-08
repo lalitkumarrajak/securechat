@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '@sanga/ui/utils';
 import { t } from '@sanga/i18n';
-import { COLS, ROWS, landing } from '@sanga/game-rules/connect4.js';
+import { COLS, ROWS, advice, landing } from '@sanga/game-rules/connect4.js';
+import { Lightbulb } from 'lucide-react';
 import { playSound } from '../sounds';
 import type { Game } from '../store';
 import type { GameBoardProps } from '../registry';
@@ -11,6 +12,7 @@ import { turnLine } from '../common/turnLine';
 
 interface State { cells: number[]; line: number[] | null; draw: boolean }
 const COLOR = ['#ef4444', '#facc15'];
+const TIPS = 'sanga-c4-tips';
 
 export default function ConnectFourBoard({ g: game, me, act, bubble }: GameBoardProps) {
   const g = game as Game<State>;
@@ -28,6 +30,16 @@ export default function ConnectFourBoard({ g: game, me, act, bubble }: GameBoard
   }, [count, g.status, s.line, s.cells, meIdx]);
 
   const open = (c: number) => myTurn && landing(s.cells, c) >= 0;
+  // Tips for a new player: where to win, where to block, which columns hand the other player a win.
+  const [tips, setTipsState] = useState(() => { try { return localStorage.getItem(TIPS) !== 'off'; } catch { return true; } });
+  const setTips = (on: boolean) => { setTipsState(on); try { localStorage.setItem(TIPS, on ? 'on' : 'off'); } catch { /* this visit only */ } };
+  const tip = myTurn && tips && meIdx >= 0 ? advice(s.cells, meIdx) as { why: 'win' | 'block' | 'middle'; c: number; traps: number[] } | null : null;
+  const them = meIdx === 0 ? t('Yellow') : t('Red');
+  const tipText = !tip ? '' : tip.why === 'win' ? t('You can win! Drop in column {n}.', { n: tip.c + 1 })
+    : tip.why === 'block' ? t('Careful: {them} wins next in column {n}. Drop there to block it.', { them, n: tip.c + 1 })
+    : count < 2 ? t('Start in the middle (column {n}): it’s part of the most lines.', { n: tip.c + 1 })
+    : t('Try column {n}: build towards four, near the middle.', { n: tip.c + 1 });
+  const trapText = tip?.traps.length ? t('Avoid column {list}: {them} could drop on top of yours and win.', { list: tip.traps.map((c) => c + 1).join(', '), them }) : '';
   return (
     <div className="flex h-full min-h-0 flex-col items-center justify-between gap-3 px-3 py-3">
       <div className="flex w-full max-w-md gap-2">
@@ -42,7 +54,8 @@ export default function ConnectFourBoard({ g: game, me, act, bubble }: GameBoard
             <button key={c} type="button" disabled={!open(c)} onClick={() => act({ a: 'drop', c })} aria-label={t('Drop in column {n}', { n: c + 1 })}
               onMouseEnter={() => setHover(c)} onMouseLeave={() => setHover(null)} onFocus={() => setHover(c)} onBlur={() => setHover(null)}
               className="grid h-9 place-items-center rounded-lg transition hover:bg-white/10 disabled:pointer-events-none">
-              <span className={cn('size-6 rounded-full transition', open(c) && hover === c ? 'opacity-80' : 'opacity-0')} style={{ background: COLOR[meIdx] ?? '#fff' }} />
+              {tip?.traps.includes(c) && hover !== c ? <span className="text-sm font-bold text-amber-300" aria-hidden>✕</span>
+                : <span className={cn('size-6 rounded-full transition', open(c) && hover === c ? 'opacity-80' : tip?.c === c ? 'animate-pulse opacity-70 ring-2 ring-white' : 'opacity-0')} style={{ background: COLOR[meIdx] ?? '#fff' }} />}
             </button>
           ))}
         </div>
@@ -66,7 +79,23 @@ export default function ConnectFourBoard({ g: game, me, act, bubble }: GameBoard
         </div>
       </div>
 
-      <p className={cn('rounded-full px-4 py-1.5 text-center font-semibold text-white', myTurn ? 'bg-white/20 turn-bob' : 'bg-black/20')} role="status">{turnLine(g, meIdx, s.draw)}</p>
+      <div className="flex w-full max-w-md flex-col items-center gap-2">
+        {tip && (
+          <div className="w-full rounded-2xl bg-black/30 px-3 py-2 text-sm text-white" role="note" aria-label={t('Tip')}>
+            <p className="flex gap-2"><Lightbulb className="mt-0.5 size-4 shrink-0 text-amber-300" />{tipText}</p>
+            {trapText && <p className="mt-1 pl-6 text-white/80">{trapText}</p>}
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <p className={cn('rounded-full px-4 py-1.5 text-center font-semibold text-white', myTurn ? 'bg-white/20 turn-bob' : 'bg-black/20')} role="status">{turnLine(g, meIdx, s.draw)}</p>
+          {meIdx >= 0 && g.status === 'play' && (
+            <button type="button" role="switch" aria-checked={tips} onClick={() => setTips(!tips)}
+              className={cn('flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold', tips ? 'bg-amber-300 text-amber-950' : 'bg-white/15 text-white/80')}>
+              <Lightbulb className="size-3.5" />{t('Tips')}
+            </button>
+          )}
+        </div>
+      </div>
       <span className="sr-only">{t('{rows} rows by {cols} columns', { rows: ROWS, cols: COLS })}</span>
     </div>
   );
