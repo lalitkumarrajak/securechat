@@ -12,6 +12,7 @@ import { SDK_DICTS } from '@sanga/sdk/locale';
 import { useCall } from './lib/calls';
 import './lib/reminders'; // reminders that come due while Sanga is open
 
+(window as { __sangaUp?: boolean }).__sangaUp = true; // the start files loaded (theme-boot.js)
 initSettings();
 initPrivacy();
 // In another language, its words come first (English needs none): the first screen is already in it.
@@ -27,6 +28,7 @@ void Promise.all(Object.entries(dicts).map(([ns, l]) => register(ns, l)))
 // Which build this page is: the first build file its head names, read the same way sw.js reads it.
 const myBuild = document.head.innerHTML.match(/\/assets\/index-[\w-]+\.js/)?.[0] || ''; // none in development
 navigator.serviceWorker?.addEventListener('message', (e) => {
+  if (e.data?.t === 'ping') { (e.source as ServiceWorker | null)?.postMessage({ t: 'pong' }); return; } // sw.js: this page is running
   if (e.data?.t !== 'update' || !myBuild || e.data.build === myBuild) return;
   let again = false;
   try { again = Date.now() - Number(sessionStorage.getItem('sanga-updated') || 0) < 60_000; sessionStorage.setItem('sanga-updated', String(Date.now())); } catch { /* no storage */ }

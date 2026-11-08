@@ -212,11 +212,23 @@ export async function saveStatement(x: StatementInput) {
   if (x.minDue) bill.minDue = x.minDue; else delete bill.minDue;
   if (x.total <= 0) { bill.none = true; bill.amount = 0; delete bill.minDue; } else delete bill.none;
   await save(bill);
-  const txns: StatementTxn[] = x.txns.slice(0, MAX_TXNS).map((t) => ({ d: t.date, t: t.desc.slice(0, 60), a: t.credit ? -t.amount : t.amount, c: t.cat }));
+  const txns: StatementTxn[] = fit(x.txns.slice(0, MAX_TXNS).map((t) => ({ d: t.date, t: t.desc.slice(0, 60), a: t.credit ? -t.amount : t.amount, c: t.cat })));
   const sid = statementId(x.card.id, month);
   await save({ id: sid, type: 'statement', card: x.card.id, month, date: x.date, ...(x.from && { from: x.from }), ...(x.due && { due: x.due }), total: x.total, ...(x.minDue && { minDue: x.minDue }), ...(x.limit && { limit: x.limit }), txns, created: s.statements[sid]?.created ?? now(), edited: now() });
   if (x.setOutstanding) await setBalance(x.card, -x.total, x.date);
   return { month, bill: bid, statement: sid };
+}
+
+/** A statement is one record, and the server takes records of up to 60 kB (sealed, so a third more):
+ *  a very long one keeps its biggest lines, in date order. */
+const TXN_BYTES = 38_000;
+function fit(txns: StatementTxn[]) {
+  const size = (t: StatementTxn) => new TextEncoder().encode(JSON.stringify(t)).length + 1;
+  let total = txns.reduce((n, t) => n + size(t), 0);
+  if (total <= TXN_BYTES) return txns;
+  const keep = new Set(txns);
+  for (const t of [...txns].sort((a, b) => Math.abs(a.a) - Math.abs(b.a))) { if (total <= TXN_BYTES) break; keep.delete(t); total -= size(t); }
+  return txns.filter((t) => keep.has(t));
 }
 
 /** The last unpaid bill of a card, which a payment SMS pays. */
@@ -269,11 +281,20 @@ async function sync() {
   await load();
   const { me } = sdk().identity();
   const k = await ledgerKey();
-  let got = false;
+  let got = false, refused = 0;
   for (const x of all()) {
     if (!x.dirty) continue;
     const body = x.deleted ? '' : await C.encryptItem(k, sealed(x), me, 'accounts', x.id);
-    const { updated } = await sdk().api<{ updated: number }>('/api/items?app=accounts', { id: x.id, body });
+    let updated: number;
+    try { ({ updated } = await sdk().api<{ updated: number }>('/api/items?app=accounts', { id: x.id, body })); }
+    catch (e) {
+      // One record refused (too big, say): the others still go, and changes still come in. No
+      // connection, or the server refusing everything (asleep, busy): stop, and try again later.
+      if ((e as Error).name === 'NetworkError' || ++refused > 2) throw e;
+      continue;
+    }
+    refused = 0;
+
     const cur = all().find((y) => y.id === x.id);
     if (!cur || cur.edited !== x.edited) continue; // changed again while sending: that goes next time
     if (x.deleted) await drop(x); else await keep({ ...cur, dirty: false, srv: updated } as Item);
@@ -281,7 +302,7 @@ async function sync() {
   let since: number = (await sdk().store.get<number>('app/accounts/since')) || 0;
   for (;;) {
     const r = await sdk().api<{ items: { id: string; body: string; updated: number }[]; more: boolean }>(`/api/items?app=accounts&since=${since}`);
-    for (const row of r.items) got = (await receive(k, me, row)) || got;
+    got = (await receive(k, me, r.items)) || got;
     if (r.items.length) since = r.items[r.items.length - 1].updated;
     await sdk().store.put('app/accounts/since', since);
     if (!r.more) break;
@@ -289,17 +310,32 @@ async function sync() {
   if (got) notify();
 }
 
-async function receive(k: CryptoKey, me: string, row: { id: string; body: string; updated: number }) {
-  const local = all().find((x) => x.id === row.id);
-  if (local?.dirty) return false;
-  if (local?.srv && local.srv >= row.updated) return false;
-  if (!row.body) { if (local) await drop(local); return !!local; }
-  try {
-    const x = valid(await C.decryptItem(k, row.body, me, 'accounts', row.id), row.id);
-    if (!x) return false;
-    await keep({ ...x, srv: row.updated } as Item);
-    return true;
-  } catch { return false; }
+/** A page of changes from your other devices: decrypted together, then put in place at once (one
+ *  update of the screens, not one per record) and saved on this device side by side. */
+async function receive(k: CryptoKey, me: string, rows: { id: string; body: string; updated: number }[]) {
+  if (!rows.length) return false;
+  const byId = new Map(all().map((x) => [x.id, x]));
+  const got = await Promise.all(rows.map(async (row): Promise<Item | { gone: Item } | null> => {
+    const local = byId.get(row.id);
+    if (local?.dirty) return null;
+    if (local?.srv && local.srv >= row.updated) return null;
+    if (!row.body) return local ? { gone: local } : null;
+    try {
+      const x = valid(await C.decryptItem(k, row.body, me, 'accounts', row.id), row.id);
+      return x ? ({ ...x, srv: row.updated } as Item) : null;
+    } catch { return null; }
+  }));
+  const put: Item[] = [], gone: Item[] = [];
+  for (const g of got) if (g) { if ('gone' in g) gone.push(g.gone); else put.push(g); }
+  if (!put.length && !gone.length) return false;
+  useLedger.setState((s) => {
+    const n = { accounts: { ...s.accounts }, debits: { ...s.debits }, entries: { ...s.entries }, bills: { ...s.bills }, statements: { ...s.statements } };
+    for (const x of put) (n[bucket(x)] as Record<string, Item>)[x.id] = x;
+    for (const x of gone) delete (n[bucket(x)] as Record<string, Item>)[x.id];
+    return n;
+  });
+  await Promise.all([...put.map((x) => sdk().store.put(KEY + x.id, x)), ...gone.map((x) => sdk().store.del(KEY + x.id))]);
+  return true;
 }
 
 // From your own devices, but check the shape anyway so a bad one can't break anything.

@@ -1,16 +1,58 @@
 // Service worker: offline app shell and push notifications.
-const CACHE = 'chattrix-v4'; // bumping it empties the saved copy: the next start waits for the network // bump when the shell files change
-const SHELL = ['/', '/theme-boot.js', '/logo.svg', '/logo-mark.png', '/icon-192.png', '/manifest.webmanifest'];
+const CACHE = 'chattrix-v5'; // bumping it empties the saved copy: the next start waits for the network // bump when the shell files change
+const SHELL = ['/theme-boot.js', '/logo.svg', '/logo-mark.png', '/icon-192.png', '/manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE)
+    .then(async (c) => { await c.addAll(SHELL); await savePage(c, await fetch('/', { cache: 'no-store' })); })
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {
-  e.waitUntil(caches.keys()
-    .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== LANG_CACHE && k !== SHARE_CACHE).map((k) => caches.delete(k))))
-    .then(() => self.clients.claim()));
+  e.waitUntil(caches.keys().then(async (keys) => {
+    const old = keys.filter((k) => k !== CACHE && k !== LANG_CACHE && k !== SHARE_CACHE);
+    await Promise.all(old.map((k) => caches.delete(k)));
+    await self.clients.claim();
+    // Not awaited: a page can't load again until this worker is done activating.
+    if (old.length) setTimeout(() => void rescue(), 0);
+  }));
 });
+
+// Taking over from an older worker: a page it opened from a saved copy whose files were gone is
+// blank, with nothing running to notice. Open pages that don't answer (main.tsx does) load again.
+const answered = new Set();
+async function rescue() {
+  const wins = await self.clients.matchAll({ type: 'window' });
+  for (const w of wins) w.postMessage({ t: 'ping' });
+  await new Promise((r) => setTimeout(r, 3000));
+  for (const w of wins) if (!answered.has(w.id)) w.navigate(w.url).catch(() => {});
+}
+
+// The files a page names to start (its script, the modules it preloads, its styles, the shell's own
+// remote entry). All hashed: the server drops them when a new version is deployed.
+const parts = (html) => [...new Set(html.match(/\/(?:assets\/[\w.-]+\.(?:js|css)|remoteEntry-[\w-]+\.js)/g) || [])];
+/** Keep a page only together with everything it needs to start. A saved page whose files are gone
+ *  from the server (a deploy came in between) would open on a blank screen, so the page is replaced
+ *  only once its new files are saved; if one can't be fetched, the old page (and its files) stay. */
+async function savePage(cache, res) {
+  if (!res.ok || !res.headers.get('content-type')?.includes('text/html')) return false;
+  const html = await res.clone().text();
+  await Promise.all(parts(html).map(async (u) => {
+    if (await cache.match(u)) return;
+    const r = await fetch(u);
+    if (!r.ok) throw new Error(u);
+    await cache.put(u, r);
+  }));
+  await cache.put('/', res);
+  return true;
+}
+/** A saved page whose files are all saved too: safe to open without the network. */
+async function whole(cache, page) {
+  const list = parts(await page.clone().text());
+  if (!list.length) return false;
+  for (const u of list) if (!(await cache.match(u))) return false;
+  return true;
+}
 
 // The app opens from the copy saved on the device straight away, and fetches the latest copy in the
 // background for next time. Waiting for the network first made phones sit on a blank screen while a
@@ -21,7 +63,7 @@ self.addEventListener('fetch', (e) => {
   if (e.request.method === 'POST' && url.origin === location.origin && url.pathname === '/share') { e.respondWith(receiveShare(e.request)); return; }
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   if (url.pathname.startsWith('/api/') || url.pathname === '/ws') return;
-  const immutable = url.pathname.startsWith('/assets/') || url.pathname.startsWith('/emoji/') || /^\/apps\/[^/]+\/assets\//.test(url.pathname);
+  const immutable = url.pathname.startsWith('/assets/') || url.pathname.startsWith('/emoji/') || /^\/apps\/[^/]+\/assets\//.test(url.pathname) || /^\/remoteEntry-[\w-]+\.js$/.test(url.pathname);
   // The other apps (/apps/<name>/): the list of apps and each app's entry file must be current, or
   // an old entry would ask for files a new version no longer has. Network first, saved copy offline.
   const current = url.pathname === '/apps.json' || url.pathname.endsWith('/remoteEntry.js') || /^\/apps\/[^/]+\/?(index\.html)?$/.test(url.pathname);
@@ -37,18 +79,31 @@ self.addEventListener('fetch', (e) => {
     }));
     return;
   }
+  if (page) {
+    e.respondWith(caches.open(CACHE).then(async (cache) => {
+      const hit = await cache.match('/');
+      const fresh = fetch('/', { cache: 'no-store' }).then(async (res) => {
+        try { await savePage(cache, res.clone()); } catch { /* a file of the new version didn't come: next time */ }
+        return res;
+      });
+      if (hit && await whole(cache, hit)) {
+        const saved = hit.clone();
+        e.waitUntil(fresh.then((res) => res.ok && newer(saved, res.clone()), () => {}));
+        return hit;
+      }
+      // Nothing usable saved: the network, or what is saved if that fails too.
+      try { return await fresh; } catch { return hit || Response.error(); }
+    }));
+    return;
+  }
   e.respondWith(caches.open(CACHE).then(async (cache) => {
     const hit = await cache.match(key);
     if (immutable && hit) return hit;
     const fresh = fetch(e.request).then((res) => {
-      if (res.ok && (!page || res.headers.get('content-type')?.includes('text/html'))) cache.put(key, res.clone());
+      if (res.ok) cache.put(key, res.clone());
       return res;
     });
-    if (hit) {
-      const saved = page ? hit.clone() : null;
-      e.waitUntil(fresh.then((res) => saved && res.ok && newer(saved, res.clone()), () => {}));
-      return hit;
-    }
+    if (hit) { e.waitUntil(fresh.catch(() => {})); return hit; }
     try { return await fresh; } catch { return Response.error(); }
   }));
 });
@@ -83,6 +138,7 @@ async function newer(saved, res) {
   for (const w of await self.clients.matchAll({ type: 'window' })) w.postMessage({ t: 'update', build: latest });
 }
 self.addEventListener('message', (e) => {
+  if (e.data?.t === 'pong') { if (e.source?.id) answered.add(e.source.id); return; }
   if (e.data?.t === 'lang') { e.waitUntil?.(saveLang(e.data.lang)); return; }
   if (e.data?.t === 'build' && latest && e.data.build && e.data.build !== latest) e.source?.postMessage({ t: 'update', build: latest });
 });
