@@ -9,7 +9,14 @@ import { sdk } from '@sanga/sdk';
 import { lang, locale, t, tk } from '@sanga/i18n';
 import { addDays, dayKey, dayStart, lunarMonth, pakshaOf, tithiAt, tithiName, type Group } from './panchang';
 import type { Place } from './astro';
-import { billId, suggestedDue, type CardBill, type CreditCard } from './cards';
+import { adopt, startLedger, type CardBill } from '@sanga/ledger';
+
+/** A credit card as the Calendar kept it before Accounts: read only to move it there (adopt). */
+export interface LegacyCard {
+  id: string; type: 'card'; name: string; last4?: string; statementDay: number; dueAfter: number; remind: number[]; time: string;
+  currency: string; color: string; archived?: boolean; created: number; edited: number; srv?: number; dirty?: boolean; deleted?: boolean;
+}
+type CreditCard = LegacyCard;
 
 export type Kind = 'event' | 'birthday' | 'holiday' | 'fast' | 'reminder';
 export type Freq = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'tithi';
@@ -100,7 +107,7 @@ export const KINDS: Record<Kind, { label: string; emoji: string; color: string }
 interface CalState {
   events: Record<string, CalEvent>;
   fasts: Record<string, FastLog>;
-  cards: Record<string, CreditCard>;
+  cards: Record<string, CreditCard>;   // credit cards and bills: only until they've moved to Accounts
   bills: Record<string, CardBill>;
   settings: Settings;
   loaded: boolean;
@@ -127,13 +134,6 @@ export function newEvent(day: string, kind: Kind = 'event'): CalEvent {
     reminders: allDay ? (kind === 'holiday' ? [] : [-540]) : [15],
     created: Date.now(), edited: Date.now(),
   };
-}
-export function newCard(): CreditCard {
-  return { id: C.randomId(12), type: 'card', name: '', statementDay: 1, dueAfter: 20, remind: [3, 1, 0], time: '09:00', currency: 'INR', color: 'blue', created: Date.now(), edited: Date.now() };
-}
-/** A bill for the card's statement month, due when its usual gap says (change it to what the statement says). */
-export function newBill(card: CreditCard, month: string): CardBill {
-  return { id: billId(card.id, month), type: 'bill', card: card.id, month, amount: 0, due: suggestedDue(card, month), created: Date.now(), edited: Date.now() };
 }
 export function newFast(day: string, name: string, ref?: string): FastLog {
   return { id: C.randomId(12), type: 'fast', day, name, ref, status: day >= today() ? 'planned' : 'kept', fastType: 'phalahar', notes: '', created: Date.now(), edited: Date.now() };
@@ -286,7 +286,20 @@ export function startCalendar() {
   started = true;
   sdk().on('calendar', () => void syncCalendar());
   sdk().onReady(() => void syncCalendar());
-  void load().then(() => syncCalendar());
+  void startLedger(); // credit card bills live in Accounts; their reminders come from here
+  void load().then(() => syncCalendar()).then(moveCards);
+}
+
+/** Credit cards and their bills used to be kept here; they now live in Accounts. Moved once, on the
+ *  first start after the update (same ids, so two devices doing it at once make no copies). */
+export async function moveCards() {
+  const s = useCal.getState();
+  const cards = Object.values(s.cards).filter((c) => !c.deleted), bills = Object.values(s.bills).filter((b) => !b.deleted);
+  if (!cards.length && !bills.length) return;
+  try {
+    const took = new Set(await adopt(cards.map(({ type: _t, srv: _s, dirty: _d, ...c }) => c), bills.map(({ srv: _s, dirty: _d, ...b }) => b)));
+    for (const x of [...cards, ...bills]) if (took.has(x.id)) remove(x);
+  } catch { /* not signed in yet, or offline: next start */ }
 }
 
 let loading: Promise<void> | null = null;
@@ -412,7 +425,7 @@ function valid(o: any, id: string): Item | null {
     const amt = (v: unknown) => (Number.isSafeInteger(v) && (v as number) >= 0 ? (v as number) : undefined);
     return { id, type: 'bill', card: o.card.slice(0, 40), month: o.month, amount: amt(o.amount) ?? 0, ...(amt(o.minDue) !== undefined && { minDue: amt(o.minDue) }), due: o.due.slice(0, 10),
       ...(typeof o.paid === 'string' && /^\d{4}-\d\d-\d\d$/.test(o.paid) && { paid: o.paid, ...(amt(o.paidAmount) !== undefined && { paidAmount: amt(o.paidAmount) }) }),
-      ...(o.split && { split: true }), created: num(o.created), edited: num(o.edited) };
+      ...(o.split && { split: true }), ...(o.none && { none: true }), created: num(o.created), edited: num(o.edited) };
   }
   if (o.type === 'fast' && typeof o.day === 'string' && DATE.test(o.day)) {
     return { id, type: 'fast', day: o.day.slice(0, 10), name: str(o.name, 120), ref: str(o.ref, 80) || undefined,

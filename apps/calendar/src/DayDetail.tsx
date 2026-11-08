@@ -10,9 +10,10 @@ import { clock, longDay, useEvents, useObservances } from './util';
 import { STATUS } from './fasts';
 import { Fact } from './Fact';
 import { ObservanceCard } from './ObservanceCard';
+import { creditCards, live, money, useLedger } from '@sanga/ledger';
 
-export function DayDetail({ day, onEdit, onAdd, onLogFast, onEditFast }: {
-  day: string; onEdit: (e: CalEvent, day: string) => void; onAdd: () => void;
+export function DayDetail({ day, onEdit, onAdd, onLogFast, onEditFast, onBill }: {
+  day: string; onBill: () => void; onEdit: (e: CalEvent, day: string) => void; onAdd: () => void;
   onLogFast: (o: Observance) => void; onEditFast: (f: FastLog) => void;
 }) {
   const place = useCal((s) => s.settings.place);
@@ -22,6 +23,9 @@ export function DayDetail({ day, onEdit, onAdd, onLogFast, onEditFast }: {
   const obs = useObservances(day, day).get(day) || [];
   const events = useEvents(day, day).get(day) || [];
   const fasts = Object.values(allFasts).filter((f) => f.day === day && !f.deleted);
+  // Credit card bills due this day (kept in Accounts).
+  const billsMap = useLedger((s) => s.bills), accountsMap = useLedger((s) => s.accounts);
+  const dues = useMemo(() => { const cards = new Map(creditCards().map((c) => [c.id, c])); return live(Object.values(billsMap)).filter((b) => b.due === day && !b.none && cards.has(b.card)).map((b) => ({ b, c: cards.get(b.card)! })); }, [billsMap, accountsMap, day]);
 
   return (
     <section aria-label={t('Details for {day}', { day: longDay(day) })} className="space-y-3">
@@ -35,6 +39,13 @@ export function DayDetail({ day, onEdit, onAdd, onLogFast, onEditFast }: {
         </button>
       </div>
 
+      {dues.map(({ b, c }) => (
+        <button key={b.id} type="button" onClick={onBill} className="flex w-full items-center gap-3 rounded-2xl border border-line/70 bg-panel p-3 text-left shadow-sm hover:shadow-md">
+          <span className="text-xl" aria-hidden>💳</span>
+          <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{t('{card} bill due', { card: c.name })}</span>
+            <span className="block text-sm text-muted">{b.paid ? t('Paid') : money(b.amount, c.currency)}</span></span>
+        </button>
+      ))}
       {obs.map((o) => <ObservanceCard key={o.id} o={o} logged={fasts.find((f) => f.ref === o.id)} onLog={() => onLogFast(o)} onEditFast={onEditFast} />)}
 
       {events.length > 0 && (

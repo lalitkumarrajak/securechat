@@ -9,6 +9,7 @@ import { deleteBill, save, type GroupData } from './store';
 import { BillField } from './BillField';
 import { CategoryPicker } from './CategoryPicker';
 import { SplitEditor, type SplitDraft } from './SplitEditor';
+import { applyPaidFrom, PaidFromField, refOf, usePaidFrom } from './PaidFrom';
 
 /** Add or change an expense. `expense` null: closed; an object without a saved record is new. */
 export function ExpenseEditor({ g, expense, onClose }: { g: GroupData; expense: Expense | null; onClose: () => void }) {
@@ -44,6 +45,11 @@ function Form({ g, expense, onClose }: { g: GroupData; expense: Expense; onClose
   const [bill, setBill] = useState(expense.bill);
   const [uploaded, setUploaded] = useState<string[]>([]);
   const kind = kindOf(meta);
+  // Which of my accounts paid (only when I'm the one who paid). A card bill is usually already taken
+  // from the bank when it's marked paid in Accounts, so it starts as not taken from an account.
+  const mine = people.find((p) => p.u === me || p.id === me)?.id;
+  const ref = refOf(g.gid, expense.id);
+  const paidFrom = usePaidFrom(ref, currency, isNew, expense.cat === 'cards');
   // Lending: what's lent is owed by the others, not shared with whoever paid (until you change the split).
   const others = (payer: string) => { const o = choices.filter((p) => !p.gone && p.id !== payer).map((p) => p.id); return o.length ? o : [payer]; };
   const [splitTouched, setSplitTouched] = useState(false);
@@ -85,6 +91,8 @@ function Form({ g, expense, onClose }: { g: GroupData; expense: Expense; onClose
       type: 'expense', id: expense.id, desc: desc.trim() || (cats.get(cat) ? catName(cats.get(cat)!) : t('Expense')), amount, cat, date, paidBy, mode: draft.mode,
       values: draft.mode === 'equal' ? {} : values, owed, ...(notes.trim() && { notes: notes.trim() }), ...(bill && { bill }), by: me, edited: 0,
     });
+    const finalDesc = desc.trim() || (cats.get(cat) ? catName(cats.get(cat)!) : t('Expense'));
+    void applyPaidFrom(ref, paidBy === mine ? paidFrom.choice : '', { kind: 'out', amount, date, desc: finalDesc, cat });
     onClose();
   };
   const cancel = () => { for (const id of uploaded) void deleteBill(g.gid, id); onClose(); };
@@ -113,6 +121,10 @@ function Form({ g, expense, onClose }: { g: GroupData; expense: Expense; onClose
           </select>
         </div>
       </div>
+      {paidBy === mine && paidFrom.ready && (
+        <PaidFromField id="paid-from" label={t('Paid from')} value={paidFrom.choice} onChange={paidFrom.setChoice} options={paidFrom.options}
+          hint={paidFrom.choice ? t('The whole {amount} comes out of it; what others owe you comes back when they pay.', { amount: amount ? toInput(amount, currency) : '0' }) : undefined} />
+      )}
       <div><Label>{t('Split')}</Label>
         <SplitEditor people={choices} name={name} draft={draft} onChange={change} owed={owed} currency={currency} error={tried || draft.mode !== 'equal' ? splitError : ''} />
       </div>

@@ -48,7 +48,7 @@ export const shellSdk: Sdk = {
   },
   pairKey: peerKey,
   open(app, params = {}) {
-    const section = ({ split: 'split', calendar: 'calendar', notes: 'diary' } as const)[app as 'split'];
+    const section = ({ split: 'split', calendar: 'calendar', notes: 'diary', accounts: 'accounts' } as const)[app as 'split'];
     if (!section) throw new Error(`No app “${app}”`);
     setApp({ appParams: { ...getApp().appParams, [app]: params } });
     go(section);

@@ -8,7 +8,7 @@ import { ctx } from './context.js';
 import { readJson, sendJson } from './http.js';
 import { sendTo } from './hub.js';
 
-export const ITEM_APPS = ['calendar'];
+export const ITEM_APPS = ['calendar', 'accounts'];
 const ID_RE = /^[A-Za-z0-9_-]{8,40}$/;
 const MAX_BODY = 60_000;
 const MAX_ITEMS = 20_000;

@@ -55,7 +55,7 @@ export interface AppProps {
 /** The live message types apps may receive. The shell handles every other type itself (messages,
  *  calls, stories, games…); an app neither sees those nor can take them over. Add a type here when
  *  an app's server part (server/<name>.js) sends a new one. */
-export const APP_FRAMES: readonly string[] = ['notes', 'calendar', 'split'];
+export const APP_FRAMES: readonly string[] = ['notes', 'calendar', 'split', 'accounts'];
 
 export function assertAppFrame(type: string) {
   if (!APP_FRAMES.includes(type)) throw new Error(`Apps can't listen to “${type}” messages`); // i18n-ok

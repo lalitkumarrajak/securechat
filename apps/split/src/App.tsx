@@ -12,6 +12,8 @@ import { sdk, type AppProps } from '@sanga/sdk';
 import { Button, IconButton } from '@sanga/ui/button';
 import { cn } from '@sanga/ui/utils';
 import { useSplit, startSplit } from './store';
+import { startLedger, useLedger as useMoney } from '@sanga/ledger';
+import { reconcile } from './PaidFrom';
 import { Empty } from './Empty';
 import { GroupList } from './GroupList';
 import { GroupView } from './GroupView';
@@ -30,7 +32,11 @@ function SplitAppInner({ onClose, tab, params }: AppProps) {
   const [draft, setDraft] = useState<Draft | null>(() => parseDraft(params.draft)); // a bill sent from the Calendar
   const online = sdk().useOnline();
   const error = useSplit((s) => s.error);
-  useEffect(() => { startSplit(); }, []);
+  useEffect(() => { startSplit(); void startLedger(); }, []);
+  // Your accounts follow the groups: an expense you paid that was changed or deleted (by anyone) updates
+  // what it took from your account.
+  const allGroups = useSplit((s) => s.groups), ledgerLoaded = useMoney((s) => s.loaded);
+  useEffect(() => { if (ledgerLoaded) reconcile(allGroups, me); }, [allGroups, ledgerLoaded, me]);
   // A card bill from the Calendar, and you have one Credit card bills group in its currency: straight there.
   const groups = useSplit((s) => s.groups);
   const loaded = useSplit((s) => s.loaded);

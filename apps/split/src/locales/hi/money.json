@@ -1,0 +1,9 @@
+{
+  "Paid from": "कहाँ से दिया",
+  "The whole {amount} comes out of it; what others owe you comes back when they pay.": "पूरे {amount} इसी से कटेंगे; दूसरों का हिस्सा उनके चुकाने पर वापस आएगा।",
+  "{card} (debit card, {account})": "{card} (डेबिट कार्ड, {account})",
+  "only you see this": "यह सिर्फ़ आपको दिखता है",
+  "Don’t take it from an account": "किसी अकाउंट से न काटें",
+  "Paid back in {group}": "{group} में वापस चुकाया",
+  "Received into": "किसमें आया"
+}

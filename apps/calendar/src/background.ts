@@ -3,6 +3,7 @@
 // Calendar tab isn't opened for weeks.
 import { load, onChange, startCalendar, syncCalendar } from './model';
 import { scheduleReminders } from './reminders';
+import { onLedgerChange } from '@sanga/ledger';
 
 let running = false;
 export default async function background() {
@@ -10,6 +11,7 @@ export default async function background() {
   running = true;
   startCalendar();
   onChange(scheduleReminders);
+  onLedgerChange(scheduleReminders); // credit card bills, kept in Accounts
   await load();
   await syncCalendar();
   scheduleReminders();

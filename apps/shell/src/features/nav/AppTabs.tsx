@@ -1,5 +1,5 @@
 // The tabs along the bottom once signed in: Chats, Stories, Calendar and Split, then More, a page with
-// Sanga's other apps (Games, the Diary). Five tabs fit a phone.
+// Sanga's other apps (Games, the Diary, Accounts). Five tabs fit a phone.
 import type { ReactNode } from 'react';
 import { CalendarDays, CircleDashed, LayoutGrid, MessageCircle, Wallet } from 'lucide-react';
 import { cn } from '@sanga/ui/utils';
@@ -43,7 +43,7 @@ export function AppTabs() {
       {tab(tk('Calendar'), <CalendarDays />, section === 'calendar', to('calendar'))}
       {tab(tk('Split'), <Wallet />, section === 'split', to('split'))}
       {/* Games and the Diary are opened from More's page, and More stays lit while you're in them. */}
-      {tab(tk('More'), <LayoutGrid />, section === 'more' || section === 'games' || section === 'diary', to('more'), gamesDue > 0 && <Count n={gamesDue} />)}
+      {tab(tk('More'), <LayoutGrid />, section === 'more' || section === 'games' || section === 'diary' || section === 'accounts', to('more'), gamesDue > 0 && <Count n={gamesDue} />)}
     </nav>
   );
 }

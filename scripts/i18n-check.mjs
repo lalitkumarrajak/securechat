@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-export const NAMESPACES = ['apps/shell/src', 'apps/split/src', 'apps/calendar/src', 'apps/notes/src', 'packages/ui/src', 'packages/sdk/src'];
+export const NAMESPACES = ['apps/shell/src', 'apps/split/src', 'apps/calendar/src', 'apps/notes/src', 'apps/accounts/src', 'packages/ui/src', 'packages/sdk/src', 'packages/ledger/src'];
 const LANGS = ['hi', 'mr'];
 
 const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => {

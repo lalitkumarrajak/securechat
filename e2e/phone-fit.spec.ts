@@ -1,9 +1,9 @@
-// End-to-end: on a phone, Split and the Calendar's Cards fit the screen. A page wider than the screen makes
+// End-to-end: on a phone, Split, the Calendar and Accounts fit the screen. A page wider than the screen makes
 // the browser zoom out and shift, and the bottom tabs seem to ride up as you scroll; so every screen is
 // checked for sideways overflow, and a long list is scrolled with the tabs watched.
 import { test, expect, type Page } from '@playwright/test';
 import fs from 'node:fs';
-import { phone, signUp, tab, uname, type Phone } from './helpers';
+import { openApp, phone, signUp, tab, uname, type Phone } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 let P: Phone;
@@ -75,20 +75,26 @@ test('Split: every screen of a group fits, and the tabs stay put while the list 
   await fits(P.page, 'Split, my spending');
 });
 
-test('Calendar → Cards fits too', async () => {
+test('the Calendar and Accounts (with a card) fit too', async () => {
   await tab(P, 'Calendar').click();
   const cal = P.page.getByRole('region', { name: 'Calendar' });
   await expect(cal.getByRole('heading', { name: 'Calendar', exact: true })).toBeVisible();
   await fits(P.page, 'Calendar, month');
-  await cal.getByRole('tab', { name: 'Cards' }).click();
-  await fits(P.page, 'Calendar, cards (empty)');
-  await cal.getByRole('button', { name: 'Add a card' }).click();
-  const d = P.page.getByRole('dialog', { name: 'Add a credit card' });
-  await d.getByLabel('Card name').fill('HDFC Millennia');
+  await openApp(P, 'Accounts');
+  const acc = P.page.getByRole('region', { name: 'Accounts' });
+  await expect(acc.getByText('All your money in one place')).toBeVisible({ timeout: 15_000 });
+  await fits(P.page, 'Accounts (empty)');
+  await acc.getByRole('button', { name: 'Add credit card' }).click();
+  const d = P.page.getByRole('dialog', { name: 'Add credit card' });
+  await d.getByLabel('Name', { exact: true }).fill('HDFC Millennia');
+  await d.getByLabel('Credit limit').fill('150000');
   await d.getByLabel(/Statement day/).fill(String(new Date().getDate()));
-  await d.getByRole('button', { name: 'Add card' }).click();
-  await expect(cal.getByText('Is your HDFC Millennia bill ready?')).toBeVisible();
-  await fits(P.page, 'Calendar, cards with a card');
+  await fits(P.page, 'Accounts, add a card');
+  await d.getByRole('button', { name: 'Add', exact: true }).click();
+  await fits(P.page, 'Accounts, with a card');
+  await acc.getByRole('tab', { name: 'Bills' }).click();
+  await expect(acc.getByText('Is your HDFC Millennia bill ready?')).toBeVisible();
+  await fits(P.page, 'Accounts, bills');
   await P.page.screenshot({ path: shots('94-phone-cards') });
   expect(P.errors).toEqual([]);
 });

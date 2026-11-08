@@ -1,0 +1,20 @@
+{
+  "name": "@sanga/ledger",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Your money in Sanga: accounts, cards, cash, transfers, card bills and statements, end-to-end encrypted. Used by Accounts, Split and the Calendar",
+  "exports": {
+    ".": "./src/index.ts",
+    "./statement": "./src/statement.ts",
+    "./pdf": "./src/pdf.ts",
+    "./share": "./src/share.ts",
+    "./locale": "./src/locale.ts"
+  },
+  "scripts": { "test": "TZ=Asia/Kolkata vitest run" },
+  "dependencies": {
+    "@sanga/crypto": "*",
+    "@sanga/sdk": "*",
+    "@sanga/i18n": "*"
+  }
+}

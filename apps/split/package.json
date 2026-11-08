@@ -14,6 +14,7 @@
     "@sanga/crypto": "*",
     "@sanga/sdk": "*",
     "@sanga/ui": "*",
-    "@sanga/i18n": "*"
+    "@sanga/i18n": "*",
+    "@sanga/ledger": "*"
   }
 }

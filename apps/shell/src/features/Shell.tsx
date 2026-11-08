@@ -1,9 +1,11 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { useApp } from '../state/app';
 import { handleInvite } from '../lib/invite';
 import { DiaryPage } from './notes/DiaryPage';
 import { CalendarPage } from './calendar/CalendarPage';
 import { SplitPage } from './split/SplitPage';
+import { AccountsPage } from './accounts/AccountsPage';
+import { getApp, setApp, useApp } from '../state/app';
+import { go } from '../lib/nav';
 import { MorePage } from './nav/MorePage';
 import { GamesSkeleton } from './games/GamesSkeleton';
 import { Overlays } from './shell/Overlays';
@@ -15,6 +17,7 @@ const GamesHub = lazy(() => import('./games/GamesHub').then((m) => ({ default: m
 export function Main() {
   const section = useApp((s) => s.section);
   useEffect(() => { handleInvite(); }, []); // opened from someone's invite link
+  useEffect(() => { takeShare(); }, []); // opened by Share → Sanga
   usePrefetch();
   useKeyboardHeight();
   return (
@@ -23,11 +26,22 @@ export function Main() {
       {section === 'diary' && <DiaryPage />}
       {section === 'calendar' && <CalendarPage />}
       {section === 'split' && <SplitPage />}
+      {section === 'accounts' && <AccountsPage />}
       {section === 'more' && <MorePage />}
       {section === 'games' && <Suspense fallback={<GamesSkeleton />}><GamesHub /></Suspense>}
       <Overlays />
     </>
   );
+}
+
+// Share → Sanga with a statement PDF or a bank SMS: the service worker kept it and opened /?share=1.
+// Accounts reads it (and lets it go); the address goes back to plain.
+function takeShare() {
+  if (new URLSearchParams(location.search).get('share') !== '1') return;
+  history.replaceState(null, '', location.pathname);
+  setApp({ appParams: { ...getApp().appParams, accounts: { import: 'share' } } });
+  setApp({ section: 'chat' });
+  go('accounts');
 }
 
 // Nothing is downloaded ahead of use: Settings, Friends, Stories, Games and the other apps load when

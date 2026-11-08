@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { awaitingBill, billId, billState, cardReminders, lastStatement, parseAmount, statementDate, suggestedDue, toInput, unpaid, type CardBill, type CreditCard } from './cards';
 
-const card = (o: Partial<CreditCard> = {}): CreditCard => ({ id: 'cardaaaaaaaa', type: 'card', name: 'HDFC', statementDay: 5, dueAfter: 20, remind: [3, 1, 0], time: '09:00', currency: 'INR', color: 'blue', created: 0, edited: 0, ...o });
+const card = (o: Partial<CreditCard> = {}): CreditCard => ({ id: 'cardaaaaaaaa', type: 'account', kind: 'credit', opening: 0, name: 'HDFC', statementDay: 5, dueAfter: 20, remind: [3, 1, 0], time: '09:00', currency: 'INR', color: 'blue', created: 0, edited: 0, ...o });
 const bill = (o: Partial<CardBill> = {}): CardBill => ({ id: 'b1', type: 'bill', card: 'cardaaaaaaaa', month: '2026-11', amount: 1234500, due: '2026-11-25', created: 0, edited: 0, ...o });
 
 describe('statement dates', () => {

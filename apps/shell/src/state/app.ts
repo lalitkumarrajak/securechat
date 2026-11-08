@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import type { Chat, Friend, Group, Me, Msg, Presence, Request } from '../lib/types';
 
 export type Status = 'loading' | 'auth' | 'app';
-export type Section = 'chat' | 'stories' | 'games' | 'diary' | 'calendar' | 'split' | 'more';
+export type Section = 'chat' | 'stories' | 'games' | 'diary' | 'calendar' | 'split' | 'accounts' | 'more';
 export type Conn = 'online' | 'connecting' | 'offline';
 export type Panel = null | 'settings' | 'friends' | 'contact' | 'archived' | 'group' | 'newgroup';
 

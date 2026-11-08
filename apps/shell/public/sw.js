@@ -8,7 +8,7 @@ self.addEventListener('install', (e) => {
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys()
-    .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== LANG_CACHE).map((k) => caches.delete(k))))
+    .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== LANG_CACHE && k !== SHARE_CACHE).map((k) => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 
@@ -18,6 +18,7 @@ self.addEventListener('activate', (e) => {
 // they're cache-first; an old saved page still finds the old assets it names.
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
+  if (e.request.method === 'POST' && url.origin === location.origin && url.pathname === '/share') { e.respondWith(receiveShare(e.request)); return; }
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   if (url.pathname.startsWith('/api/') || url.pathname === '/ws') return;
   const immutable = url.pathname.startsWith('/assets/') || url.pathname.startsWith('/emoji/') || /^\/apps\/[^/]+\/assets\//.test(url.pathname);
@@ -51,6 +52,22 @@ self.addEventListener('fetch', (e) => {
     try { return await fresh; } catch { return Response.error(); }
   }));
 });
+
+// Share → Sanga (manifest share_target): a statement PDF or a bank SMS from another app. Kept for the
+// moment it takes Sanga to open, in a cache of its own; Accounts reads it once and deletes it.
+const SHARE_CACHE = 'sanga-share';
+async function receiveShare(req) {
+  try {
+    const form = await req.formData();
+    const file = form.getAll('file').find((f) => f && typeof f !== 'string');
+    const text = ['title', 'text', 'url'].map((k) => form.get(k)).filter((x) => typeof x === 'string' && x.trim()).join('\n');
+    await caches.delete(SHARE_CACHE);
+    const c = await caches.open(SHARE_CACHE);
+    if (file) await c.put('/share/file', new Response(file));
+    await c.put('/share/meta', new Response(JSON.stringify({ name: file?.name || '', type: file?.type || '', text })));
+  } catch { /* nothing usable was shared: Sanga opens all the same */ }
+  return Response.redirect('/?share=1', 303);
+}
 
 // The page just opened from the saved copy, and the server has a newer Sanga: tell the open windows,
 // which switch to it (main.tsx). The page names its build's script, so comparing that is enough.

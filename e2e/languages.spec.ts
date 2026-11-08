@@ -11,7 +11,7 @@ const shots = (name: string) => `e2e/.artifacts/screens/${name}.png`;
 /** All of one language, as the app has it: English → that language. */
 function dictOf(lang: string) {
   const dict: Record<string, string> = {};
-  for (const ns of ['apps/shell/src', 'apps/split/src', 'apps/calendar/src', 'apps/notes/src', 'packages/ui/src', 'packages/sdk/src']) {
+  for (const ns of ['apps/shell/src', 'apps/split/src', 'apps/calendar/src', 'apps/notes/src', 'apps/accounts/src', 'packages/ui/src', 'packages/sdk/src', 'packages/ledger/src']) {
     const dir = path.join(ns, 'locales', lang);
     if (!fs.existsSync(dir)) continue;
     for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json')))
@@ -120,11 +120,14 @@ for (const L of LANGS) test.describe(L.english, () => {
     await clean(P.page, 'Split → add expense');
     await P.page.screenshot({ path: shots(`67-${L.english.toLowerCase()}-add-expense`) });
     await P.page.keyboard.press('Escape');
-    // Calendar → Cards.
-    await tab(P, tr('Calendar')).click();
-    const cal = P.page.getByRole('region', { name: tr('Calendar') }).or(P.page.getByRole('region', { name: 'Calendar' })).first();
-    await cal.getByRole('tab', { name: tr('Cards') }).click();
-    await clean(P.page, 'Calendar → Cards');
+    // Accounts (from More), and its Bills.
+    await tab(P, tr('More')).click();
+    await P.page.getByRole('region', { name: tr('More') }).getByRole('button', { name: new RegExp(`^${tr('Accounts')}`) }).click();
+    const acc = P.page.getByRole('region', { name: tr('Accounts') });
+    await expect(acc.getByRole('heading', { name: tr('Accounts'), exact: true })).toBeVisible({ timeout: 15_000 });
+    await clean(P.page, 'Accounts');
+    await acc.getByRole('tab', { name: tr('Bills') }).click();
+    await clean(P.page, 'Accounts → Bills');
   });
 
   test(`${L.english} stays after a reload; switching to ${L.other.name} and back to English`, async () => {

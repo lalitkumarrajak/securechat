@@ -1,29 +1,42 @@
-// Credit cards, kept private to your own devices: a card (its name, the day each month its statement is
-// made, how many days before the due date to remind you), and for each month the bill you entered
-// (amount, due date, whether you've paid it). Only the last four digits are ever kept, and only if you
-// type them: never a full number or a CVV. Everything here is plain arithmetic on dates, so it's
-// tested on its own (cards.test.ts); model.ts stores the records and reminders.ts hands the reminders on.
+// Credit card bills: for each card (a credit account: the day each month its statement is made, how
+// many days before the due date to remind you) and month, the bill (amount, due date, whether you've
+// paid it, or that there was none), and the statement it came from. Plain arithmetic on dates, tested
+// on its own (cards.test.ts); model.ts stores the records, and the Calendar turns cardReminders into
+// notifications.
 import { locale, t } from '@sanga/i18n';
-import { addDays } from './panchang';
+import type { Account } from './types';
 
-export interface CreditCard {
-  id: string; type: 'card';
-  name: string;
-  last4?: string;
-  statementDay: number;        // 1–31: the day of the month the statement is generated (short months use their last day)
-  dueAfter: number;            // usually this many days after the statement, to pre-fill the due date
-  remind: number[];            // days before the due date to remind you (0 = on the day)
-  time: string;                // HH:mm, when reminders come
-  currency: string;
-  color: string;
-  archived?: boolean;
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const dayKey = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+export const addDays = (key: string, n: number) => { const [y, m, d] = key.split('-').map(Number); return dayKey(new Date(y, m - 1, d + n)); };
+export const todayKey = () => dayKey(new Date());
+
+/** A credit card account, with what its bills need filled in (see asCard). */
+export type CreditCard = Account & { kind: 'credit'; statementDay: number; dueAfter: number; remind: number[]; time: string };
+/** A credit account with its bill settings filled in from the defaults. */
+export const asCard = (a: Account): CreditCard => ({ ...a, kind: 'credit', statementDay: a.statementDay ?? 1, dueAfter: a.dueAfter ?? 20, remind: a.remind ?? [3, 1, 0], time: a.time ?? '09:00' });
+
+/** One line of an imported statement: date, description, amount in paise (negative: a credit), category. */
+export interface StatementTxn { d: string; t: string; a: number; c: string }
+/** A statement read from the bank's PDF or SMS, kept so you can see where the money went. */
+export interface CardStatement {
+  id: string; type: 'statement';
+  card: string;
+  month: string;               // YYYY-MM of the statement date, like its bill
+  date: string;                // statement date
+  from?: string;               // the period it covers
+  due?: string;
+  total: number; minDue?: number; limit?: number;
+  txns: StatementTxn[];
   created: number; edited: number;
   srv?: number; dirty?: boolean; deleted?: boolean;
 }
+export const MAX_TXNS = 400;
+export const statementId = (card: string, month: string) => `s${card}${month.replace('-', '')}`.slice(0, 40);
 
 export interface CardBill {
   id: string; type: 'bill';
-  card: string;                // CreditCard id
+  card: string;                // the credit account's id
   month: string;               // YYYY-MM of the statement
   amount: number;              // total due, in the smallest unit (paise, cents)
   minDue?: number;
@@ -31,6 +44,7 @@ export interface CardBill {
   paid?: string;               // YYYY-MM-DD it was paid
   paidAmount?: number;
   split?: boolean;             // already sent to Split as an expense
+  none?: boolean;              // no bill this month (nothing spent, or a credit balance): nothing to pay or remind
   created: number; edited: number;
   srv?: number; dirty?: boolean; deleted?: boolean;
 }
@@ -91,15 +105,15 @@ export function awaitingBill(cards: CreditCard[], bills: CardBill[], now: string
   });
 }
 
-export type BillState = 'paid' | 'overdue' | 'soon' | 'later';
+export type BillState = 'none' | 'paid' | 'overdue' | 'soon' | 'later';
 const gap = (a: string, b: string) => Math.round((new Date(`${b}T12:00:00`).getTime() - new Date(`${a}T12:00:00`).getTime()) / 864e5);
 /** Where a bill stands: paid, past its due date, due within 3 days, or later. */
-export const billState = (b: CardBill, now: string): BillState => (b.paid ? 'paid' : b.due < now ? 'overdue' : gap(now, b.due) <= 3 ? 'soon' : 'later');
+export const billState = (b: CardBill, now: string): BillState => (b.none ? 'none' : b.paid ? 'paid' : b.due < now ? 'overdue' : gap(now, b.due) <= 3 ? 'soon' : 'later');
 /** Days from `now` to the due date (negative once overdue). */
 export const daysToDue = (b: CardBill, now: string) => gap(now, b.due);
 
 /** Unpaid bills, most urgent first. */
-export const unpaid = (bills: CardBill[]) => liveBills(bills).filter((b) => !b.paid).sort((a, b) => a.due.localeCompare(b.due));
+export const unpaid = (bills: CardBill[]) => liveBills(bills).filter((b) => !b.paid && !b.none).sort((a, b) => a.due.localeCompare(b.due));
 
 /** The bill's due date suggested from the statement: `dueAfter` days later. */
 export const suggestedDue = (card: CreditCard, month: string) => addDays(statementDate(month, card.statementDay), card.dueAfter);
@@ -122,7 +136,7 @@ export function cardReminders(cards: CreditCard[], bills: CardBill[], now: strin
       out.push({ key: `c|${card.id}|${month}|s2`, at: atTime(addDays(date, 2), card.time), title: t('💳 {card}: still need your bill', { card: card.name }), body: t('Add the amount and due date, and I’ll remind you before it’s due.') });
     }
     for (const b of mine) {
-      if (b.paid) continue;
+      if (b.paid || b.none) continue;
       const amt = money(b.amount, card.currency);
       for (const d of [...new Set(card.remind)].filter((n) => n >= 0 && n <= 30)) {
         out.push({

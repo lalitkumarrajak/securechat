@@ -1,16 +1,17 @@
 import { useMemo } from 'react';
 import { CreditCard } from 'lucide-react';
 import { t, tn } from '@sanga/i18n';
-import { awaitingBill, billState, daysToDue, liveCards, money, unpaid } from './cards';
-import { today, useCal } from './model';
+import { awaitingBill, billState, creditCards, daysToDue, money, unpaid, useLedger } from '@sanga/ledger';
+import { today } from './model';
 import { inWords } from './util';
 
-/** Shown above every view when a card needs you: a statement whose bill isn't entered, or a bill due soon or overdue. */
+/** Shown above every view when a card needs you: a statement whose bill isn't in yet, or a bill due soon or
+ *  overdue. Cards and bills live in Accounts; this opens it. */
 export function CardsBanner({ onOpen }: { onOpen: () => void }) {
-  const cardsMap = useCal((s) => s.cards), billsMap = useCal((s) => s.bills);
+  const accountsMap = useLedger((s) => s.accounts), billsMap = useLedger((s) => s.bills);
   const note = useMemo(() => {
     const now = today();
-    const cards = liveCards(Object.values(cardsMap)), bills = Object.values(billsMap);
+    const cards = creditCards(), bills = Object.values(billsMap);
     const byId = new Map(cards.map((c) => [c.id, c]));
     const urgent = unpaid(bills).find((b) => byId.has(b.card) && billState(b, now) !== 'later');
     if (urgent) {
@@ -20,7 +21,7 @@ export function CardsBanner({ onOpen }: { onOpen: () => void }) {
     }
     const waiting = awaitingBill(cards, bills, now)[0];
     return waiting ? { tone: 'amber', text: t('{card}: your bill should be ready. Add the amount and due date.', { card: waiting.card.name }) } : null;
-  }, [cardsMap, billsMap]);
+  }, [accountsMap, billsMap]);
   if (!note) return null;
   return (
     <button type="button" onClick={onOpen} className={`mt-3 flex w-full items-center gap-3 rounded-2xl border p-3 text-left text-sm font-medium ${note.tone === 'red' ? 'border-red-500/40 bg-red-500/10' : 'border-amber-500/40 bg-amber-500/10'}`}>

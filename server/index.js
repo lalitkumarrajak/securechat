@@ -61,6 +61,9 @@ async function handleHttp(req, res) {
   const route = routes[key];
   if (!route) {
     if (url.pathname.startsWith('/api/')) return sendJson(res, 404, { error: 'not found' });
+    // Share → Sanga lands here only when the service worker isn't running (it takes the shared file
+    // itself, see sw.js): open Accounts, where the statement can be chosen again.
+    if (req.method === 'POST' && url.pathname === '/share') { res.writeHead(303, { location: '/#accounts' }); return res.end(); }
     if (req.method !== 'GET' && req.method !== 'HEAD') return sendJson(res, 405, { error: 'method not allowed' });
     if (url.pathname === '/apps.json') return sendJson(res, 200, installedApps());
     const emoji = EMOJI_RE.exec(url.pathname);

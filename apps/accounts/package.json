@@ -1,0 +1,20 @@
+{
+  "name": "@sanga/accounts",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Sanga Accounts: bank accounts, credit and debit cards, cash and wallets, balances, transfers, card bills and statements. End-to-end encrypted. Opened from More, or on its own at /apps/accounts/",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "TZ=Asia/Kolkata vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@sanga/crypto": "*",
+    "@sanga/sdk": "*",
+    "@sanga/ui": "*",
+    "@sanga/i18n": "*",
+    "@sanga/ledger": "*"
+  }
+}
