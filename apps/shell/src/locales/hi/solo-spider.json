@@ -1,0 +1,48 @@
+{
+  "spades": "हुकुम",
+  "hearts": "पान",
+  "diamonds": "ईंट",
+  "clubs": "चिड़ी",
+  "Ace": "इक्का",
+  "Jack": "गुलाम",
+  "Queen": "बेगम",
+  "King": "राजा",
+  "{rank} of {suit}": "{suit} का {rank}",
+  "Easy": "आसान",
+  "Hard": "कठिन",
+  "Choose how hard a game you want.": "चुनें कि खेल कितना कठिन हो।",
+  "All eight runs done!": "आठों क्रम पूरे!",
+  "Deal a row from the stock.": "गड्डी से एक पंक्ति बाँटें।",
+  "Move the {card} from column {a} to column {b}.": "{card} को कॉलम {a} से कॉलम {b} में ले जाएँ।",
+  "No useful moves left. Undo or start a new game.": "कोई काम की चाल नहीं बची। वापस लें या नया खेल शुरू करें।",
+  "The {card} can’t move anywhere.": "{card} कहीं नहीं जा सकता।",
+  "Fill every empty column before dealing.": "बाँटने से पहले हर ख़ाली कॉलम भरें।",
+  "A full run! {n} of {total} done.": "पूरा क्रम! {total} में से {n} पूरे।",
+  "Tap a card to move it, or drag it. Build King to Ace in one suit.": "पत्ता हिलाने के लिए टैप करें या उसे खींचें। एक ही रंग में राजा से इक्का तक जमाएँ।",
+  "Score {n}": "स्कोर {n}",
+  "New game": "नया खेल",
+  "Empty column {n}": "ख़ाली कॉलम {n}",
+  "{card}, column {n}": "{card}, कॉलम {n}",
+  "Runs done: {n} of {total}": "पूरे क्रम: {total} में से {n}",
+  "Deal a row ({n} left)": "एक पंक्ति बाँटें ({n} बाकी)",
+  "More suits make it harder.": "ज़्यादा रंग, ज़्यादा कठिन।",
+  "{n} moves": {
+    "one": "{n} चाल",
+    "other": "{n} चालें"
+  },
+  "{n} suits": {
+    "one": "{n} रंग",
+    "other": "{n} रंग"
+  },
+  "{n} wins at this level": {
+    "one": "इस लेवल पर {n} जीत",
+    "other": "इस लेवल पर {n} जीत"
+  },
+  "Spider Solitaire": "स्पाइडर सॉलिटेयर",
+  "Two decks, ten columns, eight runs": "दो गड्डियाँ, दस कॉलम, आठ क्रम",
+  "Put a card on any card one higher, like a 7 on an 8.": "पत्ते को अपने से एक बड़े किसी भी पत्ते पर रखें, जैसे 8 पर 7।",
+  "A run of the same suit going down moves together.": "एक ही रंग का घटता क्रम एक साथ चलता है।",
+  "Tap a card to send it where it fits best, or drag it.": "पत्ते पर टैप करें, वह सबसे सही जगह चला जाएगा, या उसे खींचें।",
+  "Stuck? Tap the stock to deal a card onto every column. No column can be empty.": "अटक गए? गड्डी पर टैप करें, हर कॉलम पर एक पत्ता आएगा। कोई कॉलम ख़ाली नहीं होना चाहिए।",
+  "Build King down to Ace in one suit and it leaves the table. Clear all eight to win.": "एक ही रंग में राजा से इक्का तक जमाएँ, वह क्रम मेज़ से हट जाता है। जीतने के लिए आठों हटाएँ।"
+}
