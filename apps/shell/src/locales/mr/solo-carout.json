@@ -1,0 +1,21 @@
+{
+  "Red car": "लाल गाडी",
+  "Truck {n}": "ट्रक {n}",
+  "Car {n}": "गाडी {n}",
+  "Moves: {n}": "चाली: {n}",
+  "Best: {n}": "सर्वोत्तम: {n}",
+  "Out! Well driven.": "बाहेर! छान चालवली.",
+  "Slide the glowing car to the marked spot.": "चमकणारी गाडी खूण केलेल्या जागेपर्यंत सरकवा.",
+  "Drag it, or tap a dot to slide it there.": "ती ओढा, किंवा एखाद्या ठिपक्यावर टॅप करून तिथे सरकवा.",
+  "Clear a way for the red car to drive out on the right.": "लाल गाडीला उजवीकडून बाहेर पडण्यासाठी वाट मोकळी करा.",
+  "Parking lot": "पार्किंग",
+  "Slide here: row {r}, column {c}": "इथे सरकवा: ओळ {r}, कॉलम {c}",
+  "Out in {n} moves. The fewest it can be done in: {best}.": "{n} चालींमध्ये बाहेर. कमीत कमी {best} चालींमध्ये होऊ शकते.",
+  "Car Out": "गाडी बाहेर",
+  "Slide the cars, free the red one": "गाड्या सरकवा, लाल गाडी सोडवा",
+  "Cars only move along their length: forwards and backwards, never sideways.": "गाड्या फक्त त्यांच्या लांबीच्या दिशेने चालतात: पुढे-मागे, कधीच बाजूला नाही.",
+  "Drag a car to slide it, or tap it and then tap a dot.": "गाडी सरकवण्यासाठी ती ओढा, किंवा तिच्यावर टॅप करून मग एखाद्या ठिपक्यावर टॅप करा.",
+  "Clear a way so the red car can drive out of the gap on the right.": "वाट मोकळी करा, म्हणजे लाल गाडी उजवीकडच्या मोकळ्या जागेतून बाहेर पडेल.",
+  "Fewer moves is better: each slide counts as one, however far.": "कमी चाली चांगल्या: प्रत्येक सरकवणे एक चाल, कितीही लांब असो.",
+  "Stuck? Undo, start again, or ask for a hint.": "अडकलात? मागे घ्या, पुन्हा सुरू करा किंवा सूचना मागा."
+}

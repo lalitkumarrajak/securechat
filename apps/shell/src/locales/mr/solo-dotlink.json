@@ -1,0 +1,17 @@
+{
+  "{colour} dot": "{colour} ठिपका",
+  "Filled: {p}%": "भरले: {p}%",
+  "Every pair joined, every square filled!": "प्रत्येक जोडी जुळली, प्रत्येक चौकोन भरला!",
+  "Here’s the {colour} path.": "हा घ्या {colour} मार्ग.",
+  "Every pair is joined. Now fill every square.": "प्रत्येक जोडी जुळली. आता प्रत्येक चौकोन भरा.",
+  "Drag from a dot to the other dot of its colour.": "एका ठिपक्यापासून त्याच रंगाच्या दुसऱ्या ठिपक्यापर्यंत ओढा.",
+  "Board": "पट",
+  "In {n} moves.": "{n} चालींमध्ये.",
+  "Dot Link": "ठिपके जोडा",
+  "Join the dots, fill the board": "ठिपके जोडा, पट भरा",
+  "Drag from a dot to the other dot of the same colour, or tap square by square.": "एका ठिपक्यापासून त्याच रंगाच्या दुसऱ्या ठिपक्यापर्यंत ओढा, किंवा एकेका चौकोनावर टॅप करा.",
+  "Paths can’t cross or share a square.": "मार्ग एकमेकांना छेदू शकत नाहीत, ना एक चौकोन वाटून घेऊ शकतात.",
+  "Drawing into another path cuts it back; press on a path to change it.": "दुसऱ्या मार्गात ओढल्यास तो कापला जातो; मार्ग बदलण्यासाठी त्यावर दाबा.",
+  "Finish when every pair is joined and every square is filled.": "प्रत्येक जोडी जुळली आणि प्रत्येक चौकोन भरला की लेव्हल पूर्ण.",
+  "Stuck? A hint draws one path for you.": "अडकलात? सूचना तुमच्यासाठी एक मार्ग काढून देते."
+}
