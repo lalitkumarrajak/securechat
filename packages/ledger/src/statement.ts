@@ -9,7 +9,7 @@ import { tk } from '@sanga/i18n';
 export interface Seg { x: number; w: number; s: string }
 export type Line = Seg[];
 
-export type Cat = 'food' | 'groceries' | 'shopping' | 'fuel' | 'travel' | 'bills' | 'entertainment' | 'health' | 'education' | 'emi' | 'fees' | 'cash' | 'payment' | 'refund' | 'other';
+export type Cat = 'food' | 'groceries' | 'shopping' | 'fuel' | 'travel' | 'bills' | 'entertainment' | 'health' | 'education' | 'emi' | 'fees' | 'cash' | 'payment' | 'refund' | 'cashback' | 'other';
 export interface Txn { date: string; desc: string; amount: number; credit: boolean; cat: Cat }
 export interface Parsed {
   kind: 'statement' | 'payment' | 'unknown';
@@ -34,11 +34,22 @@ export const CATS: Record<Cat, { label: string; emoji: string }> = {
   fees: { label: tk('Fees, tax & interest'), emoji: '💸' },
   cash: { label: tk('Cash withdrawal'), emoji: '🏧' },
   payment: { label: tk('Payment to card'), emoji: '✅' },
-  refund: { label: tk('Refunds & cashback'), emoji: '↩️' },
+  refund: { label: tk('Refunds'), emoji: '↩️' },
+  cashback: { label: tk('Cashback'), emoji: '🎁' },
   other: { label: tk('Other'), emoji: '🧾' },
 };
-/** Categories a purchase can be put in (payments and refunds come from what the statement says). */
-export const SPEND_CATS = (Object.keys(CATS) as Cat[]).filter((c) => c !== 'payment' && c !== 'refund');
+/** Categories for money that came back to the card: these aren't spending. */
+export const CREDIT_CATS: Cat[] = ['refund', 'cashback', 'payment'];
+/** Categories a purchase can be put in (payments, refunds and cashback come from what the statement says). */
+export const SPEND_CATS = (Object.keys(CATS) as Cat[]).filter((c) => !CREDIT_CATS.includes(c));
+
+/** Cashback, however a bank words it: "CASHBACK", "Cash back credit", "Reward points redeemed",
+ *  "Rewards redemption", "Statement credit", "CB credit". */
+export const CASHBACK = /cash\s*-?\s*back|\brewards?\s*(points?\s*)?(redemption|redeemed|redeem|credit|conversion)|\b(points?|rp)\s*redemption|statement\s*credit|\bcb\s*(credit|cr)\b/i;
+const REFUND = /refund|reversal|reversed|chargeback|return/i;
+/** A saved line's category. Statements imported before Cashback was its own category kept cashback as
+ *  a refund: read those as cashback when the line says so. */
+export const savedCat = (c: string, desc: string) => (c === 'refund' && CASHBACK.test(desc) && !REFUND.test(desc) ? 'cashback' : c);
 
 const RULES: [Cat, RegExp][] = [
   ['fees', /\b(late\s*(payment)?\s*fee|annual\s*fee|joining\s*fee|finance\s*charge|interest|[icsu]?gst|service\s*tax|surcharge|overlimit|over\s*limit|fee\b|charges?\b|markup)/i],
@@ -57,7 +68,11 @@ const RULES: [Cat, RegExp][] = [
 
 /** A guess at what a purchase was for, from its description. */
 export function categorize(desc: string, credit = false): Cat {
-  if (credit) return /payment|thank\s*you|received|neft|imps|upi|autopay|auto\s*debit|bbps|cred\b/i.test(desc) && !/refund|reversal|cashback|cash\s*back/i.test(desc) ? 'payment' : 'refund';
+  if (credit) {
+    if (CASHBACK.test(desc)) return 'cashback';
+    if (REFUND.test(desc)) return 'refund';
+    return /payment|thank\s*you|received|neft|imps|upi|autopay|auto\s*debit|bbps|cred\b/i.test(desc) ? 'payment' : 'refund';
+  }
   for (const [cat, re] of RULES) if (re.test(desc)) return cat;
   return 'other';
 }
@@ -214,7 +229,10 @@ function findTxns(lines: Line[], ref?: string): Txn[] {
     let desc = rest.slice(0, amounts[0].index).replace(/\s{2,}/g, ' ').replace(/\b\d{8,}\b/g, '').replace(/[|]+/g, ' ').trim();
     desc = desc.replace(/^[-–:]+|[-–:]+$/g, '').trim();
     if (!desc || !/[a-z]{2,}/i.test(desc) || SKIP.test(desc) || a.minor === 0) continue;
-    const credit = a.credit || /^cr\b/i.test(tail) || /payment\s*(received|thank)|thank\s*you|refund|reversal|cashback|cash\s*back/i.test(desc);
+    const marked = a.credit || /^cr\b/i.test(tail);
+    // Cashback taken back ("CASHBACK REVERSAL") is a charge, unless the statement marks the line as a credit.
+    const clawback = /cash\s*-?\s*back.{0,20}revers|revers.{0,20}cash\s*-?\s*back/i.test(desc);
+    const credit = marked || (!clawback && (/payment\s*(received|thank)|thank\s*you|refund|reversal/i.test(desc) || CASHBACK.test(desc)));
     out.push({ date: d.date, desc: desc.slice(0, 60), amount: a.minor, credit, cat: categorize(desc, credit) });
   }
   return out;
@@ -266,13 +284,14 @@ export function parseStatement(lines: Line[]): Parsed {
 /** Pasted text (an SMS, an email): each line is one run. */
 export const textLines = (s: string): Line[] => s.split(/\r?\n/).map((x) => x.trim()).filter(Boolean).map((x) => [{ x: 0, w: x.length * 6, s: x }]);
 
-/** What was spent (purchases less refunds) and what was paid to the card, from a statement's lines. */
+/** What was spent (purchases less refunds and cashback) and what was paid to the card, from a statement's lines. */
 export function totals(txns: { amount: number; credit: boolean; cat: Cat }[]) {
-  let spent = 0, refunds = 0, paid = 0;
+  let spent = 0, refunds = 0, cashback = 0, paid = 0;
   for (const x of txns) {
     if (!x.credit) spent += x.amount;
     else if (x.cat === 'payment') paid += x.amount;
+    else if (x.cat === 'cashback') cashback += x.amount;
     else refunds += x.amount;
   }
-  return { spent, refunds, paid, net: spent - refunds };
+  return { spent, refunds, cashback, paid, net: spent - refunds - cashback };
 }

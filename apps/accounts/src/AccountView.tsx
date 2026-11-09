@@ -1,11 +1,11 @@
-// One account: its balance (a card's: what you owe, what's left of the limit), what you can do with it,
+// One account: its balance (a card's: what you owe, what's left of the limit, the cashback it earned), what you can do with it,
 // its details (never a full number), its debit cards, its bills and the history of money in and out.
 import { useMemo, useState } from 'react';
-import { ArrowDownLeft, ArrowLeft, ArrowLeftRight, ArrowUpRight, CreditCard as CardIcon, FileUp, Pencil, Plus, Receipt } from 'lucide-react';
+import { ArrowDownLeft, ArrowLeft, ArrowLeftRight, ArrowUpRight, CreditCard as CardIcon, FileUp, Gift, Pencil, Plus, Receipt } from 'lucide-react';
 import { Button, IconButton } from '@sanga/ui/button';
 import { cn } from '@sanga/ui/utils';
 import { t } from '@sanga/i18n';
-import { asCard, creditLine, openBill, balances, CARD_BG, effect, entriesOf, live, money, newDebit, newEntry, useLedger, type Account, type CardBill, type CreditCard, type DebitCard, type Entry } from '@sanga/ledger';
+import { asCard, cashbackList, creditLine, openBill, balances, CARD_BG, effect, entriesOf, live, money, newDebit, newEntry, todayKey, useLedger, type Account, type CardBill, type CreditCard, type DebitCard, type Entry } from '@sanga/ledger';
 import { BillsView } from './BillsView';
 import { ACC_TYPES, entryTitle, KINDS, label, NETWORK_NAMES, ordinalDay, shortDay } from './util';
 
@@ -19,6 +19,10 @@ export function AccountView({ id, onBack, onEdit, onEntry, onDebit, onBill, onIm
   const entries = useMemo(() => entriesOf(id, s), [s, id]);
   const debits = useMemo(() => live(Object.values(s.debits)).filter((d) => d.account === id), [s.debits, id]);
   const [more, setMore] = useState(false);
+  const earned = useMemo(() => {
+    const list = cashbackList(s).filter((x) => x.card === id), year = todayKey().slice(0, 4);
+    return { all: list.reduce((n, x) => n + x.amount, 0), year: list.filter((x) => x.date.startsWith(year)).reduce((n, x) => n + x.amount, 0) };
+  }, [s, id]);
   if (!a || a.deleted) return null;
   const cur = a.currency, credit = a.kind === 'credit';
   const fmt = (n: number) => money(n, cur);
@@ -62,9 +66,10 @@ export function AccountView({ id, onBack, onEdit, onEntry, onDebit, onBill, onIm
         {(a.last4 || a.acc4) && <p className="relative mt-4 font-mono tracking-widest text-white/90">•••• {a.last4 ?? a.acc4}{a.expiry && <span className="ml-4 text-xs tracking-normal">{a.expiry}</span>}</p>}
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className={cn('grid gap-2', credit ? 'grid-cols-4' : 'grid-cols-3')}>
         {credit ? (<>
           <Action icon={<ArrowUpRight />} label={t('Spent')} onClick={() => add('out')} />
+          <Action icon={<Gift />} label={t('Cashback')} onClick={() => add('in', { cat: 'cashback' })} />
           <Action icon={<Receipt />} label={t('Pay bill')} onClick={() => { const ob = openBill(id); if (ob) onBill(ob, asCard(a)); else onEntry(newEntry('transfer', live(Object.values(s.accounts)).find((x) => x.kind === 'bank' && !x.archived)?.id ?? id, { to: id, amount: owe })); }} />
           <Action icon={<FileUp />} label={t('Statement')} onClick={onImport} />
         </>) : (<>
@@ -73,6 +78,16 @@ export function AccountView({ id, onBack, onEdit, onEntry, onDebit, onBill, onIm
           <Action icon={<ArrowLeftRight />} label={t('Transfer')} onClick={() => add('transfer')} />
         </>)}
       </div>
+
+      {credit && earned.all > 0 && (
+        <div className="flex items-center gap-3 rounded-2xl border border-line/70 bg-panel p-3">
+          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-green-500/12 text-green-700 dark:text-green-300 [&_svg]:size-4"><Gift /></span>
+          <span className="min-w-0 flex-1"><span className="block text-sm font-medium">{t('Cashback earned')}</span>
+            <span className="block text-xs text-muted">{t('{amount} this year', { amount: fmt(earned.year) })}</span></span>
+          <span className="shrink-0 text-right"><span className="block font-semibold tabular-nums text-green-700 dark:text-green-400">{fmt(earned.all)}</span>
+            <span className="block text-xs text-muted">{t('in all')}</span></span>
+        </div>
+      )}
 
       {a.kind === 'bank' && (
         <section>
@@ -113,9 +128,9 @@ export function AccountView({ id, onBack, onEdit, onEntry, onDebit, onBill, onIm
               return (
                 <li key={e.id}><button type="button" onClick={() => onEntry(e)} className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-hover">
                   <span className={cn('grid size-9 shrink-0 place-items-center rounded-full [&_svg]:size-4', n >= 0 ? 'bg-green-500/12 text-green-700 dark:text-green-300' : 'bg-panel-2 text-muted')}>
-                    {e.kind === 'transfer' ? <ArrowLeftRight /> : n >= 0 ? <ArrowDownLeft /> : <ArrowUpRight />}</span>
+                    {e.kind === 'transfer' ? <ArrowLeftRight /> : e.cat === 'cashback' ? <Gift /> : n >= 0 ? <ArrowDownLeft /> : <ArrowUpRight />}</span>
                   <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{entryTitle(e, name, id)}</span>
-                    <span className="block truncate text-xs text-muted">{[shortDay(e.date), e.ref?.startsWith('split:') && t('from Split'), e.via && s.debits[e.via] && t('Debit card {name}', { name: s.debits[e.via].name })].filter(Boolean).join(' · ')}</span></span>
+                    <span className="block truncate text-xs text-muted">{[shortDay(e.date), e.ref?.startsWith('split:') && t('from Split'), e.cat === 'cashback' && e.card && e.card !== id && t('Cashback from {card}', { card: name(e.card) }), e.via && s.debits[e.via] && t('Debit card {name}', { name: s.debits[e.via].name })].filter(Boolean).join(' · ')}</span></span>
                   <span className={cn('shrink-0 text-sm font-semibold tabular-nums', n >= 0 && 'text-green-700 dark:text-green-400')}>{n >= 0 ? '+' : '−'}{fmt(Math.abs(n))}</span>
                 </button></li>
               );
@@ -129,7 +144,7 @@ export function AccountView({ id, onBack, onEdit, onEntry, onDebit, onBill, onIm
 
 function Action({ icon, label: text, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="flex flex-col items-center gap-1.5 rounded-2xl border border-line/70 bg-panel py-3 text-sm font-medium hover:bg-hover [&_svg]:size-5">
+    <button type="button" onClick={onClick} className="flex min-w-0 flex-col items-center gap-1.5 rounded-2xl border border-line/70 bg-panel px-1 py-3 text-center text-xs font-medium hover:bg-hover sm:text-sm [&_svg]:size-5">
       <span className="grid size-9 place-items-center rounded-full bg-accent/12 text-accent-ink">{icon}</span>{text}
     </button>
   );

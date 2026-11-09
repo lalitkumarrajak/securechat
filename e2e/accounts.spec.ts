@@ -136,6 +136,49 @@ test('a transfer: cash from the ATM', async () => {
   await expect(balanceOf('Cash')).toContainText('₹2,500.00');
 });
 
+test('cashback: on the card it lowers what you owe; paid to the bank, it counts for the card that earned it', async () => {
+  await balanceOf('Millennia').click();
+  const owed = await acc().getByText(/^₹[\d,]+\.\d\d$/).first().textContent();
+  await acc().getByRole('button', { name: 'Cashback', exact: true }).click();
+  const d = P.page.getByRole('dialog', { name: 'Add cashback' });
+  await expect(d.getByLabel('This is cashback')).toBeChecked();
+  await d.getByLabel(/^Amount/).fill('150');
+  await d.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect(acc().getByRole('button', { name: /^Cashback/ }).last()).toContainText('+₹150.00');
+  await expect(acc().getByText('Cashback earned')).toBeVisible();
+  const toNum = (x: string | null) => Number((x ?? '').replace(/[^\d.]/g, ''));
+  const after = await acc().getByText(/^₹[\d,]+\.\d\d$/).first().textContent();
+  expect(Math.abs(toNum(owed) - toNum(after))).toBeCloseTo(150, 2);
+  await acc().getByRole('button', { name: 'All accounts' }).click();
+
+  await balanceOf('HDFC Savings').click();
+  await acc().getByRole('button', { name: 'Money in' }).click();
+  const b = P.page.getByRole('dialog'); // its title becomes "Add cashback" once ticked
+  await b.getByLabel(/^Amount/).fill('50');
+  await b.getByLabel('This is cashback').check();
+  await b.getByLabel(/^Earned on card/).selectOption({ label: 'Millennia ••4321' });
+  await b.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect(acc().getByText('Cashback from Millennia')).toBeVisible();
+  await acc().getByRole('button', { name: 'All accounts' }).click();
+
+  await balanceOf('Millennia').click();
+  await expect(acc().getByText('Cashback earned').locator('../..')).toContainText(/₹\d[\d,]*\.\d\d/);
+  const total = toNum(await acc().getByText('Cashback earned').locator('../..').locator('span.tabular-nums').textContent());
+  expect(total).toBeGreaterThanOrEqual(200);
+  await P.page.screenshot({ path: shots('93-accounts-cashback') });
+
+  // Deleted again, both balances are back where they were (and the tests after this one see them as before).
+  await acc().getByRole('button', { name: /^Cashback/ }).last().click();
+  await P.page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+  await expect(acc().getByText(/^₹[\d,]+\.\d\d$/).first()).toHaveText(owed!);
+  await acc().getByRole('button', { name: 'All accounts' }).click();
+  await balanceOf('HDFC Savings').click();
+  await acc().getByText('Cashback from Millennia').click();
+  await P.page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+  await acc().getByRole('button', { name: 'All accounts' }).click();
+  await expect(balanceOf('HDFC Savings')).toContainText('₹43,879.50');
+});
+
 test('a payment SMS marks the September bill paid', async () => {
   await acc().getByRole('tab', { name: 'Bills' }).click();
   await acc().getByRole('button', { name: /Import a statement/ }).click();

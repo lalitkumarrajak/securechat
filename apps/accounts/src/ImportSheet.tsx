@@ -15,7 +15,7 @@ import {
   creditCards, liveAccounts, money, newAccount, openBill, payBill, save, saveStatement, statementId, todayKey, useLedger, newEntry,
   asCard, type CreditCard,
 } from '@sanga/ledger';
-import { CATS, SPEND_CATS, parseStatement, textLines, totals, type Cat, type Line, type Parsed, type Txn } from '@sanga/ledger/statement';
+import { CATS, CREDIT_CATS, SPEND_CATS, parseStatement, textLines, totals, type Cat, type Line, type Parsed, type Txn } from '@sanga/ledger/statement';
 import { NeedPassword, readPdf, readWithSaved } from '@sanga/ledger/pdf';
 import { label, monthTitle, parseAmount, SELECT, shortDay, toInput } from './util';
 
@@ -215,21 +215,20 @@ function Review({ p, password, onSaved }: { p: Parsed; password?: string; onSave
 
       {txns.length > 0 && (
         <section aria-label={t('Transactions')} className="rounded-2xl border border-line">
-          <div className="grid grid-cols-3 divide-x divide-line border-b border-line text-center">
-            <div className="p-2.5"><p className="text-xs text-muted">{tn(txns.filter((x) => !x.credit).length, '{n} purchase', '{n} purchases')}</p><p className="font-semibold tabular-nums">{money(sum.spent, cur)}</p></div>
-            <div className="p-2.5"><p className="text-xs text-muted">{t('Refunds')}</p><p className="font-semibold tabular-nums">{money(sum.refunds, cur)}</p></div>
-            <div className="p-2.5"><p className="text-xs text-muted">{t('Paid to card')}</p><p className="font-semibold tabular-nums">{money(sum.paid, cur)}</p></div>
+          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-t-2xl border-b border-line bg-line text-center sm:grid-cols-4">
+            <div className="bg-panel p-2.5"><p className="text-xs text-muted">{tn(txns.filter((x) => !x.credit).length, '{n} purchase', '{n} purchases')}</p><p className="font-semibold tabular-nums">{money(sum.spent, cur)}</p></div>
+            <div className="bg-panel p-2.5"><p className="text-xs text-muted">{t('Refunds')}</p><p className="font-semibold tabular-nums">{money(sum.refunds, cur)}</p></div>
+            <div className="bg-panel p-2.5"><p className="text-xs text-muted">{t('Cashback')}</p><p className="font-semibold tabular-nums text-green-700 dark:text-green-400">{money(sum.cashback, cur)}</p></div>
+            <div className="bg-panel p-2.5"><p className="text-xs text-muted">{t('Paid to card')}</p><p className="font-semibold tabular-nums">{money(sum.paid, cur)}</p></div>
           </div>
           <ul className="divide-y divide-line">
             {list.map((x, i) => (
               <li key={i} className="flex items-center gap-2 px-3 py-2">
                 <span className="w-12 shrink-0 text-xs text-muted">{shortDay(x.date)}</span>
                 <span className="min-w-0 flex-1 truncate text-sm">{x.desc}</span>
-                {x.credit ? <span className="shrink-0 text-xs text-muted">{CATS[x.cat].emoji} {t(CATS[x.cat].label)}</span> : (
-                  <select aria-label={t('Category')} value={x.cat} onChange={(e) => setCat(i, e.target.value as Cat)} className="h-8 max-w-28 shrink-0 rounded-lg sm:max-w-40 border border-line bg-panel-2 px-1 text-xs">
-                    {SPEND_CATS.map((c) => <option key={c} value={c}>{CATS[c].emoji} {t(CATS[c].label)}</option>)}
-                  </select>
-                )}
+                <select aria-label={t('Category')} value={x.cat} onChange={(e) => setCat(i, e.target.value as Cat)} className="h-8 max-w-28 shrink-0 rounded-lg sm:max-w-40 border border-line bg-panel-2 px-1 text-xs">
+                  {(x.credit ? CREDIT_CATS : SPEND_CATS).map((c) => <option key={c} value={c}>{CATS[c].emoji} {t(CATS[c].label)}</option>)}
+                </select>
                 <span className={cn('w-20 shrink-0 text-right text-sm tabular-nums', x.credit && 'text-green-600 dark:text-green-400')}>{x.credit ? '+' : ''}{money(x.amount, cur)}</span>
               </li>
             ))}

@@ -286,5 +286,17 @@
   "Keep both": "दोनों रखें",
   "Merge": "मिलाएँ",
   "Make them one card?": "इन्हें एक कार्ड बनाएँ?",
-  "Everything on {others} moves to {name}, then {others} is removed.": "{others} का सब कुछ {name} में चला जाएगा, फिर {others} हटा दिया जाएगा।"
+  "Everything on {others} moves to {name}, then {others} is removed.": "{others} का सब कुछ {name} में चला जाएगा, फिर {others} हटा दिया जाएगा।",
+  "Cashback": "कैशबैक",
+  "Cashback earned": "मिला कैशबैक",
+  "{amount} this year": "इस साल {amount}",
+  "in all": "कुल",
+  "Cashback from {card}": "{card} का कैशबैक",
+  "Add cashback": "कैशबैक जोड़ें",
+  "This is cashback": "यह कैशबैक है",
+  "It lowers what you owe on this card, and counts as cashback the card earned.": "इससे इस कार्ड पर बकाया कम होता है, और यह कार्ड से मिले कैशबैक में गिना जाता है।",
+  "Counted as cashback, not income.": "इसे कैशबैक गिना जाता है, आमदनी नहीं।",
+  "Earned on card": "किस कार्ड से मिला",
+  "e.g. Amazon cashback": "जैसे Amazon कैशबैक",
+  "{p}% of what you spent": "ख़र्च का {p}%"
 }

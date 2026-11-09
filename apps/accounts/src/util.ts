@@ -25,6 +25,7 @@ export const label = (a: Account) => a.name + (a.last4 ? ` ••${a.last4}` : a
 export function entryTitle(e: Entry, name: (id: string) => string, account?: string) {
   if (e.desc) return e.desc;
   if (e.ref?.startsWith('bill:')) return t('Card bill paid');
+  if (e.cat === 'cashback') return t('Cashback');
   if (e.kind === 'adjust') return t('Balance corrected');
   if (e.kind === 'transfer') return account === e.to ? t('From {name}', { name: name(e.account) }) : t('To {name}', { name: name(e.to!) });
   return e.kind === 'in' ? t('Money in') : t('Money out');

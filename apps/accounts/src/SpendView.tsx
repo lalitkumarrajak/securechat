@@ -1,14 +1,15 @@
 // Where the money went, from imported statements: for one card or all of them, one month's statement or
 // every month: spending day by day, by category, the places you spent most, month by month, and each
-// purchase (change what it was for, and the charts follow).
+// purchase (change what it was for, and the charts follow). Cashback, from statements and added by hand,
+// is counted on its own: what came back, and as a share of what was spent.
 import { useMemo, useState } from 'react';
 import { FileUp, Search } from 'lucide-react';
 import { Button } from '@sanga/ui/button';
 import { Input } from '@sanga/ui/input';
 import { cn } from '@sanga/ui/utils';
 import { locale, t, tn } from '@sanga/i18n';
-import { addDays, creditCards, money, save, useLedger, type CardStatement } from '@sanga/ledger';
-import { CATS, SPEND_CATS, type Cat } from '@sanga/ledger/statement';
+import { addDays, cashbackList, creditCards, money, save, useLedger, type CardStatement } from '@sanga/ledger';
+import { CATS, CREDIT_CATS, savedCat, SPEND_CATS, type Cat } from '@sanga/ledger/statement';
 import { Columns, Ranking, type Bar } from './charts';
 import { monthTitle, SELECT, shortDay } from './util';
 
@@ -19,6 +20,7 @@ const merchant = (s: string) => s.replace(/\b(pvt|private|ltd|limited|india|in|w
 export function SpendView({ focus, onImport }: { focus?: string | null; onImport: () => void }) {
   const statementsMap = useLedger((s) => s.statements);
   const accounts = useLedger((s) => s.accounts);
+  const entriesMap = useLedger((s) => s.entries);
   const cards = useMemo(() => creditCards(), [accounts]);
   const statements = useMemo(() => Object.values(statementsMap).filter((x) => !x.deleted && cards.some((c) => c.id === x.card)), [statementsMap, cards]);
   const focused = focus ? statementsMap[focus] : undefined;
@@ -35,10 +37,14 @@ export function SpendView({ focus, onImport }: { focus?: string | null; onImport
   const compact = (n: number) => new Intl.NumberFormat(locale(), { notation: 'compact', maximumFractionDigits: 1 }).format(n / 100);
 
   const inScope = useMemo(() => mine.filter((x) => m === 'all' || x.month === m), [mine, m]);
-  const lines: Line[] = useMemo(() => inScope.flatMap((st) => st.txns.map((x, i) => ({ st, i, d: x.d, t: x.t, a: x.a, c: (isCat(x.c) ? x.c : 'other') as Cat, card: st.card }))), [inScope]);
+  const lines: Line[] = useMemo(() => inScope.flatMap((st) => st.txns.map((x, i) => ({ st, i, d: x.d, t: x.t, a: x.a, c: ((c) => (isCat(c) ? c : 'other'))(savedCat(x.c, x.t)) as Cat, card: st.card }))), [inScope]);
   const spend = useMemo(() => lines.filter((l) => l.a > 0), [lines]);
   const refunds = useMemo(() => lines.filter((l) => l.a < 0 && l.c === 'refund').reduce((s, l) => s - l.a, 0), [lines]);
   const total = spend.reduce((s, l) => s + l.a, 0);
+  // Cashback the cards in view earned in this month (or every month): statement lines and entries added by hand.
+  const cashback = useMemo(() => cashbackList({ ...useLedger.getState(), statements: statementsMap, entries: entriesMap, accounts })
+    .filter((x) => x.card && (card === 'all' ? cards.some((c) => c.id === x.card) : x.card === card) && (m === 'all' || x.month === m))
+    .reduce((n, x) => n + x.amount, 0), [statementsMap, entriesMap, accounts, cards, card, m]);
 
   // Day by day over the statement period (or, for every month, month by month).
   const dayBars: Bar[] = useMemo(() => {
@@ -104,7 +110,9 @@ export function SpendView({ focus, onImport }: { focus?: string | null; onImport
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Tile label={t('Spent')} value={fmt(total - refunds)} note={refunds ? t('after {amount} refunds', { amount: fmt(refunds) }) : undefined} strong />
-        <Tile label={t('Purchases')} value={String(spend.length)} />
+        {cashback > 0
+          ? <Tile label={t('Cashback')} value={fmt(cashback)} note={total - refunds > 0 ? t('{p}% of what you spent', { p: (Math.round((cashback / (total - refunds)) * 1000) / 10).toLocaleString(locale()) }) : undefined} />
+          : <Tile label={t('Purchases')} value={String(spend.length)} />}
         {peak && peak.value > 0 ? <Tile label={t('Biggest day')} value={fmt(peak.value)} note={peak.title} /> : <Tile label={t('Months')} value={String(months.length)} />}
         <Tile label={t('Top category')} value={byCat[0] ? `${byCat[0].emoji} ${byCat[0].name}` : '—'} note={byCat[0] ? fmt(byCat[0].value) : undefined} />
       </div>
@@ -152,7 +160,11 @@ export function SpendView({ focus, onImport }: { focus?: string | null; onImport
                 <select aria-label={t('Category')} value={l.c} onChange={(e) => recat(l, e.target.value as Cat)} className="h-8 max-w-32 shrink-0 rounded-lg sm:max-w-40 border border-line bg-panel-2 px-1 text-xs">
                   {SPEND_CATS.map((c) => <option key={c} value={c}>{CATS[c].emoji} {t(CATS[c].label)}</option>)}
                 </select>
-              ) : <span className="shrink-0 text-xs text-muted">{CATS[l.c].emoji} {t(CATS[l.c].label)}</span>}
+              ) : (
+                <select aria-label={t('Category')} value={l.c} onChange={(e) => recat(l, e.target.value as Cat)} className="h-8 max-w-32 shrink-0 rounded-lg sm:max-w-40 border border-line bg-panel-2 px-1 text-xs">
+                  {(CREDIT_CATS.includes(l.c) ? CREDIT_CATS : [l.c, ...CREDIT_CATS]).map((c) => <option key={c} value={c}>{CATS[c].emoji} {t(CATS[c].label)}</option>)}
+                </select>
+              )}
               <span className={cn('w-20 shrink-0 text-right text-sm tabular-nums', l.a < 0 && 'text-green-600 dark:text-green-400')}>{l.a < 0 ? '+' : ''}{fmt(Math.abs(l.a))}</span>
             </li>
           ))}

@@ -8,6 +8,7 @@ import * as C from '@sanga/crypto';
 import { sdk } from '@sanga/sdk';
 import { addDays, asCard, billId, lastStatement, MAX_TXNS, statementId, suggestedDue, todayKey, type CardBill, type CardStatement, type CreditCard, type StatementTxn } from './cards';
 import { NETWORKS, type Account, type AccountKind, type DebitCard, type Entry } from './types';
+import { savedCat } from './statement';
 
 export type Item = Account | DebitCard | Entry | CardBill | CardStatement;
 export interface LedgerState {
@@ -230,6 +231,31 @@ export function unbilled(card: CreditCard, s: LedgerState = useLedger.getState()
   return { since, list, total: list.reduce((n, e) => n + (e.kind === 'out' ? e.amount : -e.amount), 0) };
 }
 
+/** Cashback: from imported statements (lines put in Cashback) and from entries marked as cashback
+ *  (into the card itself, or into a bank account or wallet, naming the card that earned it). Cashback
+ *  added by hand on a card isn't counted again once a statement covering its date is imported: the
+ *  statement lists it. `month` is the statement's month for statement lines, the entry's own otherwise. */
+export interface CashbackItem { key: string; date: string; month: string; amount: number; card?: string; account: string; desc: string; entry?: Entry }
+export function cashbackList(s: LedgerState = useLedger.getState()): CashbackItem[] {
+  const out: CashbackItem[] = [];
+  const statements = live(Object.values(s.statements));
+  for (const st of statements) {
+    st.txns.forEach((x, i) => { if (x.a < 0 && savedCat(x.c, x.t) === 'cashback') out.push({ key: `${st.id}:${i}`, date: x.d, month: st.month, amount: -x.a, card: st.card, account: st.card, desc: x.t }); });
+  }
+  const covered = (card: string, date: string) => statements.some((st) => st.card === card && date <= st.date && date >= (st.from ?? addDays(st.date, -31)));
+  for (const e of live(Object.values(s.entries))) {
+    if (e.kind !== 'in' || e.cat !== 'cashback') continue;
+    const onCard = s.accounts[e.account]?.kind === 'credit';
+    const card = onCard ? e.account : e.card;
+    if (onCard && covered(e.account, e.date)) continue;
+    out.push({ key: e.id, date: e.date, month: e.date.slice(0, 7), amount: e.amount, card, account: e.account, desc: e.desc, entry: e });
+  }
+  return out.sort((a, b) => b.date.localeCompare(a.date));
+}
+/** Cashback a card earned (wherever it was paid), in a date range or all of it. */
+export const cashbackOf = (card: string, from = '', to = '9999', s: LedgerState = useLedger.getState()) =>
+  cashbackList(s).filter((x) => x.card === card && x.date >= from && x.date <= to).reduce((n, x) => n + x.amount, 0);
+
 /** The entry recording a bill's payment, if it was paid from an account here. */
 export const billPayment = (b: CardBill) => live(Object.values(useLedger.getState().entries)).find((e) => e.ref === `bill:${b.id}`);
 
@@ -451,7 +477,7 @@ export function valid(o: any, id: string): Item | null {
   if (o.type === 'entry' && ['in', 'out', 'transfer', 'adjust'].includes(o.kind) && typeof o.account === 'string' && DAY.test(o.date) && Number.isSafeInteger(o.amount)) {
     if (o.kind === 'transfer' && typeof o.to !== 'string') return null;
     return clean<Entry>({ id, type: 'entry', kind: o.kind, account: o.account.slice(0, 40), to: o.kind === 'transfer' ? o.to.slice(0, 40) : undefined,
-      amount: o.kind === 'adjust' ? o.amount : Math.abs(o.amount), date: o.date, desc: str(o.desc, 120), cat: opt(o.cat, 30), via: opt(o.via, 40), ref: opt(o.ref, 120), ...base });
+      amount: o.kind === 'adjust' ? o.amount : Math.abs(o.amount), date: o.date, desc: str(o.desc, 120), cat: opt(o.cat, 30), card: opt(o.card, 40), via: opt(o.via, 40), ref: opt(o.ref, 120), ...base });
   }
   if (o.type === 'bill' && typeof o.card === 'string' && /^\d{4}-\d\d$/.test(o.month) && DAY.test(o.due)) {
     return clean<CardBill>({ id, type: 'bill', card: o.card.slice(0, 40), month: o.month, amount: amt(o.amount) ?? 0, minDue: amt(o.minDue), due: o.due,

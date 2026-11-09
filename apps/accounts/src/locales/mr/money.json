@@ -286,5 +286,17 @@
   "Keep both": "दोन्ही ठेवा",
   "Merge": "एकत्र करा",
   "Make them one card?": "यांचे एक कार्ड करायचे?",
-  "Everything on {others} moves to {name}, then {others} is removed.": "{others} वरील सर्व काही {name} वर जाईल, मग {others} काढले जाईल."
+  "Everything on {others} moves to {name}, then {others} is removed.": "{others} वरील सर्व काही {name} वर जाईल, मग {others} काढले जाईल.",
+  "Cashback": "कॅशबॅक",
+  "Cashback earned": "मिळालेला कॅशबॅक",
+  "{amount} this year": "या वर्षी {amount}",
+  "in all": "एकूण",
+  "Cashback from {card}": "{card} चा कॅशबॅक",
+  "Add cashback": "कॅशबॅक जोडा",
+  "This is cashback": "हा कॅशबॅक आहे",
+  "It lowers what you owe on this card, and counts as cashback the card earned.": "यामुळे या कार्डवरची थकबाकी कमी होते, आणि तो कार्डने मिळवलेल्या कॅशबॅकमध्ये मोजला जातो.",
+  "Counted as cashback, not income.": "हा कॅशबॅक म्हणून मोजला जातो, उत्पन्न म्हणून नाही.",
+  "Earned on card": "कोणत्या कार्डवर मिळाला",
+  "e.g. Amazon cashback": "उदा. Amazon कॅशबॅक",
+  "{p}% of what you spent": "खर्चाच्या {p}%"
 }

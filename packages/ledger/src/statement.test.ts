@@ -49,7 +49,7 @@ describe('a statement with labels beside values', () => {
       ['2025-02-16', 'food', 45600, false], ['2025-02-18', 'shopping', 249900, false], ['2025-02-20', 'payment', 1000000, true],
       ['2025-02-22', 'fuel', 150000, false], ['2025-03-01', 'entertainment', 64900, false], ['2025-03-02', 'refund', 30000, true], ['2025-03-05', 'fees', 1800, false],
     ]);
-    expect(totals(p.txns)).toEqual({ spent: 45600 + 249900 + 150000 + 64900 + 1800, refunds: 30000, paid: 1000000, net: 45600 + 249900 + 150000 + 64900 + 1800 - 30000 });
+    expect(totals(p.txns)).toEqual({ spent: 45600 + 249900 + 150000 + 64900 + 1800, refunds: 30000, cashback: 0, paid: 1000000, net: 45600 + 249900 + 150000 + 64900 + 1800 - 30000 });
   });
 });
 
@@ -90,6 +90,39 @@ describe('categories', () => {
     expect(categorize('AIRTEL PREPAID RECHARGE')).toBe('bills');
     expect(categorize('APOLLO PHARMACY')).toBe('health');
     expect(categorize('RANDOM SHOP 123')).toBe('other');
-    expect(categorize('CASHBACK CREDIT', true)).toBe('refund');
+  });
+});
+
+describe('cashback', () => {
+  it('tells cashback from refunds and payments', () => {
+    expect(categorize('CASHBACK CREDIT', true)).toBe('cashback');
+    expect(categorize('UPI CASHBACK', true)).toBe('cashback');
+    expect(categorize('Cash back on Amazon', true)).toBe('cashback');
+    expect(categorize('REWARDS REDEMPTION', true)).toBe('cashback');
+    expect(categorize('Reward Points Redeemed', true)).toBe('cashback');
+    expect(categorize('STATEMENT CREDIT', true)).toBe('cashback');
+    expect(categorize('AMAZON REFUND', true)).toBe('refund');
+    expect(categorize('FUEL SURCHARGE REVERSAL', true)).toBe('refund');
+    expect(categorize('PAYMENT RECEIVED UPI', true)).toBe('payment');
+  });
+  const lines = [
+    L([40, 'Statement Date: 14/03/2025'], [300, 'Payment Due Date: 03/04/2025']),
+    L([40, 'Total Dues'], [200, '1,950.00']),
+    L([40, '16/02/2025'], [100, 'SWIGGY BANGALORE'], [450, '2,000.00']),
+    L([40, '20/02/2025'], [100, 'CASHBACK CREDIT'], [450, '100.00']),
+    L([40, '21/02/2025'], [100, 'REWARDS REDEMPTION'], [450, '50.00']),
+    L([40, '22/02/2025'], [100, 'STATEMENT CREDIT'], [450, '25.00 Cr']),
+    L([40, '25/02/2025'], [100, 'CASHBACK REVERSAL'], [450, '125.00']),
+    L([40, '26/02/2025'], [100, 'AMAZON REFUND'], [450, '300.00 Cr']),
+  ];
+  const p = parseStatement(lines);
+  it('reads cashback lines as money back, even without "Cr"', () => {
+    expect(p.txns.map((x) => [x.desc, x.cat, x.amount, x.credit])).toEqual([
+      ['SWIGGY BANGALORE', 'food', 200000, false], ['CASHBACK CREDIT', 'cashback', 10000, true], ['REWARDS REDEMPTION', 'cashback', 5000, true],
+      ['STATEMENT CREDIT', 'cashback', 2500, true], ['CASHBACK REVERSAL', 'other', 12500, false], ['AMAZON REFUND', 'refund', 30000, true],
+    ]);
+  });
+  it('keeps cashback apart in the totals', () => {
+    expect(totals(p.txns)).toEqual({ spent: 212500, refunds: 30000, cashback: 17500, paid: 0, net: 212500 - 30000 - 17500 });
   });
 });

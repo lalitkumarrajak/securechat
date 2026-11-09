@@ -59,7 +59,8 @@ export interface Entry extends Synced {
   amount: number;              // paise; positive, except an adjustment, which is the change (+/-)
   date: string;                // YYYY-MM-DD
   desc: string;
-  cat?: string;
+  cat?: string;                // 'cashback' for cashback
+  card?: string;               // cashback paid into another account: the credit card that earned it
   via?: string;                // the debit card it was paid with
   ref?: string;                // what it records: "split:<group>:<expense>", "bill:<bill id>"
 }

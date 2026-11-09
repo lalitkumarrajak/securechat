@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { balances, creditLine, effect, netWorth, valid, type LedgerState } from './model';
-import { awaitingBill, billState, cardReminders, unpaid, type CardBill, type CreditCard } from './cards';
+import { balances, cashbackList, cashbackOf, creditLine, effect, netWorth, valid, type LedgerState } from './model';
+import { awaitingBill, billState, cardReminders, unpaid, type CardBill, type CardStatement, type CreditCard } from './cards';
 import type { Account, Entry } from './types';
 
 const acc = (id: string, kind: Account['kind'], opening = 0, o: Partial<Account> = {}): Account => ({ id, type: 'account', kind, name: id, currency: 'INR', color: 'blue', opening, created: 0, edited: 0, ...o });
@@ -87,5 +87,43 @@ describe('a shared credit limit', () => {
   });
   it('the link survives sync', () => {
     expect((valid({ ...s.accounts.reg }, 'reg') as Account).limitWith).toBe('mil');
+  });
+});
+
+describe('cashback', () => {
+  const st: CardStatement = { id: 'st1', type: 'statement', card: 'card', month: '2026-10', date: '2026-10-14', from: '2026-09-15', total: 0,
+    txns: [{ d: '2026-10-01', t: 'SWIGGY', a: 50000, c: 'food' }, { d: '2026-10-05', t: 'CASHBACK CREDIT', a: -10000, c: 'cashback' }, { d: '2026-10-06', t: 'REFUND', a: -5000, c: 'refund' }], created: 0, edited: 0 };
+  const s: LedgerState = {
+    ...state([acc('bank', 'bank', 0), acc('card', 'credit', -100000), acc('other', 'credit', 0)], [
+      ent('c1', 'in', 'card', 10000, { date: '2026-10-05', cat: 'cashback' }),  // added by hand, then on the statement too
+      ent('c2', 'in', 'card', 2000, { date: '2026-10-20', cat: 'cashback' }),   // after the statement
+      ent('c3', 'in', 'bank', 30000, { date: '2026-10-21', cat: 'cashback', card: 'card' }), // paid to the bank
+      ent('c4', 'in', 'bank', 99900, { date: '2026-10-21' }),                   // not cashback
+      ent('c5', 'in', 'other', 4000, { date: '2026-10-05', cat: 'cashback' }),
+    ]),
+    statements: { st1: st },
+  };
+  it('lowers what you owe on the card it went into', () => {
+    expect(balances(s).get('card')).toBe(-100000 + 10000 + 2000);
+    expect(balances(s).get('bank')).toBe(30000 + 99900);
+  });
+  it('counts statement lines and entries once, by the card that earned it', () => {
+    expect(cashbackList(s).map((x) => [x.key, x.card, x.amount])).toEqual([
+      ['c3', 'card', 30000], ['c2', 'card', 2000], ['st1:1', 'card', 10000], ['c5', 'other', 4000],
+    ]);
+    expect(cashbackOf('card', '', '9999', s)).toBe(42000);
+    expect(cashbackOf('card', '2026-10-15', '2026-10-31', s)).toBe(32000);
+  });
+  it('keeps the card that earned it through sync', () => {
+    expect((valid({ ...s.entries.c3 }, 'c3') as Entry).card).toBe('card');
+  });
+});
+
+describe('cashback in statements imported before it had its own category', () => {
+  it('is read as cashback when the line says so', () => {
+    const st: CardStatement = { id: 'st0', type: 'statement', card: 'card', month: '2026-08', date: '2026-08-14', total: 0, created: 0, edited: 0,
+      txns: [{ d: '2026-08-02', t: 'CASHBACK CREDIT', a: -7000, c: 'refund' }, { d: '2026-08-03', t: 'AMAZON REFUND', a: -9000, c: 'refund' }] };
+    const s: LedgerState = { ...state([acc('card', 'credit')], []), statements: { st0: st } };
+    expect(cashbackList(s).map((x) => [x.desc, x.amount])).toEqual([['CASHBACK CREDIT', 7000]]);
   });
 });
