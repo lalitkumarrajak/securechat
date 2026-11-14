@@ -72,6 +72,39 @@ describe('a statement with a row of labels over a row of values', () => {
   });
 });
 
+describe('a statement that prints only its month, with a Debit/Credit column (Axis)', () => {
+  const lines = [
+    L([40, 'Axis Bank Flipkart Credit Card Monthly Statement']),
+    L([300, 'Credit Card Number: 4111XXXXXXXX4242']),
+    L([40, 'Total Payment Due'], [200, 'Minimum Payment Due'], [380, 'Payment Due Date']),
+    L([40, '₹ 1,450.00'], [200, '₹ 100.00'], [380, "03 Dec '26"]),
+    L([40, 'Selected Statement Month'], [200, 'Credit Limit'], [380, 'Opening Balance']),
+    L([40, 'Nov 2026'], [200, '₹ 50,000.00'], [380, '₹ 60.00']),
+    L([40, 'Date'], [120, 'Transaction Details'], [380, 'Amount (INR)'], [480, 'Debit/Credit']),
+    L([40, "10 Nov '26"], [120, 'BIGBASKET,BANGALORE'], [380, '₹ 320.00'], [480, 'Debit']),
+    L([40, "08 Nov '26"], [120, 'Cashback credit Oct26-POS:132'], [380, '₹ 132.00'], [480, 'Credit']),
+    L([40, "31 Oct '26"], [120, 'MB PAYMENT #AB12CD34EF'], [380, '₹ 60.00'], [480, 'Credit']),
+    L([40, "20 Oct '26"], [120, 'HOTEL SUNRISE,PUNE'], [380, '₹ 1,322.00'], [480, 'Debit']),
+  ];
+  const p = parseStatement(lines);
+  it('works the statement date out from the due date, and says so', () => {
+    expect(p).toMatchObject({ bank: 'Axis Bank', last4: '4242', dueDate: '2026-12-03', statementDate: '2026-11-13', dateGuessed: true, total: 145000, minDue: 10000, limit: 5000000 });
+  });
+  it('reads “Credit” in its own column as money back to the card', () => {
+    expect(p.txns.map((x) => [x.desc.slice(0, 12), x.credit, x.cat])).toEqual([
+      ['BIGBASKET,BA', false, 'groceries'], ['Cashback cre', true, 'cashback'], ['MB PAYMENT #', true, 'payment'], ['HOTEL SUNRIS', false, expect.any(String)],
+    ]);
+    expect(totals(p.txns)).toMatchObject({ spent: 164200, cashback: 13200, paid: 6000 });
+  });
+  it('never puts the worked-out date before the last purchase', () => {
+    const late = parseStatement([...lines, L([40, "15 Nov '26"], [120, 'SWIGGY BENGALURU'], [380, '₹ 45.00'], [480, 'Debit'])]);
+    expect(late.statementDate).toBe('2026-11-15');
+  });
+  it('keeps a printed statement date as it is', () => {
+    expect(parseStatement([L([40, 'Statement Date: 12 Nov 2026']), ...lines]).dateGuessed).toBeUndefined();
+  });
+});
+
 describe('SMS from the bank', () => {
   it('a statement SMS', () => {
     const p = parseStatement(textLines('Your SBI Card ending 4455 statement is generated. Total Amt Due: Rs.12,345.67, Min Amt Due: Rs.620.00, Payment Due Date: 05-Apr-25.'));

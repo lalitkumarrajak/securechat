@@ -140,7 +140,16 @@ function Review({ p, password, onSaved }: { p: Parsed; password?: string; onSave
   const [newName, setNewName] = useState(p.bank ?? '');
   const card = cardId === 'new' ? undefined : cards.find((c) => c.id === cardId);
   const cur = card?.currency ?? 'INR';
-  const [date, setDate] = useState(p.statementDate ?? '');
+  // A statement without a printed date (Axis gives only the month): the card's own gap to its due date beats the usual 20 days.
+  const guessFor = (c?: CreditCard) => {
+    if (!p.dateGuessed || !p.dueDate || !c?.dueAfter) return p.statementDate ?? '';
+    const d = new Date(`${p.dueDate}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - c.dueAfter);
+    const g = d.toISOString().slice(0, 10), last = p.txns.reduce((m, x) => (x.date > m ? x.date : m), '');
+    return last > g && last <= p.dueDate ? last : g;
+  };
+  const [date, setDate] = useState(() => guessFor(card));
+  const [dateTouched, setDateTouched] = useState(false);
+  const guessed = !!p.dateGuessed && !dateTouched;
   const [due, setDue] = useState(p.dueDate ?? '');
   const [totalText, setTotalText] = useState(p.total !== undefined ? toInput(p.total, cur) : '');
   const [minText, setMinText] = useState(p.minDue !== undefined ? toInput(p.minDue, cur) : '');
@@ -155,8 +164,8 @@ function Review({ p, password, onSaved }: { p: Parsed; password?: string; onSave
   const day = date ? Number(date.slice(8)) : 0;
   const gap = date && due ? Math.round((new Date(`${due}T12:00:00`).getTime() - new Date(`${date}T12:00:00`).getTime()) / 864e5) : null;
   const changes = card ? [
-    card.statementDay !== day && day ? t('statement day {a} → {b}', { a: card.statementDay, b: day }) : '',
-    gap !== null && gap >= 0 && gap <= 60 && card.dueAfter !== gap ? t('due {a} → {b} days after it', { a: card.dueAfter, b: gap }) : '',
+    !guessed && card.statementDay !== day && day ? t('statement day {a} → {b}', { a: card.statementDay, b: day }) : '',
+    !guessed && gap !== null && gap >= 0 && gap <= 60 && card.dueAfter !== gap ? t('due {a} → {b} days after it', { a: card.dueAfter, b: gap }) : '',
     p.limit && card.limit !== p.limit ? t('limit → {amount}', { amount: money(p.limit, cur) }) : '',
     p.last4 && !card.last4 ? t('last 4 → {d}', { d: p.last4 }) : '',
   ].filter(Boolean) : [];
@@ -167,8 +176,8 @@ function Review({ p, password, onSaved }: { p: Parsed; password?: string; onSave
     const base: CreditCard = card ?? asCard(newAccount('credit', { name: newName.trim(), bank: p.bank, last4: p.last4 }));
     const next: CreditCard = { ...base };
     if (update || !card) {
-      if (day) next.statementDay = day;
-      if (gap !== null && gap >= 0 && gap <= 60) next.dueAfter = gap;
+      if (day && (!guessed || !card)) next.statementDay = day;
+      if (!guessed && gap !== null && gap >= 0 && gap <= 60) next.dueAfter = gap;
       if (p.limit && !next.limitWith) next.limit = p.limit;
       if (p.last4 && !next.last4) next.last4 = p.last4;
     }
@@ -184,17 +193,18 @@ function Review({ p, password, onSaved }: { p: Parsed; password?: string; onSave
   return (
     <form className="grid min-w-0 grid-cols-1 gap-4" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
       <div className="grid grid-cols-2 gap-3">
-        <div className={cn(cardId !== 'new' && 'col-span-2')}><Label htmlFor="i-card">{t('Card')}</Label><CardPick cards={cards} value={cardId} onChange={(v) => { setCardId(v); setSetOwed(v === 'new'); }} /></div>
+        <div className={cn(cardId !== 'new' && 'col-span-2')}><Label htmlFor="i-card">{t('Card')}</Label><CardPick cards={cards} value={cardId} onChange={(v) => { setCardId(v); setSetOwed(v === 'new'); if (!dateTouched) setDate(guessFor(cards.find((c) => c.id === v))); }} /></div>
         {cardId === 'new' && <div><Label htmlFor="i-new">{t('Card name')}</Label><Input id="i-new" maxLength={60} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={t('e.g. HDFC Millennia')} /></div>}
       </div>
       {p.last4 && !matched && cardId !== 'new' && <p className="-mt-2 text-xs text-amber-700 dark:text-amber-300">{t('The statement is for a card ending {d}.', { d: p.last4 })}</p>}
 
       <div className="grid grid-cols-2 gap-3">
-        <div><Label htmlFor="i-date">{t('Statement date')}</Label><Input id="i-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+        <div><Label htmlFor="i-date">{t('Statement date')}</Label><Input id="i-date" type="date" value={date} onChange={(e) => { setDate(e.target.value); setDateTouched(true); }} /></div>
         <div><Label htmlFor="i-due">{t('Due date')}</Label><Input id="i-due" type="date" value={due} onChange={(e) => setDue(e.target.value)} /></div>
         <div><Label htmlFor="i-total">{t('Total amount due')}</Label><Input id="i-total" inputMode="decimal" value={totalText} onChange={(e) => setTotalText(e.target.value)} className="tabular-nums" /></div>
         <div><Label htmlFor="i-min" hint={t('optional')}>{t('Minimum due')}</Label><Input id="i-min" inputMode="decimal" value={minText} onChange={(e) => setMinText(e.target.value)} className="tabular-nums" /></div>
       </div>
+      {guessed && date && <p className="-mt-2 text-xs text-amber-700 dark:text-amber-300">{t('This statement doesn’t print its date, so I worked it out from the due date. Check it.')}</p>}
       {!date && <p className="-mt-2 text-sm text-danger">{t('Add the statement date: it says which month’s bill this is.')}</p>}
       {total !== null && (total === 0 || credit) && <p className="-mt-2 rounded-xl bg-green-500/10 p-3 text-sm">{t('Nothing to pay: this month is saved as “No bill”, with no reminders.')}</p>}
       {seenBefore && <p className="-mt-2 text-xs text-muted">{t('You imported this month’s statement before; saving replaces it.')}</p>}

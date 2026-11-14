@@ -84,7 +84,8 @@ test('import a locked statement PDF: asked for the password once, the bill and p
   await expect(r.getByLabel('Statement date')).toHaveValue('2026-09-14');
   await expect(r.getByLabel('Due date')).toHaveValue('2026-10-04');
   await expect(r.getByLabel('Total amount due')).toHaveValue('8915.00');
-  await expect(r).toContainText(/Update Millennia from this statement: statement day \d+ → 14, due 20 → 20|Update Millennia from this statement: statement day \d+ → 14/);
+  // The card was added with today as its statement day: on the 14th it already matches, so there's nothing to update.
+  if (new Date().getDate() !== 14) await expect(r).toContainText(/Update Millennia from this statement: statement day \d+ → 14, due 20 → 20|Update Millennia from this statement: statement day \d+ → 14/);
   await expect(r.getByRole('region', { name: 'Transactions' })).toContainText('SWIGGY BANGALORE');
   await expect(r.getByRole('region', { name: 'Transactions' })).toContainText('6 purchases');
   await P.page.screenshot({ path: shots('91-accounts-review') });

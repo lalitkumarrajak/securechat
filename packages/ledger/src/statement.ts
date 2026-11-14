@@ -15,6 +15,8 @@ export interface Parsed {
   kind: 'statement' | 'payment' | 'unknown';
   bank?: string; last4?: string;
   statementDate?: string; dueDate?: string; from?: string; to?: string;
+  /** The statement doesn't print its date (Axis gives only the month): statementDate was worked out from the due date. */
+  dateGuessed?: boolean;
   total?: number; minDue?: number; limit?: number;
   paidAmount?: number; paidOn?: string;
   txns: Txn[];
@@ -224,21 +226,30 @@ function findTxns(lines: Line[], ref?: string): Txn[] {
     const amounts = findAmounts(rest).filter((a) => a.decimals);
     if (!amounts.length) continue;
     const a = amounts[amounts.length - 1];
-    // Some statements list the amount, then "Cr" in a column of its own.
-    const tail = rest.slice(a.end).trim();
+    // Some statements list the amount, then "Cr" (or "Credit" / "Debit", as Axis does) in a column of its own.
+    const tail = rest.slice(a.end).replace(/^[\s|]+/, '');
+    const debit = /^(dr|debit)\b/i.test(tail);
     let desc = rest.slice(0, amounts[0].index).replace(/\s{2,}/g, ' ').replace(/\b\d{8,}\b/g, '').replace(/[|]+/g, ' ').trim();
     desc = desc.replace(/^[-–:]+|[-–:]+$/g, '').trim();
     if (!desc || !/[a-z]{2,}/i.test(desc) || SKIP.test(desc) || a.minor === 0) continue;
-    const marked = a.credit || /^cr\b/i.test(tail);
+    const marked = a.credit || /^(cr|credit)\b/i.test(tail);
     // Cashback taken back ("CASHBACK REVERSAL") is a charge, unless the statement marks the line as a credit.
     const clawback = /cash\s*-?\s*back.{0,20}revers|revers.{0,20}cash\s*-?\s*back/i.test(desc);
-    const credit = marked || (!clawback && (/payment\s*(received|thank)|thank\s*you|refund|reversal/i.test(desc) || CASHBACK.test(desc)));
+    const credit = marked || (!debit && !clawback && (/payment\s*(received|thank)|thank\s*you|refund|reversal/i.test(desc) || CASHBACK.test(desc)));
     out.push({ date: d.date, desc: desc.slice(0, 60), amount: a.minor, credit, cat: categorize(desc, credit) });
   }
   return out;
 }
 
 const PAYMENT = /(payment|pymt|paid).{0,60}(received|credited|successful|processed|posted)|received.{0,40}payment|thank\s*you\s*for\s*(the\s*|your\s*)?payment/i;
+
+/** Days from the statement to its due date on most Indian cards, for a statement that doesn't print its date. */
+export const DUE_GAP = 20;
+function shiftDay(day: string, n: number) {
+  const d = new Date(`${day}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
 
 /** Everything that can be read from a statement's lines (or an SMS, one line each). */
 export function parseStatement(lines: Line[]): Parsed {
@@ -258,12 +269,13 @@ export function parseStatement(lines: Line[]): Parsed {
   }
   const sd = findField(lines, 'statementDate', out.to);
   out.statementDate = (typeof sd === 'string' ? sd : undefined) ?? out.to;
-  const ref = out.statementDate;
+  let ref = out.statementDate;
   const dd = findField(lines, 'dueDate', ref);
   if (typeof dd === 'string') {
     // A due date without a year comes after the statement, possibly in the new year.
     out.dueDate = ref && dd < ref && dd.slice(5) < ref.slice(5) ? `${+dd.slice(0, 4) + 1}${dd.slice(4)}` : dd;
   }
+  if (!ref && out.dueDate) { ref = out.statementDate = shiftDay(out.dueDate, -DUE_GAP); out.dateGuessed = true; }
   const num = (k: Key) => { const v = findField(lines, k, ref); return typeof v === 'number' ? v : undefined; };
   out.total = num('total'); out.minDue = num('minDue'); out.limit = num('limit');
   if (out.minDue !== undefined && out.total !== undefined && out.minDue > out.total) out.minDue = undefined;
@@ -277,6 +289,11 @@ export function parseStatement(lines: Line[]): Parsed {
     return out;
   }
   out.txns = findTxns(lines, ref);
+  if (out.dateGuessed && out.dueDate) {
+    // The statement is made after its last purchase (and before the due date).
+    const last = out.txns.reduce((m, x) => (x.date > m ? x.date : m), '');
+    if (last > out.statementDate! && last <= out.dueDate) out.statementDate = last;
+  }
   if (out.total !== undefined || out.dueDate || out.txns.length) out.kind = 'statement';
   return out;
 }
