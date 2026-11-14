@@ -204,7 +204,6 @@ function Review({ p, password, onSaved }: { p: Parsed; password?: string; onSave
         <div><Label htmlFor="i-total">{t('Total amount due')}</Label><Input id="i-total" inputMode="decimal" value={totalText} onChange={(e) => setTotalText(e.target.value)} className="tabular-nums" /></div>
         <div><Label htmlFor="i-min" hint={t('optional')}>{t('Minimum due')}</Label><Input id="i-min" inputMode="decimal" value={minText} onChange={(e) => setMinText(e.target.value)} className="tabular-nums" /></div>
       </div>
-      {guessed && date && <p className="-mt-2 text-xs text-amber-700 dark:text-amber-300">{t('This statement doesn’t print its date, so I worked it out from the due date. Check it.')}</p>}
       {!date && <p className="-mt-2 text-sm text-danger">{t('Add the statement date: it says which month’s bill this is.')}</p>}
       {total !== null && (total === 0 || credit) && <p className="-mt-2 rounded-xl bg-green-500/10 p-3 text-sm">{t('Nothing to pay: this month is saved as “No bill”, with no reminders.')}</p>}
       {seenBefore && <p className="-mt-2 text-xs text-muted">{t('You imported this month’s statement before; saving replaces it.')}</p>}

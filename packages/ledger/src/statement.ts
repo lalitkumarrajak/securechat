@@ -15,7 +15,7 @@ export interface Parsed {
   kind: 'statement' | 'payment' | 'unknown';
   bank?: string; last4?: string;
   statementDate?: string; dueDate?: string; from?: string; to?: string;
-  /** The statement doesn't print its date (Axis gives only the month): statementDate was worked out from the due date. */
+  /** The statement doesn't print its date (Axis gives only the month): statementDate comes from the due date. */
   dateGuessed?: boolean;
   total?: number; minDue?: number; limit?: number;
   paidAmount?: number; paidOn?: string;
