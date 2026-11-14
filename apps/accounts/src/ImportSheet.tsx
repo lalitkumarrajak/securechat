@@ -221,18 +221,21 @@ function Review({ p, password, onSaved }: { p: Parsed; password?: string; onSave
             <div className="bg-panel p-2.5"><p className="text-xs text-muted">{t('Cashback')}</p><p className="font-semibold tabular-nums text-green-700 dark:text-green-400">{money(sum.cashback, cur)}</p></div>
             <div className="bg-panel p-2.5"><p className="text-xs text-muted">{t('Paid to card')}</p><p className="font-semibold tabular-nums">{money(sum.paid, cur)}</p></div>
           </div>
-          <ul className="divide-y divide-line">
+          {/* On a phone a row may need more room than the sheet has: the list then scrolls sideways instead of cutting it off. */}
+          <div className="overflow-x-auto overscroll-x-contain" tabIndex={0}>
+          <ul className="w-max min-w-full divide-y divide-line">
             {list.map((x, i) => (
               <li key={i} className="flex items-center gap-2 px-3 py-2">
-                <span className="w-12 shrink-0 text-xs text-muted">{shortDay(x.date)}</span>
-                <span className="min-w-0 flex-1 truncate text-sm">{x.desc}</span>
-                <select aria-label={t('Category')} value={x.cat} onChange={(e) => setCat(i, e.target.value as Cat)} className="h-8 max-w-28 shrink-0 rounded-lg sm:max-w-40 border border-line bg-panel-2 px-1 text-xs">
+                <span className="w-12 shrink-0 whitespace-nowrap text-xs text-muted">{shortDay(x.date)}</span>
+                <span className="flex-1 whitespace-nowrap text-sm">{x.desc}</span>
+                <select aria-label={t('Category')} value={x.cat} onChange={(e) => setCat(i, e.target.value as Cat)} className="h-8 shrink-0 rounded-lg border border-line bg-panel-2 px-1 text-xs">
                   {(x.credit ? CREDIT_CATS : SPEND_CATS).map((c) => <option key={c} value={c}>{CATS[c].emoji} {t(CATS[c].label)}</option>)}
                 </select>
-                <span className={cn('w-20 shrink-0 text-right text-sm tabular-nums', x.credit && 'text-green-600 dark:text-green-400')}>{x.credit ? '+' : ''}{money(x.amount, cur)}</span>
+                <span className={cn('min-w-20 shrink-0 whitespace-nowrap text-right text-sm tabular-nums', x.credit && 'text-green-600 dark:text-green-400')}>{x.credit ? '+' : ''}{money(x.amount, cur)}</span>
               </li>
             ))}
           </ul>
+          </div>
           {txns.length > 8 && <button type="button" className="w-full border-t border-line p-2 text-sm text-accent-ink" onClick={() => setShowAll(!showAll)}>{showAll ? t('Show fewer') : t('Show all {n}', { n: txns.length })}</button>}
         </section>
       )}
