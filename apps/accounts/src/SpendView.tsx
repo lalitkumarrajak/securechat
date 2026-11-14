@@ -3,9 +3,10 @@
 // purchase (change what it was for, and the charts follow). Cashback, from statements and added by hand,
 // is counted on its own: what came back, and as a share of what was spent.
 import { useMemo, useState } from 'react';
-import { FileUp, Search, X } from 'lucide-react';
+import { FileUp, ListFilter, Search, X } from 'lucide-react';
 import { Button } from '@sanga/ui/button';
-import { Input } from '@sanga/ui/input';
+import { Dialog } from '@sanga/ui/dialog';
+import { Input, Label } from '@sanga/ui/input';
 import { cn } from '@sanga/ui/utils';
 import { locale, t, tn } from '@sanga/i18n';
 import { addDays, cashbackList, creditCards, money, save, useLedger, type CardStatement } from '@sanga/ledger';
@@ -49,11 +50,12 @@ export function SpendView({ focus, onImport }: { focus?: string | null; onImport
     return { from: allLines.reduce((x, l) => (l.d < x ? l.d : x), from), to };
   }, [inScope, allLines, m]);
   const lines = useMemo(() => allLines.filter((l) => inRange(l.d)), [allLines, range]); // eslint-disable-line react-hooks/exhaustive-deps
-  const pick = (k: 'from' | 'to', v: string) => {
+  const [filtering, setFiltering] = useState(false);
+  const apply = (from: string, to: string) => {
     if (!period) return;
-    const next = { from: range?.from ?? period.from, to: range?.to ?? period.to, [k]: v || period[k] };
-    if (next.from > next.to) { if (k === 'from') next.to = next.from; else next.from = next.to; }
-    setRange(next.from === period.from && next.to === period.to ? null : next);
+    from = from || period.from; to = to || period.to;
+    if (from > to) [from, to] = [to, from];
+    setRange(from <= period.from && to >= period.to ? null : { from: from < period.from ? period.from : from, to: to > period.to ? period.to : to });
     setDay(null);
   };
   const spend = useMemo(() => lines.filter((l) => l.a > 0), [lines]);
@@ -123,19 +125,21 @@ export function SpendView({ focus, onImport }: { focus?: string | null; onImport
           {months.map((x) => <option key={x} value={x}>{new Date(`${x}-01T12:00:00`).toLocaleDateString(locale(), { month: 'short', year: 'numeric' })}</option>)}
           <option value="all">{t('Every month')}</option>
         </select>
+        {period && (
+          <Button variant="outline" aria-label={t('Filter by date')} title={t('Filter by date')} aria-pressed={!!range} onClick={() => setFiltering(true)}
+            className={cn('relative h-11 w-11 rounded-xl px-0', range && 'border-accent text-accent-ink')}>
+            <ListFilter className="size-5" />{range && <span className="absolute top-2 right-2 size-2 rounded-full bg-accent" aria-hidden />}</Button>
+        )}
         <Button variant="outline" aria-label={t('Import a statement')} title={t('Import a statement')} className="h-11 w-11 rounded-xl px-0 text-accent-ink sm:w-auto sm:px-4" onClick={onImport}>
           <FileUp className="size-5" /><span className="hidden sm:inline">{t('Import')}</span></Button>
       </div>
-      {period && (
-        <div className="flex items-end gap-2">
-          <label className="min-w-0 flex-1"><span className="mb-1 block text-xs text-muted">{t('From')}</span>
-            <Input type="date" className="h-11" value={range?.from ?? period.from} min={period.from} max={period.to} onChange={(e) => pick('from', e.target.value)} /></label>
-          <label className="min-w-0 flex-1"><span className="mb-1 block text-xs text-muted">{t('To')}</span>
-            <Input type="date" className="h-11" value={range?.to ?? period.to} min={period.from} max={period.to} onChange={(e) => pick('to', e.target.value)} /></label>
-          {range && <Button variant="outline" aria-label={t('Whole statement')} title={t('Whole statement')} className="h-11 w-11 rounded-xl px-0" onClick={() => { setRange(null); setDay(null); }}><X className="size-5" /></Button>}
-        </div>
+      {range && (
+        <button type="button" onClick={() => { setRange(null); setDay(null); }} aria-label={t('Clear the date filter')}
+          className="inline-flex items-center gap-1.5 rounded-full bg-accent/12 px-3 py-1.5 text-sm font-medium text-accent-ink">
+          {shortDay(range.from)} – {shortDay(range.to)}<X className="size-4" /></button>
       )}
       </div>
+      {filtering && period && <DateFilter period={period} range={range} onApply={(f, to) => { apply(f, to); setFiltering(false); }} onClose={() => setFiltering(false)} />}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Tile label={t('Spent')} value={fmt(total - refunds)} note={refunds ? t('after {amount} refunds', { amount: fmt(refunds) }) : undefined} strong />
@@ -204,6 +208,25 @@ export function SpendView({ focus, onImport }: { focus?: string | null; onImport
         </ul>
       </section>
     </div>
+  );
+}
+
+function DateFilter({ period, range, onApply, onClose }: { period: { from: string; to: string }; range: { from: string; to: string } | null; onApply: (from: string, to: string) => void; onClose: () => void }) {
+  const [from, setFrom] = useState(range?.from ?? period.from);
+  const [to, setTo] = useState(range?.to ?? period.to);
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()} title={t('Filter by date')}>
+      <form className="grid gap-4" onSubmit={(e) => { e.preventDefault(); onApply(from, to); }}>
+        <div className="grid grid-cols-2 gap-3">
+          <div><Label htmlFor="f-from">{t('From')}</Label><Input id="f-from" type="date" value={from} min={period.from} max={period.to} onChange={(e) => setFrom(e.target.value)} /></div>
+          <div><Label htmlFor="f-to">{t('To')}</Label><Input id="f-to" type="date" value={to} min={period.from} max={period.to} onChange={(e) => setTo(e.target.value)} /></div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Button variant="outline" onClick={() => onApply(period.from, period.to)}>{t('Clear')}</Button>
+          <Button type="submit">{t('Apply')}</Button>
+        </div>
+      </form>
+    </Dialog>
   );
 }
 
