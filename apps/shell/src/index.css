@@ -7,7 +7,7 @@
 @source "../../notes/src";
 @source "../../calendar/src";
 @source "../../split/src";
-@source "../../accounts/src";
+@source "../../accounts/src"; /* keep apps/shell/turbo.json build inputs in step with these */
 
 /* ---------- chat wallpapers (Settings → Appearance): .wallpaper.wp-<name> ---------- */
 .wallpaper { background-color: var(--chat); }

@@ -182,7 +182,7 @@ function Review({ p, password, onSaved }: { p: Parsed; password?: string; onSave
   const list = showAll ? txns : txns.slice(0, 8);
 
   return (
-    <form className="grid gap-4" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
+    <form className="grid min-w-0 grid-cols-1 gap-4" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
       <div className="grid grid-cols-2 gap-3">
         <div className={cn(cardId !== 'new' && 'col-span-2')}><Label htmlFor="i-card">{t('Card')}</Label><CardPick cards={cards} value={cardId} onChange={(v) => { setCardId(v); setSetOwed(v === 'new'); }} /></div>
         {cardId === 'new' && <div><Label htmlFor="i-new">{t('Card name')}</Label><Input id="i-new" maxLength={60} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={t('e.g. HDFC Millennia')} /></div>}
@@ -214,7 +214,7 @@ function Review({ p, password, onSaved }: { p: Parsed; password?: string; onSave
       )}
 
       {txns.length > 0 && (
-        <section aria-label={t('Transactions')} className="rounded-2xl border border-line">
+        <section aria-label={t('Transactions')} className="min-w-0 rounded-2xl border border-line">
           <div className="grid grid-cols-2 gap-px overflow-hidden rounded-t-2xl border-b border-line bg-line text-center sm:grid-cols-4">
             <div className="bg-panel p-2.5"><p className="text-xs text-muted">{tn(txns.filter((x) => !x.credit).length, '{n} purchase', '{n} purchases')}</p><p className="font-semibold tabular-nums">{money(sum.spent, cur)}</p></div>
             <div className="bg-panel p-2.5"><p className="text-xs text-muted">{t('Refunds')}</p><p className="font-semibold tabular-nums">{money(sum.refunds, cur)}</p></div>

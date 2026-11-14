@@ -1,0 +1,16 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/ui/src/**",
+        "$TURBO_ROOT$/apps/notes/src/**",
+        "$TURBO_ROOT$/apps/calendar/src/**",
+        "$TURBO_ROOT$/apps/split/src/**",
+        "$TURBO_ROOT$/apps/accounts/src/**"
+      ]
+    }
+  }
+}
