@@ -197,6 +197,7 @@
   "The statement is for a card ending {d}.": "यह स्टेटमेंट {d} पर ख़त्म होने वाले कार्ड का है।",
   "Statement date": "स्टेटमेंट तारीख़",
   "Total amount due": "कुल चुकाने वाली राशि",
+  "Whole statement": "पूरा स्टेटमेंट",
   "Add the statement date: it says which month’s bill this is.": "स्टेटमेंट तारीख़ जोड़ें: इससे पता चलता है कि यह किस महीने का बिल है।",
   "Nothing to pay: this month is saved as “No bill”, with no reminders.": "कुछ चुकाना नहीं: यह महीना “कोई बिल नहीं” के रूप में सेव होगा, बिना रिमाइंडर के।",
   "You imported this month’s statement before; saving replaces it.": "इस महीने का स्टेटमेंट पहले इम्पोर्ट हो चुका है; सेव करने पर वह बदल जाएगा।",

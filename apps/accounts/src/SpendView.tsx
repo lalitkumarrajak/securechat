@@ -3,7 +3,7 @@
 // purchase (change what it was for, and the charts follow). Cashback, from statements and added by hand,
 // is counted on its own: what came back, and as a share of what was spent.
 import { useMemo, useState } from 'react';
-import { FileUp, Search } from 'lucide-react';
+import { FileUp, Search, X } from 'lucide-react';
 import { Button } from '@sanga/ui/button';
 import { Input } from '@sanga/ui/input';
 import { cn } from '@sanga/ui/utils';
@@ -30,6 +30,9 @@ export function SpendView({ focus, onImport }: { focus?: string | null; onImport
   const [month, setMonth] = useState<string>(focused?.month ?? 'latest');
   const m = month === 'latest' ? months[0] ?? 'all' : month;
   const [day, setDay] = useState<string | null>(null);
+  // A stretch of days inside the statement (From / To): everything on the page follows it.
+  const [range, setRange] = useState<{ from: string; to: string } | null>(null);
+  const inRange = (d: string) => !range || (d >= range.from && d <= range.to);
   const [cat, setCat] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const currency = (card === 'all' ? cards[0] : cards.find((c) => c.id === card))?.currency ?? 'INR';
@@ -37,26 +40,40 @@ export function SpendView({ focus, onImport }: { focus?: string | null; onImport
   const compact = (n: number) => new Intl.NumberFormat(locale(), { notation: 'compact', maximumFractionDigits: 1 }).format(n / 100);
 
   const inScope = useMemo(() => mine.filter((x) => m === 'all' || x.month === m), [mine, m]);
-  const lines: Line[] = useMemo(() => inScope.flatMap((st) => st.txns.map((x, i) => ({ st, i, d: x.d, t: x.t, a: x.a, c: ((c) => (isCat(c) ? c : 'other'))(savedCat(x.c, x.t)) as Cat, card: st.card }))), [inScope]);
+  const allLines: Line[] = useMemo(() => inScope.flatMap((st) => st.txns.map((x, i) => ({ st, i, d: x.d, t: x.t, a: x.a, c: ((c) => (isCat(c) ? c : 'other'))(savedCat(x.c, x.t)) as Cat, card: st.card }))), [inScope]);
+  // The statement's days (its period, and any purchase listed before it starts).
+  const period = useMemo(() => {
+    if (m === 'all' || !inScope.length) return null;
+    const to = inScope.reduce((x, s) => (s.date > x ? s.date : x), inScope[0].date);
+    const from = inScope.reduce((x, s) => { const f = s.from ?? addDays(s.date, -30); return f < x ? f : x; }, to);
+    return { from: allLines.reduce((x, l) => (l.d < x ? l.d : x), from), to };
+  }, [inScope, allLines, m]);
+  const lines = useMemo(() => allLines.filter((l) => inRange(l.d)), [allLines, range]); // eslint-disable-line react-hooks/exhaustive-deps
+  const pick = (k: 'from' | 'to', v: string) => {
+    if (!period) return;
+    const next = { from: range?.from ?? period.from, to: range?.to ?? period.to, [k]: v || period[k] };
+    if (next.from > next.to) { if (k === 'from') next.to = next.from; else next.from = next.to; }
+    setRange(next.from === period.from && next.to === period.to ? null : next);
+    setDay(null);
+  };
   const spend = useMemo(() => lines.filter((l) => l.a > 0), [lines]);
   const refunds = useMemo(() => lines.filter((l) => l.a < 0 && l.c === 'refund').reduce((s, l) => s - l.a, 0), [lines]);
   const total = spend.reduce((s, l) => s + l.a, 0);
   // Cashback the cards in view earned in this month (or every month): statement lines and entries added by hand.
   const cashback = useMemo(() => cashbackList({ ...useLedger.getState(), statements: statementsMap, entries: entriesMap, accounts })
-    .filter((x) => x.card && (card === 'all' ? cards.some((c) => c.id === x.card) : x.card === card) && (m === 'all' || x.month === m))
-    .reduce((n, x) => n + x.amount, 0), [statementsMap, entriesMap, accounts, cards, card, m]);
+    .filter((x) => x.card && (card === 'all' ? cards.some((c) => c.id === x.card) : x.card === card) && (m === 'all' || x.month === m) && inRange(x.date))
+    .reduce((n, x) => n + x.amount, 0), [statementsMap, entriesMap, accounts, cards, card, m, range]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Day by day over the statement period (or, for every month, month by month).
   const dayBars: Bar[] = useMemo(() => {
-    if (m === 'all' || !inScope.length) return [];
-    const to = inScope.reduce((x, s) => (s.date > x ? s.date : x), inScope[0].date);
-    const from = inScope.reduce((x, s) => { const f = s.from ?? addDays(s.date, -30); return f < x ? f : x; }, to);
+    if (!period) return [];
+    const from = range?.from ?? period.from, to = range?.to ?? period.to;
     const sums = new Map<string, number>();
     for (const l of spend) sums.set(l.d, (sums.get(l.d) ?? 0) + l.a);
     const out: Bar[] = [];
-    for (let d = spend.reduce((x, l) => (l.d < x ? l.d : x), from); d <= to && out.length < 62; d = addDays(d, 1)) out.push({ key: d, label: String(Number(d.slice(8))), value: sums.get(d) ?? 0, title: shortDay(d) });
+    for (let d = from; d <= to && out.length < 62; d = addDays(d, 1)) out.push({ key: d, label: String(Number(d.slice(8))), value: sums.get(d) ?? 0, title: shortDay(d) });
     return out;
-  }, [inScope, spend, m]);
+  }, [period, range, spend]);
   const monthBars: Bar[] = useMemo(() => {
     const sums = new Map<string, number>();
     for (const st of mine) for (const x of st.txns) if (x.a > 0) sums.set(st.month, (sums.get(st.month) ?? 0) + x.a);
@@ -96,16 +113,28 @@ export function SpendView({ focus, onImport }: { focus?: string | null; onImport
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        <select aria-label={t('Card')} className={cn(SELECT, 'w-auto')} value={card} onChange={(e) => { setCard(e.target.value); setMonth('latest'); setDay(null); }}>
+      <div className="space-y-2">
+      <div className="flex gap-2">
+        <select aria-label={t('Card')} className={cn(SELECT, 'flex-1')} value={card} onChange={(e) => { setCard(e.target.value); setMonth('latest'); setDay(null); setRange(null); }}>
           <option value="all">{t('All cards')}</option>
           {cards.filter((c) => statements.some((s) => s.card === c.id)).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <select aria-label={t('Statement')} className={cn(SELECT, 'w-auto')} value={month === 'latest' ? m : month} onChange={(e) => { setMonth(e.target.value); setDay(null); }}>
-          {months.map((x) => <option key={x} value={x}>{monthTitle(x)}</option>)}
+        <select aria-label={t('Statement')} className={cn(SELECT, 'flex-1')} value={month === 'latest' ? m : month} onChange={(e) => { setMonth(e.target.value); setDay(null); setRange(null); }}>
+          {months.map((x) => <option key={x} value={x}>{new Date(`${x}-01T12:00:00`).toLocaleDateString(locale(), { month: 'short', year: 'numeric' })}</option>)}
           <option value="all">{t('Every month')}</option>
         </select>
-        <Button variant="ghost" className="ml-auto" onClick={onImport}><FileUp className="size-4" />{t('Import')}</Button>
+        <Button variant="outline" aria-label={t('Import a statement')} title={t('Import a statement')} className="h-11 w-11 rounded-xl px-0 text-accent-ink sm:w-auto sm:px-4" onClick={onImport}>
+          <FileUp className="size-5" /><span className="hidden sm:inline">{t('Import')}</span></Button>
+      </div>
+      {period && (
+        <div className="flex items-end gap-2">
+          <label className="min-w-0 flex-1"><span className="mb-1 block text-xs text-muted">{t('From')}</span>
+            <Input type="date" className="h-11" value={range?.from ?? period.from} min={period.from} max={period.to} onChange={(e) => pick('from', e.target.value)} /></label>
+          <label className="min-w-0 flex-1"><span className="mb-1 block text-xs text-muted">{t('To')}</span>
+            <Input type="date" className="h-11" value={range?.to ?? period.to} min={period.from} max={period.to} onChange={(e) => pick('to', e.target.value)} /></label>
+          {range && <Button variant="outline" aria-label={t('Whole statement')} title={t('Whole statement')} className="h-11 w-11 rounded-xl px-0" onClick={() => { setRange(null); setDay(null); }}><X className="size-5" /></Button>}
+        </div>
+      )}
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -127,7 +156,7 @@ export function SpendView({ focus, onImport }: { focus?: string | null; onImport
       {monthBars.length > 1 && (
         <section className="rounded-3xl border border-line/70 bg-panel p-4 shadow-sm">
           <h3 className="font-semibold">{t('Month by month')}</h3>
-          <Columns bars={monthBars} active={m === 'all' ? null : m} onPick={(k) => { setMonth(k ?? 'all'); setDay(null); }} fmt={fmt} compact={compact} every={1}
+          <Columns bars={monthBars} active={m === 'all' ? null : m} onPick={(k) => { setMonth(k ?? 'all'); setDay(null); setRange(null); }} fmt={fmt} compact={compact} every={1}
             summary={t('Card spending each month')} />
         </section>
       )}
