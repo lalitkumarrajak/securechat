@@ -68,9 +68,9 @@ export function Ranking({ rows, active, onPick, fmt }: { rows: { key: string; na
           <>
             <span className="flex items-baseline gap-2 text-sm">
               {r.emoji && <span aria-hidden>{r.emoji}</span>}
-              <span className="min-w-0 flex-1 truncate">{r.name}{r.note && <span className="text-muted"> · {r.note}</span>}</span>
-              <span className="font-semibold tabular-nums">{fmt(r.value)}</span>
-              <span className="w-10 text-right text-xs text-muted tabular-nums">{Math.round((r.value / total) * 100)}%</span>
+              <span className="min-w-0 flex-1 break-words">{r.name}{r.note && <span className="text-muted"> · {r.note}</span>}</span>
+              <span className="shrink-0 whitespace-nowrap font-semibold tabular-nums">{fmt(r.value)}</span>
+              <span className="w-10 shrink-0 text-right text-xs text-muted tabular-nums">{Math.round((r.value / total) * 100)}%</span>
             </span>
             <span className="mt-1 block h-2 rounded-full bg-panel-2"><span className="block h-2 rounded-full bg-accent transition-all" style={{ width: `${(r.value / max) * 100}%`, opacity: active && active !== r.key ? 0.3 : 1 }} /></span>
           </>

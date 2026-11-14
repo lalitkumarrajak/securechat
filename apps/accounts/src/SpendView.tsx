@@ -132,7 +132,7 @@ export function SpendView({ focus, onImport }: { focus?: string | null; onImport
         </section>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <section className="rounded-3xl border border-line/70 bg-panel p-4 shadow-sm">
           <h3 className="mb-3 font-semibold">{t('By category')}</h3>
           <Ranking rows={byCat} active={cat} onPick={setCat} fmt={fmt} />
@@ -153,19 +153,22 @@ export function SpendView({ focus, onImport }: { focus?: string | null; onImport
         </div>
         <ul className="max-h-[28rem] divide-y divide-line overflow-y-auto">
           {shown.map((l) => (
-            <li key={l.st.id + l.i} className="flex items-center gap-2 px-3 py-2">
-              <span className="w-12 shrink-0 text-xs text-muted">{shortDay(l.d)}</span>
-              <span className="min-w-0 flex-1 truncate text-sm">{l.t}</span>
+            <li key={l.st.id + l.i} className="flex items-start gap-2 px-3 py-2.5">
+              <span className="w-12 shrink-0 pt-0.5 text-xs text-muted">{shortDay(l.d)}</span>
+              {/* The whole name, on as many lines as it needs, with its category under it. */}
+              <div className="min-w-0 flex-1">
+              <p className="text-sm break-words">{l.t}</p>
               {l.a > 0 ? (
-                <select aria-label={t('Category')} value={l.c} onChange={(e) => recat(l, e.target.value as Cat)} className="h-8 max-w-32 shrink-0 rounded-lg sm:max-w-40 border border-line bg-panel-2 px-1 text-xs">
+                <select aria-label={t('Category')} value={l.c} onChange={(e) => recat(l, e.target.value as Cat)} className="mt-1 h-8 max-w-full rounded-lg border border-line bg-panel-2 px-1 text-xs">
                   {SPEND_CATS.map((c) => <option key={c} value={c}>{CATS[c].emoji} {t(CATS[c].label)}</option>)}
                 </select>
               ) : (
-                <select aria-label={t('Category')} value={l.c} onChange={(e) => recat(l, e.target.value as Cat)} className="h-8 max-w-32 shrink-0 rounded-lg sm:max-w-40 border border-line bg-panel-2 px-1 text-xs">
+                <select aria-label={t('Category')} value={l.c} onChange={(e) => recat(l, e.target.value as Cat)} className="mt-1 h-8 max-w-full rounded-lg border border-line bg-panel-2 px-1 text-xs">
                   {(CREDIT_CATS.includes(l.c) ? CREDIT_CATS : [l.c, ...CREDIT_CATS]).map((c) => <option key={c} value={c}>{CATS[c].emoji} {t(CATS[c].label)}</option>)}
                 </select>
               )}
-              <span className={cn('w-20 shrink-0 text-right text-sm tabular-nums', l.a < 0 && 'text-green-600 dark:text-green-400')}>{l.a < 0 ? '+' : ''}{fmt(Math.abs(l.a))}</span>
+              </div>
+              <span className={cn('shrink-0 whitespace-nowrap pt-0.5 text-right text-sm tabular-nums', l.a < 0 && 'text-green-600 dark:text-green-400')}>{l.a < 0 ? '+' : ''}{fmt(Math.abs(l.a))}</span>
             </li>
           ))}
           {!shown.length && <li className="p-4 text-center text-sm text-muted">{t('Nothing here.')}</li>}
