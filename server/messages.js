@@ -52,12 +52,14 @@ export const handlers = {
     const rows = desc
       ? await ctx.db.all('syncMsgsDesc', after, m.before, ws.user, ws.user, ws.user, ws.user, 200)
       : await ctx.db.all('syncMsgs', after, ws.user, ws.user, ws.user, ws.user, 200);
+    // The client can ask for a small first page (the newest messages, shown at once on a weak signal).
+    const cap = Number.isSafeInteger(m.max) ? Math.min(512_000, Math.max(16_000, m.max)) : 512_000;
     const msgs = [];
     let bytes = 0;
     for (const r of rows) {
       msgs.push(await rowOut(r, ws.user));
       bytes += r.body.length;
-      if (bytes > 512_000) break;
+      if (bytes > cap) break;
     }
     send(ws, { t: 'batch', msgs, more: msgs.length < rows.length || rows.length === 200, ...(desc && { desc: true }), ...(tag && { tag }) });
   },

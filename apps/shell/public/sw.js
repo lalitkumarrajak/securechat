@@ -1,5 +1,8 @@
 // Service worker: offline app shell and push notifications.
 const CACHE = 'chattrix-v5'; // bumping it empties the saved copy: the next start waits for the network // bump when the shell files change
+// On a weak signal a new version is fetched a while after opening, not while Chat is catching up.
+const UPDATE_DELAY = 15000;
+const slowLink = () => { const c = self.navigator.connection; return !!c && (c.saveData === true || c.effectiveType === '2g' || c.effectiveType === 'slow-2g' || (c.rtt || 0) >= 1000); };
 const SHELL = ['/theme-boot.js', '/logo.svg', '/logo-mark.png', '/icon-192.png', '/manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
@@ -82,15 +85,17 @@ self.addEventListener('fetch', (e) => {
   if (page) {
     e.respondWith(caches.open(CACHE).then(async (cache) => {
       const hit = await cache.match('/');
-      const fresh = fetch('/', { cache: 'no-store' }).then(async (res) => {
+      const update = () => fetch('/', { cache: 'no-store' }).then(async (res) => {
         try { await savePage(cache, res.clone()); } catch { /* a file of the new version didn't come: next time */ }
         return res;
       });
       if (hit && await whole(cache, hit)) {
         const saved = hit.clone();
-        e.waitUntil(fresh.then((res) => res.ok && newer(saved, res.clone()), () => {}));
+        // On a weak signal a new version's files would hold up the messages: fetch it a little later.
+        e.waitUntil(new Promise((r) => setTimeout(r, slowLink() ? UPDATE_DELAY : 0)).then(update).then((res) => res.ok && newer(saved, res.clone()), () => {}));
         return hit;
       }
+      const fresh = update();
       // Nothing usable saved: the network, or what is saved if that fails too.
       try { return await fresh; } catch { return hit || Response.error(); }
     }));

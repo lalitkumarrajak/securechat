@@ -7,6 +7,7 @@ import { WebSocketServer } from 'ws';
 import { config, MAX_BODY } from './config.js';
 import { ctx } from './context.js';
 import { openDatabase } from './db.js';
+import { enableParts, receivePart } from './parts.js';
 import { clientIp, installedApps, loadStatic, rateLimited, sendJson, serveStatic, sha256 } from './http.js';
 import { addSocket, removeSocket, refreshPresence, send, startPresenceSweep } from './hub.js';
 import { PUBLIC_ROUTES, routes as authRoutes, touchSession, userFromToken } from './auth.js';
@@ -88,8 +89,9 @@ async function handleHttp(req, res) {
 const server = config.tlsCert && config.tlsKey
   ? https.createServer({ cert: fs.readFileSync(config.tlsCert), key: fs.readFileSync(config.tlsKey) }, handleHttp)
   : http.createServer(handleHttp);
-server.headersTimeout = 15e3;
-server.requestTimeout = 30e3;
+// Long enough for a phone on a weak signal to upload a story or a voice note (Node's default).
+server.headersTimeout = 30e3;
+server.requestTimeout = 300e3;
 
 // ---------- WebSocket ----------
 // Before auth a socket may only send its small 'auth' frame, so a stranger can't make us buffer
@@ -115,7 +117,8 @@ wss.on('connection', (ws, req) => {
   ws.beat = Date.now();
   ws.watching = new Set();
   ws.ip = clientIp(req);
-  const authTimer = setTimeout(() => ws.close(4000, 'auth timeout'), 10e3);
+  // Generous: on a weak phone signal the sign-in frame can take several seconds after the socket opens.
+  const authTimer = setTimeout(() => ws.close(4000, 'auth timeout'), 30e3);
   // ws has no public per-socket limit; lowering its receiver's one refuses (1009) a big frame from
   // its header instead of after buffering it. The size check below still holds if ws changes.
   if (ws._receiver) ws._receiver._maxPayload = PRE_AUTH_MAX;
@@ -134,6 +137,15 @@ wss.on('connection', (ws, req) => {
     let m;
     try { m = JSON.parse(data); } catch { return; }
     if (!m || typeof m.t !== 'string') return;
+    // A piece of a big frame (parts.js): the frame is handled once its last piece is in.
+    if (ws.user && ws.parts) {
+      const whole = receivePart(ws, m, MAX_BODY + 4096);
+      if (whole === null) return;
+      if (whole !== undefined) {
+        try { m = JSON.parse(whole); } catch { return; }
+        if (!m || typeof m.t !== 'string' || m.t === '~' || m.t === '~a') return;
+      }
+    }
     queue = queue.then(() => onMessage(m)).catch((err) => console.error('handler error', m.t, err));
   });
 
@@ -150,8 +162,9 @@ wss.on('connection', (ws, req) => {
       touchSession(ws.tokenHash, ws.ip);
       ws.active = m.act !== false;
       ws.beat = Date.now();
+      if (m.ch === 1) enableParts(ws); // it reads big frames in pieces
       addSocket(ws);
-      send(ws, { t: 'ok', u: user, av: await avatarVersion(user) });
+      send(ws, { t: 'ok', u: user, av: await avatarVersion(user), ch: 1 });
       callConnected(ws);
       await refreshPresence(user);
       return;

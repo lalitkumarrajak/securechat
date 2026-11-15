@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { handleInvite } from '../lib/invite';
+import { chatSynced } from '../lib/engine';
 import { DiaryPage } from './notes/DiaryPage';
 import { CalendarPage } from './calendar/CalendarPage';
 import { SplitPage } from './split/SplitPage';
@@ -51,8 +52,10 @@ function takeShare() {
 // reminders) start once Sanga has settled; nothing is downloaded for the others.
 function usePrefetch() {
   useEffect(() => {
-    const bg = setTimeout(() => void import('../lib/apps').then((m) => m.runBackgrounds()), 6000);
-    return () => clearTimeout(bg);
+    // Once Chat has caught up (and a little after), so it never competes with the messages.
+    let bg = 0, gone = false;
+    void chatSynced().then(() => { if (!gone) bg = window.setTimeout(() => void import('../lib/apps').then((m) => m.runBackgrounds()), 3000); });
+    return () => { gone = true; clearTimeout(bg); };
   }, []);
 }
 

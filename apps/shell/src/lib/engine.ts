@@ -38,6 +38,10 @@ const S = {
   groupKeys: new Map<string, { key: CryptoKey; from: string }>(), // "<sender>/<key id>" -> key and whose it is
   inbox: Promise.resolve() as Promise<unknown>,
   inflight: new Set<string>(),
+  attempts: 0, // connection tries since the last one that worked (a weak signal gets more time each try)
+  // Big frames in pieces (server/parts.js): what the server reads, what's still to go, and what's coming in.
+  parts: { on: false, queue: [] as string[], sizes: [] as number[], inflight: 0, incoming: new Map<string, string[]>() },
+  goneEarly: new Set<number>(), // deleted for everyone before the (big) message itself came in
   rcpt: { 1: new Set<number>(), 2: new Set<number>() } as Record<1 | 2, Set<number>>,
   rcptTimer: 0,
   lastTypingSent: 0,
@@ -232,14 +236,18 @@ function connect() {
   setConn('connecting');
   const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
   S.ws = ws;
-  // A handshake that never completes (a cold server, a dead network) would otherwise hang for
-  // minutes with no retry: give up after a few seconds and let onclose schedule the next attempt.
-  const stalled = window.setTimeout(() => { if (ws.readyState === 0) ws.close(); }, 8000);
-  ws.onopen = () => { clearTimeout(stalled); ws.send(JSON.stringify({ t: 'auth', token: S.token, act: visible() })); };
+  S.parts = { on: false, queue: [], sizes: [], inflight: 0, incoming: new Map() };
+  // A handshake that never completes (a dead network) would otherwise hang for minutes with no retry:
+  // give up and let onclose schedule the next attempt. On a weak signal, opening a secure connection
+  // takes several round trips of a few seconds each, so allow plenty, and more on each new try.
+  const stalled = window.setTimeout(() => { if (ws.readyState === 0) ws.close(); }, Math.min(60_000, (slowLink() ? 30_000 : 15_000) + S.attempts * 10_000));
+  S.attempts++;
+  ws.onopen = () => { clearTimeout(stalled); ws.send(JSON.stringify({ t: 'auth', token: S.token, act: visible(), ch: 1 })); };
   ws.onmessage = (e) => {
     resetPong();
     let m;
     try { m = JSON.parse(e.data); } catch { return; }
+    if (m?.t === '~' || m?.t === '~a') { m = pieceIn(ws, m); if (!m) return; }
     // One frame at a time, in order: a message and the key that opens it may arrive back to back.
     S.inbox = S.inbox.then(() => handle(m)).catch((err) => console.error(err));
   };
@@ -249,6 +257,7 @@ function connect() {
     S.ready = false;
     S.synced = false;
     S.inflight.clear();
+    S.parts.queue = [];
     clearInterval(S.pingTimer);
     clearTimeout(S.pongTimer);
     if (e.code === 4001) { sessionExpired(); return; }
@@ -267,8 +276,61 @@ function resetPong() {
 
 // Only once signed in: before that the server accepts nothing but the (small) sign-in frame.
 function wsSend(obj: unknown) {
-  if (S.ready && S.ws?.readyState === 1) { S.ws.send(JSON.stringify(obj)); return true; }
-  return false;
+  if (!S.ready || S.ws?.readyState !== 1) return false;
+  const s = JSON.stringify(obj);
+  if (S.parts.on && s.length > PART) piecesOut(s);
+  else S.ws.send(s);
+  return true;
+}
+
+// ---------- big frames in pieces (server/parts.js) ----------
+// A photo or a voice note goes in pieces, only WINDOW bytes of them on their way at a time, so a text
+// sent meanwhile goes straight out instead of waiting behind it on a weak signal. The same for what
+// comes in: the server sends big frames in pieces, and each one is answered as it arrives.
+const PART = 8192;
+const WINDOW = 32768;
+let pieceId = 0;
+function piecesOut(s: string) {
+  const id = 'c' + (++pieceId).toString(36);
+  const n = Math.ceil(s.length / PART);
+  for (let i = 0; i < n; i++) S.parts.queue.push(JSON.stringify({ t: '~', id, i, n, d: s.slice(i * PART, (i + 1) * PART) }));
+  pump();
+}
+function pump() {
+  const p = S.parts;
+  while (p.queue.length && p.inflight < WINDOW && S.ws?.readyState === 1) {
+    const part = p.queue.shift()!;
+    p.sizes.push(part.length);
+    p.inflight += part.length;
+    S.ws.send(part);
+  }
+}
+/** Something big is still going out: reactions, edits and group keys wait behind it (they may be about it). */
+const sendingBig = () => S.parts.queue.length > 0;
+/** Something big is still coming in. */
+const receivingBig = () => S.parts.incoming.size > 0;
+function pieceIn(ws: WebSocket, m: any) {
+  const p = S.parts;
+  if (m.t === '~a') {
+    if (p.sizes.length) p.inflight -= p.sizes.shift()!;
+    const was = p.queue.length;
+    pump();
+    if (was && !p.queue.length) void flushOutbox(); // what waited behind it can go now
+    return null;
+  }
+  if (typeof m.id !== 'string' || typeof m.d !== 'string') return null;
+  ws.send('{"t":"~a"}');
+  const got = p.incoming.get(m.id) ?? [];
+  got.push(m.d);
+  if (got.length < m.n) { p.incoming.set(m.id, got); return null; }
+  p.incoming.delete(m.id);
+  try { return JSON.parse(got.join('')); } catch { return null; }
+}
+
+/** A weak or metered connection (as far as the phone can tell). */
+export function slowLink() {
+  const c = (navigator as Navigator & { connection?: { effectiveType?: string; rtt?: number; saveData?: boolean } }).connection;
+  return !!c && (c.saveData === true || c.effectiveType === '2g' || c.effectiveType === 'slow-2g' || (c.rtt ?? 0) >= 1000);
 }
 export { wsSend as sendFrame };
 
@@ -276,6 +338,12 @@ export { wsSend as sendFrame };
 export const frameHooks: Record<string, (m: any) => void> = {};
 /** Run each time the connection is up again (notes sync their changes then). */
 export const readyHooks: (() => void)[] = [];
+/** Run each time Chat has caught up after connecting: stories and the other apps sync then, so on a
+ *  weak signal they don't hold up the messages. */
+export const syncedHooks: (() => void)[] = [];
+let syncedWaiters: (() => void)[] = [];
+/** Resolves once Chat has caught up on this connection (at once if it already has). */
+export const chatSynced = () => (S.synced ? Promise.resolve() : new Promise<void>((r) => syncedWaiters.push(r)));
 export const myName = () => S.me;
 /** This account's own keys, for data only its devices may read (notes). */
 export const ownIdentity = () => ({ me: S.me, priv: S.priv, pub: S.pub });
@@ -308,12 +376,15 @@ async function handle(m: any) {
     case 'ok':
       S.ready = true;
       S.backoff = 1000;
+      S.attempts = 0;
+      S.parts.on = !!m.ch; // this server reads big frames in pieces
       setApp({ conn: 'online', syncing: true }); // what came in while away is on its way
       clearInterval(S.pingTimer);
       S.pingTimer = window.setInterval(() => wsSend({ t: 'p' }), 20000);
       // Newest first: the chat list and the latest messages show at once; older ones fill in after.
       S.fillingGap = null;
-      wsSend({ t: 'sync', after: S.lastSeq, before: Number.MAX_SAFE_INTEGER, tag: 'head' });
+      // A small first page: on a weak signal the newest messages show in seconds; the rest fills in behind.
+      wsSend({ t: 'sync', after: S.lastSeq, before: Number.MAX_SAFE_INTEGER, tag: 'head', max: 48_000 });
       wsSend({ t: 'hidden', since: S.hiddenTs });
       watchFriends();
       syncAvatar(S.me, m.av || 0).catch(() => {});
@@ -360,6 +431,7 @@ async function handle(m: any) {
       for (const it of m.items) {
         const msg = await db.msgById(it.id);
         if (msg) await markDeleted(msg);
+        else if (receivingBig()) S.goneEarly.add(it.id); // it may be the photo still coming in
       }
       await saveSeq(Math.max(...m.items.map((i: any) => i.seq)));
       break;
@@ -438,6 +510,10 @@ async function syncedHead(m: { msgs: any[]; more: boolean }) {
   const active = getApp().active;
   if (active) { await loadMessages(active); markRead(active); }
   fillNext();
+  const waiting = syncedWaiters;
+  syncedWaiters = [];
+  for (const r of waiting) r();
+  for (const f of syncedHooks) f();
 }
 
 /** Ask for the next page of the newest gap, if any. */
@@ -446,7 +522,7 @@ function fillNext() {
   setApp({ filling: !!g });
   if (!g || !S.ready || S.fillingGap) return;
   S.fillingGap = g;
-  wsSend({ t: 'sync', after: g.lo, before: g.hi, tag: 'fill' });
+  wsSend({ t: 'sync', after: g.lo, before: g.hi, tag: 'fill', max: 256_000 });
 }
 
 async function filledGap(m: { msgs: any[]; more: boolean }) {
@@ -777,7 +853,7 @@ async function ingest(row: any, fromSync: boolean): Promise<void> {
   const k = row.f + '/' + row.cid;
   const existing = await db.getMsg(k);
 
-  if (row.b === '') { // deleted for everyone
+  if (row.b === '' || S.goneEarly.delete(row.id)) { // deleted for everyone
     if (existing) await markDeleted(existing);
     else if (!(await db.get('kv', 'ctl/' + k))) {
       const msg: Msg = { k, cid: row.cid, id: row.id, peer, out, ts: row.ts, s: row.s, type: 'deleted' };
@@ -1034,7 +1110,7 @@ async function applyControl(c: any, from: string, ts: number, peer: string) {
   }
   const target = await db.getMsg(c.k);
   // An edit or reaction to a message from the part of the history still being filled in: kept until it comes.
-  if (!target && S.gaps.length && (c.type === 'edit' || c.type === 'react')) return waitFor(c.k, { c, from, ts, peer });
+  if (!target && (S.gaps.length || receivingBig()) && (c.type === 'edit' || c.type === 'react')) return waitFor(c.k, { c, from, ts, peer });
   if (!target || target.peer !== peer) return; // controls can only touch messages in this chat
   const next = c.type === 'edit' ? applyEdit(target, from, ts, c.text) : applyReact(target, from, typeof c.e === 'string' ? c.e : '');
   if (!next) return;
@@ -1226,10 +1302,13 @@ async function flushOutbox() {
   const items = (await db.all('outbox')).sort((a, b) => a.ts - b.ts);
   for (const o of items) {
     if (S.inflight.has(o.cid)) continue;
+    // Texts go past a photo still going out; reactions, edits and group keys keep their place behind it.
+    if ((o.q || o.kind === 'gkey') && sendingBig()) break;
     const frame = o.kind === 'gkey' ? { t: 'gkey', g: o.g, keys: o.keys, ref: o.cid }
       : { t: 'msg', cid: o.cid, to: o.to, b: o.b, ...(o.q && { q: 1 }), ...(o.mn && { mn: o.mn }) };
     if (!wsSend(frame)) break;
     S.inflight.add(o.cid);
+    if (o.kind === 'gkey' && sendingBig()) break; // nothing may reach the group before its key
   }
 }
 
@@ -1277,7 +1356,7 @@ export async function fetchLinkPreview(url: string): Promise<LinkPreview | null>
 }
 
 export async function sendPhoto(peer: string, file: File, re?: Msg | null, caption = '', album?: string) {
-  const img = await compressImage(file);
+  const img = await compressImage(file, slowLink() ? 1024 : 1280);
   await sendContent(peer, { type: 'img', ...img, text: caption.trim(), ...(re && { re: replyRef(re) }), ...(album && { al: album }) });
 }
 

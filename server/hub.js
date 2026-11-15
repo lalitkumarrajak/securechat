@@ -6,6 +6,7 @@
 // itself, which used to leave people "online" forever.
 import { config } from './config.js';
 import { ctx } from './context.js';
+import { sendText } from './parts.js';
 
 export const online = new Map();   // username -> Set<ws> (authenticated sockets)
 export const watchers = new Map(); // username -> Set<ws> subscribed to their presence
@@ -14,7 +15,8 @@ const shownOnline = new Set();     // users whose last broadcast state was "onli
 // Set by index.js to avoid import cycles: (user, viewer) -> presence frame or null.
 export const hooks = { presenceFor: null };
 
-export const send = (ws, obj) => { if (ws.readyState === 1) ws.send(JSON.stringify(obj)); };
+// Big frames (a photo, a page of history) go in pieces to clients that read them (parts.js).
+export const send = (ws, obj) => { if (ws.readyState === 1) sendText(ws, JSON.stringify(obj)); };
 export const sendTo = (user, obj, except) => {
   for (const ws of online.get(user) || []) if (ws !== except) send(ws, obj);
 };

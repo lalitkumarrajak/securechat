@@ -7,7 +7,7 @@ import { create } from 'zustand';
 import { toast } from 'sonner';
 import * as C from '@sanga/crypto';
 import * as db from './db';
-import { api, frameHooks, ownIdentity, peerKey, peerKeyChanged, readyHooks } from './engine';
+import { api, frameHooks, ownIdentity, peerKey, peerKeyChanged, syncedHooks } from './engine';
 import { getApp } from '../state/app';
 import { displayName } from './types';
 import { validSong, type Song } from './songs';
@@ -222,4 +222,4 @@ frameHooks.story = (m: { u: string; tag?: string; gone?: string; act?: string; l
   if (m.cmt) toast(t('{name} commented on your story', { name: who(m.cmt) }), { action: { label: t('View'), onClick: () => openStories(m.u) } });
   if (m.like) toast(t('❤️ {name} liked your story', { name: who(m.like) }));
 };
-readyHooks.push(() => void refreshStories());
+syncedHooks.push(() => void refreshStories()); // after Chat has caught up

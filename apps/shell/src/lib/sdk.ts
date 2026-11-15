@@ -3,7 +3,7 @@
 import { assertAppFrame, provideSdk, scopedStore, type Sdk } from '@sanga/sdk';
 import { confirm } from '@sanga/ui/confirm';
 import * as db from './db';
-import { api, enablePush, frameHooks, ownIdentity, peerKey, pushSupported, readyHooks } from './engine';
+import { api, enablePush, frameHooks, ownIdentity, peerKey, pushSupported, syncedHooks } from './engine';
 import { useSettings } from '../state/settings';
 import { Avatar } from '../components/Avatar';
 import { displayName } from './types';
@@ -26,9 +26,10 @@ export const shellSdk: Sdk = {
     listeners.get(type)!.add(fn);
     return () => listeners.get(type)!.delete(fn);
   },
+  // The other apps sync once Chat has caught up, so on a weak signal they don't hold up the messages.
   onReady(fn) {
-    readyHooks.push(fn);
-    return () => { const i = readyHooks.indexOf(fn); if (i >= 0) readyHooks.splice(i, 1); };
+    syncedHooks.push(fn);
+    return () => { const i = syncedHooks.indexOf(fn); if (i >= 0) syncedHooks.splice(i, 1); };
   },
   // The same table holds the sign-in token and group keys: apps only get their own keys.
   store: scopedStore({
