@@ -14,8 +14,7 @@ export function Board({ L, g, shown, home, movable, meIdx, onMove }: {
   const pad = 0.35;
   const vb = `${L.box.x - pad} ${L.box.y - pad} ${L.box.w + pad * 2} ${L.box.h + pad * 2}`;
   const used = new Set(g.s.arm);
-  const colorOfArm = (a: number) => (used.has(a) ? COLORS[a] : '#cfd6e4');
-  const fillOf = (a: number) => (used.has(a) ? `url(#fill-${a})` : 'url(#fill-off)');
+  const fillOf = (a: number) => (used.has(a) ? `url(#fill-${a})` : '#eef1f6'); // nobody's colour: plain
 
   // Tokens grouped by spot, so several on one square sit side by side, smaller.
   const tokens: { i: number; t: number; at: Pt; key: string }[] = [];
@@ -54,7 +53,6 @@ export function Board({ L, g, shown, home, movable, meIdx, onMove }: {
             <stop offset="1" stopColor={DARK[a]} />
           </linearGradient>
         ))}
-        <linearGradient id="fill-off" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#e4e9f2" /><stop offset="1" stopColor="#b9c2d3" /></linearGradient>
         <linearGradient id="frame" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor="#f3d79a" /><stop offset="0.35" stopColor="#c48a3f" /><stop offset="0.7" stopColor="#8a5a22" /><stop offset="1" stopColor="#e3b968" />
         </linearGradient>
@@ -79,14 +77,17 @@ export function Board({ L, g, shown, home, movable, meIdx, onMove }: {
         const y = L.yard(a);
         const h = y.size / 2;
         const c = fillOf(a);
-        const free = !used.has(a); // nobody plays this colour: just a faded corner, no token spots
+        if (!used.has(a)) { // nobody plays this colour: the corner is left empty
+          return y.round ? <circle key={'y' + a} cx={y.c.x} cy={y.c.y} r={h} fill="#fdfcf8" data-free="" />
+            : <rect key={'y' + a} x={y.c.x - h} y={y.c.y - h} width={y.size} height={y.size} fill="#fdfcf8" data-free="" />;
+        }
         return (
-          <g key={'y' + a} opacity={free ? 0.45 : 1}>
-            {y.round ? <circle cx={y.c.x} cy={y.c.y} r={h} fill={c} stroke={used.has(a) ? DARK[a] : '#9aa5b8'} strokeWidth="0.06" />
+          <g key={'y' + a}>
+            {y.round ? <circle cx={y.c.x} cy={y.c.y} r={h} fill={c} stroke={DARK[a]} strokeWidth="0.06" />
               : <rect x={y.c.x - h} y={y.c.y - h} width={y.size} height={y.size} rx="0.2" fill={c} />}
             {y.round ? <circle cx={y.c.x} cy={y.c.y} r={h * 0.72} fill="#fff" filter="url(#inset)" />
               : <rect x={y.c.x - h * 0.66} y={y.c.y - h * 0.66} width={h * 1.32} height={h * 1.32} rx="0.45" fill="#fff" filter="url(#inset)" />}
-            {!free && y.spots.map((s, k) => (
+            {y.spots.map((s, k) => (
               <g key={k}>
                 <circle cx={s.x} cy={s.y} r="0.42" fill={c} />
                 <circle cx={s.x} cy={s.y} r="0.42" fill="none" stroke="#000" strokeOpacity="0.15" strokeWidth="0.05" />
@@ -98,12 +99,18 @@ export function Board({ L, g, shown, home, movable, meIdx, onMove }: {
 
       {/* track */}
       {L.track.map((c, sq) => <polygon key={'t' + sq} points={poly(c.poly)} fill="url(#cell)" stroke="#9aa3b2" strokeWidth="0.035" />)}
-      {Array.from({ length: L.n }, (_, a) => (
+      {Array.from({ length: L.n }, (_, a) => used.has(a) ? (
         <g key={'a' + a}>
           {L.homeCol(a).map((c, k) => <polygon key={k} points={poly(c.poly)} fill={fillOf(a)} stroke="#9aa3b2" strokeWidth="0.035" />)}
           <polygon points={poly(L.startCell(a).poly)} fill={fillOf(a)} stroke="#9aa3b2" strokeWidth="0.035" />
           <Arrow at={L.startCell(a)} ang={L.armAng(a) + Math.PI} color="#fff" />
-          <Arrow at={L.entryCell(a)} ang={L.armAng(a) + Math.PI} color={colorOfArm(a)} />
+          <Arrow at={L.entryCell(a)} ang={L.armAng(a) + Math.PI} color={COLORS[a]} />
+          <Star at={L.starCell(a)} />
+        </g>
+      ) : ( // nobody's colour: plain squares; its start square is still safe, so it gets a star
+        <g key={'a' + a}>
+          {L.homeCol(a).map((c, k) => <polygon key={k} points={poly(c.poly)} fill="url(#cell)" stroke="#9aa3b2" strokeWidth="0.035" />)}
+          <Star at={L.startCell(a)} />
           <Star at={L.starCell(a)} />
         </g>
       ))}

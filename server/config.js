@@ -31,6 +31,7 @@ export const config = {
   gameLobbyMs: num(process.env.GAME_LOBBY_MS, 10 * 60e3), // unanswered game invites expire
   gameTurnMs: num(process.env.GAME_TURN_MS, 0),   // 0: each game's own turn time (tests shorten it)
   gameBotMs: num(process.env.GAME_BOT_MS, 0),     // tests: fixed computer-player delay (0: wait for animations)
+  gameGoneMs: num(process.env.GAME_GONE_MS, 90_000), // no connection this long: missed turns can remove them
   gameAnimMs: num(process.env.GAME_ANIM_MS, 5000), // extra time per turn for animations to finish (TURN_TOTAL in LudoBoard)
   // Tests only: dice values to roll, in order, before going back to random ("6,3,2").
   gameTestDice: (process.env.GAME_TEST_DICE || '').split(',').map(Number).filter((n) => n >= 1 && n <= 6),

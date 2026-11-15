@@ -2,7 +2,7 @@
 // you can take. The server runs the games (server/games.js); this only shows and asks.
 import { toast } from 'sonner';
 import { create } from 'zustand';
-import { frameHooks, myName, sendFrame } from '../../lib/engine';
+import { frameArrived, frameHooks, myName, sendFrame } from '../../lib/engine';
 import { randomId } from '@sanga/crypto';
 import { mentioned } from '../../lib/mentions';
 import { playSound } from './sounds';
@@ -68,7 +68,7 @@ function ingest(raw: any): Game | null {
   const prev = get().games[raw.id];
   if (prev && prev.v >= raw.v) return null;
   const { left, ...rest } = raw;
-  const g: Game = { ...rest, deadline: Date.now() + (left || 0) };
+  const g: Game = { ...rest, deadline: frameArrived() + (left || 0) };
   if (meIn(g)?.state === 'declined') {
     set((s) => { const games = { ...s.games }; delete games[g.id]; return { games, open: s.open === g.id ? null : s.open }; });
     return null;
@@ -103,7 +103,7 @@ frameHooks.gl = (m) => {
   const chat: Record<string, ChatLine[]> = {};
   for (const raw of m.games) {
     const { left, chat: lines, ...rest } = raw;
-    const g: Game = { ...rest, deadline: Date.now() + (left || 0) };
+    const g: Game = { ...rest, deadline: frameArrived() + (left || 0) };
     if (meIn(g)?.state === 'declined' || (g.status === 'over' && get().dismissed.includes(g.id))) continue;
     games[g.id] = g;
     chat[g.id] = lines || [];

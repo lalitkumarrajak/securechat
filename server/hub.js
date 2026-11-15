@@ -49,7 +49,17 @@ export async function broadcastPresence(user) {
   }
 }
 
+const goneSince = new Map(); // username -> when their last connection closed
+
+/** How long this person has had no connection at all (0 while connected). */
+export function awayFor(user) {
+  if (online.has(user)) return 0;
+  const at = goneSince.get(user);
+  return at ? Date.now() - at : Infinity;
+}
+
 export function addSocket(ws) {
+  goneSince.delete(ws.user);
   if (!online.has(ws.user)) online.set(ws.user, new Set());
   online.get(ws.user).add(ws);
 }
@@ -59,7 +69,7 @@ export function removeSocket(ws) {
   const set = online.get(ws.user);
   if (!set) return;
   set.delete(ws);
-  if (set.size === 0) online.delete(ws.user);
+  if (set.size === 0) { online.delete(ws.user); goneSince.set(ws.user, Date.now()); }
 }
 
 export function watch(ws, user) {

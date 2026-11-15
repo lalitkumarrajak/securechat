@@ -72,9 +72,11 @@ describe('games', () => {
     assert.equal(await C.gets('gt', (m) => m.id === id), false); // C declined
   });
 
-  it('plays for a player who runs out of time, and removes them after 5 missed turns', async () => {
-    // Nobody acts: turns time out (700 ms each) until someone has missed 5 in a row.
+  it('plays for a player who runs out of time, and removes them after 5 missed turns once they’ve gone', async () => {
+    // Nobody acts, both apps in the background: turns time out (700 ms each) until someone has missed 5 in a row.
+    for (const w of [A, B]) w.sendJson({ t: 'act', on: false });
     const over = await frame(A, (x) => x.id === id && x.status === 'over', 30_000);
+    for (const w of [A, B]) w.sendJson({ t: 'act', on: true });
     const out = over.players.find((p) => p.state === 'out');
     assert.equal(out.missed, 5);
     assert.ok(over.players.some((p) => p.state === 'out'));
@@ -94,6 +96,58 @@ describe('games', () => {
       const g = await frame(Y, (v) => v.id === gid && v.status === 'play' && v.turn === 1, 5000);
       assert.equal(g.players[0].missed, 1);
       assert.deepEqual(g.s.tokens[0], [1, 0, -1, -1]);
+      X.close(); Y.close();
+    } finally { await s2.stop(); }
+  });
+
+  it('a weak connection is never thrown out: dropped or slow, the turns are played for them', async () => {
+    const s2 = await startServer({ GAME_TURN_MS: '250', GAME_ANIM_MS: '0', GAME_GONE_MS: '60000' });
+    try {
+      const [x, y] = await Promise.all(['wx', 'wy'].map((v) => register(s2, name(v))));
+      await befriend(s2, x, y);
+      const X = await connect(s2, x.token);
+      let Y = await connect(s2, y.token);
+      X.sendJson({ t: 'gnew', type: 'ludo', to: [y.u], ref: 'w' });
+      const gid = (await X.next('g', (m) => m.ref === 'w')).g.id;
+      Y.sendJson({ t: 'gjoin', id: gid });
+      await frame(X, (v) => v.id === gid && v.status === 'play');
+      Y.close(); // Y's signal drops; X is there but too slow to ever make a turn
+      const late = await frame(X, (v) => v.id === gid && v.turnNo >= 14, 15_000);
+      assert.equal(late.status, 'play');
+      assert.ok(late.players.every((p) => p.state === 'playing' && p.missed <= 4), JSON.stringify(late.players));
+      // Y is back: on their turn they get time to look and play, not a clock about to run out
+      Y = await connect(s2, y.token);
+      let back;
+      for (let k = 0; k < 40 && !back; k++) {
+        Y.sendJson({ t: 'glist' });
+        const gl = await Y.next('gl');
+        back = gl.games.find((v) => v.id === gid && v.turn === 1 && v.left > 10_000);
+        if (!back) await sleep(60);
+      }
+      assert.ok(back, 'a fresh moment on their turn after reconnecting');
+      X.close(); Y.close();
+    } finally { await s2.stop(); }
+  });
+
+  it('one clock per turn: rolling, moving and a bonus roll don’t start it again', async () => {
+    const s2 = await startServer({ GAME_TURN_MS: '30000', GAME_ANIM_MS: '0', GAME_TEST_DICE: '6,3' });
+    try {
+      const [x, y] = await Promise.all(['cx', 'cy'].map((v) => register(s2, name(v))));
+      await befriend(s2, x, y);
+      const [X, Y] = await Promise.all([connect(s2, x.token), connect(s2, y.token)]);
+      X.sendJson({ t: 'gnew', type: 'ludo', to: [y.u], ref: 'c' });
+      const gid = (await X.next('g', (m) => m.ref === 'c')).g.id;
+      Y.sendJson({ t: 'gjoin', id: gid });
+      const begun = await frame(X, (v) => v.id === gid && v.status === 'play');
+      assert.ok(begun.left > 29_000);
+      await sleep(1500);
+      X.sendJson({ t: 'gact', id: gid, a: { a: 'roll' } }); // a 6: the only move (a token comes out) is made, and a bonus roll
+      const rolled = await frame(Y, (v) => v.id === gid && v.s?.tokens[0][0] === 0);
+      assert.equal(rolled.turn, 0);
+      assert.ok(rolled.left < 29_000, `the clock kept running through the roll (${rolled.left} ms left)`);
+      X.sendJson({ t: 'gact', id: gid, a: { a: 'roll' } }); // a 3, moved for them, and Y's turn
+      const next = await frame(Y, (v) => v.id === gid && v.turn === 1);
+      assert.ok(next.left > 29_000, 'the next player gets a whole turn');
       X.close(); Y.close();
     } finally { await s2.stop(); }
   });

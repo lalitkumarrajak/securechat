@@ -32,7 +32,7 @@ export function LinkBox({ url, title, text, onUse, dark, className }: {
   }
 
   const btn = cn('inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-semibold',
-    dark ? 'bg-white text-slate-900 hover:bg-white/90' : 'bg-accent text-accent-ink hover:opacity-90');
+    dark ? 'bg-white text-slate-900 hover:bg-white/90' : 'bg-accent text-white hover:opacity-90');
   return (
     <div className={cn('w-full space-y-2', className)}>
       <div className={cn('flex items-center gap-2 rounded-full p-1 pl-4', dark ? 'bg-white/10' : 'bg-hover')}>

@@ -57,14 +57,31 @@ test('people who aren’t friends open the link, sign up and land in the game', 
   await A.page.getByRole('button', { name: 'Start with 3 players' }).click();
   for (const p of [A, B, C]) await expect(p.page.getByRole('img', { name: 'Ludo board' })).toBeVisible();
   await expect(A.page.getByRole('img', { name: '5 of 5 chances left' })).toHaveCount(3); // hearts: missed turns allowed
+  // Three players on a four-colour board: the fourth corner is left empty, with no token spots
+  await expect(A.page.locator('[data-free]')).toHaveCount(1);
   await A.page.waitForTimeout(400);
   await A.page.screenshot({ path: shots('21-ludo-start') });
 });
 
+/** The seconds on the turn clock that phone shows. */
+async function secsLeft(p: Phone) {
+  const txt = await p.page.locator('[data-turn] [aria-label$="seconds left"]').textContent();
+  return Number(txt?.replace('s', ''));
+}
+
 test('dice, tokens and turns', async () => {
   // Dice from GAME_TEST_DICE: A 6 (comes out by itself), 3 (moves by itself); B 2 (no move); C 6, 4; A 6 (choose)
+  // One clock for the whole turn, the same on every phone, and only one shown at a time
+  await A.page.waitForTimeout(6500); // past the moment the turn's animations are allowed for
+  const before = await Promise.all([A, B, C].map((p) => secsLeft(p)));
+  expect(Math.max(...before) - Math.min(...before)).toBeLessThanOrEqual(1);
+  expect(before[0]).toBeLessThan(30);
+  for (const p of [A, B, C]) await expect(p.page.locator('[data-turn]')).toHaveCount(1);
   await A.page.getByRole('button', { name: 'Roll dice' }).click();
   await expect(tokenAt(A, 0, 0)).toHaveAttribute('data-p', '0', { timeout: 5000 });
+  const after = await secsLeft(A); // a 6: the token came out and A rolls again, on the same clock
+  expect(after).toBeLessThanOrEqual(before[0]);
+  expect(Math.abs((await secsLeft(B)) - after)).toBeLessThanOrEqual(1);
   await A.page.getByRole('button', { name: 'Roll dice' }).click();
   await expect(tokenAt(A, 0, 0)).toHaveAttribute('data-p', '3', { timeout: 5000 });
   await expect(B.page.getByRole('button', { name: 'Roll dice' })).toBeVisible({ timeout: 5000 });
@@ -112,6 +129,10 @@ test('emoji, quick phrases and chat during the game', async () => {
   await A.page.getByRole('button', { name: 'Game chat' }).click();
   await expect(A.page.getByRole('dialog', { name: 'Game chat' }).getByText('Good game everyone')).toBeVisible();
   await expect(A.page.getByRole('dialog', { name: 'Game chat' }).locator('span.bg-blue-600', { hasText: '@' + A.u })).toBeVisible(); // my tag stands out
+  // What I send myself is white on my colour, easy to read
+  const own = B.page.getByRole('dialog', { name: 'Game chat' }).getByText('Good game everyone');
+  await expect(own).toBeVisible();
+  expect(await own.evaluate((el) => getComputedStyle(el).color)).toBe('rgb(255, 255, 255)');
   await A.page.screenshot({ path: shots('24-ludo-chat') });
   await A.page.keyboard.press('Escape');
   await B.page.keyboard.press('Escape');
@@ -121,6 +142,9 @@ test('tease: tap a player, throw a tomato, and it flies to them', async () => {
   await B.page.locator(`[data-player="${A.u}"]`).click({ position: { x: 6, y: 6 } });
   const menu = B.page.getByRole('menu', { name: /^Tease/ });
   await expect(menu).toBeVisible();
+  for (const gone of ['Kiss', 'Slip!']) await expect(menu.getByRole('menuitem', { name: gone })).toHaveCount(0);
+  for (const fun of ['Chappal!', 'Pie face', 'Bonk', 'Wake up!']) await expect(menu.getByRole('menuitem', { name: fun })).toBeVisible();
+  await B.page.screenshot({ path: shots('24a-ludo-tease-menu') });
   await menu.getByRole('menuitem', { name: 'Tomato' }).click();
   await expect(menu).toBeHidden();
   await expect(A.page.getByText('🍅').first()).toBeVisible({ timeout: 3000 }); // in flight on the target's screen

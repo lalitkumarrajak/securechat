@@ -13,7 +13,7 @@ import crypto from 'node:crypto';
 import { config, USER_RE } from './config.js';
 import { ctx } from './context.js';
 import { rateLimited } from './http.js';
-import { isActive, send, sendTo } from './hub.js';
+import { awayFor, isActive, send, sendTo } from './hub.js';
 import { canChat } from './friends.js';
 import { shareGroup } from './groups.js';
 import { getProfile, profileHooks } from './profiles.js';
@@ -25,7 +25,7 @@ const games = new Map();  // id -> game
 const timers = new Map(); // id -> timeout
 const MAX_OPEN = 5;       // unfinished games per person
 const CHAT_KEEP = 50;
-export const TEASES = ['tomato', 'egg', 'rose', 'kiss', 'banana', 'bomb', 'snow', 'fire', 'clown', 'turtle', 'cake', 'clap']; // what can be thrown
+export const TEASES = ['tomato', 'egg', 'pie', 'slipper', 'bonk', 'splash', 'bomb', 'snow', 'fire', 'mosquito', 'alarm', 'chicken', 'clown', 'turtle', 'baby', 'lol', 'rose', 'cake', 'clap', 'crown']; // what can be thrown
 const KEEP_OVER_MS = 10 * 60e3;
 const rand = (n) => (n === 6 && config.gameTestDice.length ? config.gameTestDice.shift() - 1 : crypto.randomInt(n));
 const ID_RE = /^[A-Za-z0-9_-]{12}$/;
@@ -69,6 +69,12 @@ function schedule(g) {
   timers.set(g.id, t);
 }
 
+// Someone who reconnects during their turn has at least this long.
+const BACK_MS = 15_000;
+
+// Whoever goes on within their turn has at least this long once the animations are over.
+const KEEP_GOING_MS = 8000;
+
 // A person gets the turn time plus time for animations; a computer player "thinks" until the
 // animations are over, then a little more.
 const botDelay = (g) => config.gameBotMs || (def(g).animMs?.(g.ev) ?? 1500) + 900;
@@ -105,7 +111,11 @@ function timeout(g) {
   g.ev = [{ k: 'timeout', s: i }];
   const turnNo = g.turnNo || 0; // turns so far (unset before the first change of turn)
   if (g.missTurn !== turnNo) { pl.missed++; g.missTurn = turnNo; }
-  if (pl.missed >= core.MISSES_OUT) core.remove(g, def(g), i, 'out');
+  // Only someone who has really gone is removed: the app in the background, or no connection for a
+  // while. A weak signal (dropping out, or too slow to make the turn) just has their turns played.
+  const gone = !isActive(pl.u) && (awayFor(pl.u) === 0 || awayFor(pl.u) >= config.gameGoneMs);
+  if (pl.missed >= core.MISSES_OUT && gone) core.remove(g, def(g), i, 'out');
+  else if (pl.missed >= core.MISSES_OUT) { pl.missed = core.MISSES_OUT - 1; def(g).auto(g, rand); } // still here: one chance left
   else def(g).auto(g, rand);
   if (g.status === 'play' && g.turn === i) g.deadline = Date.now() + config.gameAnimMs + 500; // their bonus roll
   else turnDeadline(g);
@@ -245,7 +255,11 @@ export const handlers = {
     catch (err) { g.ev = []; return send(ws, { t: 'gerr', id: g.id, e: err.message }); }
     // Some actions don't need your turn (UNO's "UNO!" and catching): they don't reset the clock.
     if (i === turn) g.players[i].missed = 0;
-    if (i === turn || g.turn !== turn || g.turnNo !== turnNo) turnDeadline(g);
+    // One clock per turn: rolling the dice (or drawing a card) doesn't start it again. The next player
+    // gets a fresh one; whoever goes on (a move after the roll, a bonus roll) keeps theirs, with enough
+    // left to see what happened and act.
+    if (g.turn !== turn || g.turnNo !== turnNo) turnDeadline(g);
+    else if (i === turn && g.status === 'play') g.deadline = Math.max(g.deadline, Date.now() + (def(g).animMs?.(g.ev) ?? 0) + KEEP_GOING_MS);
     await commit(g);
   },
 
@@ -280,6 +294,15 @@ export const handlers = {
   },
 
   async glist(ws) {
+    // Back after a dropped connection with their turn running: a moment to see the board and play.
+    const now = Date.now();
+    for (const g of mine(ws.user)) {
+      if (g.status === 'play' && g.players[g.turn]?.u === ws.user && g.deadline < now + BACK_MS) {
+        g.deadline = now + BACK_MS;
+        g.ev = [];
+        await commit(g);
+      }
+    }
     send(ws, { t: 'gl', games: mine(ws.user).map((g) => ({ ...pub(g, ws.user), chat: g.chat })) });
   },
 

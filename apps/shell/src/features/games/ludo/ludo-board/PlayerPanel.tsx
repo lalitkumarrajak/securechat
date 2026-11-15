@@ -31,7 +31,8 @@ export function PlayerPanel({ g, i, me, shown, canRoll, onRoll, spinning, bubble
 
   const avatar = (
     <div className="relative">
-      <TurnRing active={active} deadline={g.deadline} color={color}>
+      {/* The clock is the current turn's: while an earlier move is still being shown, nobody's runs. */}
+      <TurnRing active={active && shown.turn === g.turn} deadline={g.deadline} color={color}>
         <div className={cn('rounded-xl border-[3px] bg-white p-0.5', gone && 'opacity-40 grayscale')} style={{ borderColor: color }}>
           <Avatar u={pl.u} name={pl.n} size={40} className="[&>*]:rounded-lg" />
         </div>

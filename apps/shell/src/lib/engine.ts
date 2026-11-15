@@ -255,7 +255,8 @@ function connect() {
     try { m = JSON.parse(e.data); } catch { return; }
     if (m?.t === '~' || m?.t === '~a') { m = pieceIn(ws, m); if (!m) return; }
     // One frame at a time, in order: a message and the key that opens it may arrive back to back.
-    S.inbox = S.inbox.then(() => handle(m)).catch((err) => console.error(err));
+    const at = Date.now();
+    S.inbox = S.inbox.then(() => { frameAt = at; return handle(m); }).catch((err) => console.error(err));
   };
   ws.onclose = (e) => {
     clearTimeout(stalled);
@@ -366,6 +367,9 @@ export function slowLink() {
 export { wsSend as sendFrame };
 
 /** Other modules (games) handle their own frame types; registered by type, e.g. frameHooks.g = fn. */
+let frameAt = 0;
+/** When the frame being handled arrived (it may have waited behind others): a game's turn clock counts from then. */
+export const frameArrived = () => frameAt || Date.now();
 export const frameHooks: Record<string, (m: any) => void> = {};
 /** Run each time the connection is up again (notes sync their changes then). */
 export const readyHooks: (() => void)[] = [];
