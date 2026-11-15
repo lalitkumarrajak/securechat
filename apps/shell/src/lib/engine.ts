@@ -16,6 +16,12 @@ import { setSettings, useSettings } from '../state/settings';
 import './swLang'; // push notifications in the language now on
 import { lang, t } from '@sanga/i18n';
 
+// Big frames in pieces (see piecesOut below).
+const PART = 8192;
+const WINDOW = 32768;
+const MAX_WINDOW = 1 << 20;
+const QUEUED = 250; // ms of waiting on top of the quickest round trip before the window shrinks
+
 const S = {
   token: null as string | null,
   me: '',
@@ -40,7 +46,7 @@ const S = {
   inflight: new Set<string>(),
   attempts: 0, // connection tries since the last one that worked (a weak signal gets more time each try)
   // Big frames in pieces (server/parts.js): what the server reads, what's still to go, and what's coming in.
-  parts: { on: false, queue: [] as string[], sizes: [] as number[], inflight: 0, incoming: new Map<string, string[]>() },
+  parts: newParts(),
   goneEarly: new Set<number>(), // deleted for everyone before the (big) message itself came in
   rcpt: { 1: new Set<number>(), 2: new Set<number>() } as Record<1 | 2, Set<number>>,
   rcptTimer: 0,
@@ -236,11 +242,11 @@ function connect() {
   setConn('connecting');
   const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
   S.ws = ws;
-  S.parts = { on: false, queue: [], sizes: [], inflight: 0, incoming: new Map() };
-  // A handshake that never completes (a dead network) would otherwise hang for minutes with no retry:
-  // give up and let onclose schedule the next attempt. On a weak signal, opening a secure connection
-  // takes several round trips of a few seconds each, so allow plenty, and more on each new try.
-  const stalled = window.setTimeout(() => { if (ws.readyState === 0) ws.close(); }, Math.min(60_000, (slowLink() ? 30_000 : 15_000) + S.attempts * 10_000));
+  S.parts = newParts();
+  // A handshake that never completes (a stale network after the phone wakes) would otherwise hang for
+  // minutes with no retry: give up soon and try again. A weak signal gets longer, and more on each try,
+  // since opening a secure connection there takes several slow round trips.
+  const stalled = window.setTimeout(() => { if (ws.readyState === 0) ws.close(); }, Math.min(30_000, (slowLink() ? 20_000 : 8_000) + S.attempts * 4_000));
   S.attempts++;
   ws.onopen = () => { clearTimeout(stalled); ws.send(JSON.stringify({ t: 'auth', token: S.token, act: visible(), ch: 1 })); };
   ws.onmessage = (e) => {
@@ -253,25 +259,40 @@ function connect() {
   };
   ws.onclose = (e) => {
     clearTimeout(stalled);
-    if (S.ws !== ws) return;
-    S.ready = false;
-    S.synced = false;
-    S.inflight.clear();
-    S.parts.queue = [];
-    clearInterval(S.pingTimer);
-    clearTimeout(S.pongTimer);
-    if (e.code === 4001) { sessionExpired(); return; }
-    setApp({ conn: navigator.onLine ? 'connecting' : 'offline', syncing: false });
-    // Exponential backoff with jitter so many clients don't reconnect in lockstep.
-    S.reconnectTimer = window.setTimeout(connect, S.backoff * (0.5 + Math.random()));
-    S.backoff = Math.min(S.backoff * 2, 8000);
+    lost(ws, e.code);
   };
+}
+
+/** The socket is gone (or given up on): clean up and try again shortly. */
+function lost(ws: WebSocket, code: number) {
+  if (S.ws !== ws) return;
+  S.ready = false;
+  S.synced = false;
+  S.inflight.clear();
+  S.parts.queue = [];
+  clearInterval(S.pingTimer);
+  clearTimeout(S.pongTimer);
+  if (code === 4001) { sessionExpired(); return; }
+  setApp({ conn: navigator.onLine ? 'connecting' : 'offline', syncing: false });
+  // Exponential backoff with jitter so many clients don't reconnect in lockstep.
+  S.reconnectTimer = window.setTimeout(connect, S.backoff * (0.5 + Math.random()));
+  S.backoff = Math.min(S.backoff * 2, 8000);
+}
+
+/** A socket that stopped answering: don't wait for the browser to notice (that can take a minute). */
+function dropDead() {
+  const ws = S.ws;
+  if (!ws || !visible()) return;
+  lost(ws, 1006);
+  S.ws = null;
+  ws.onclose = ws.onmessage = null;
+  ws.close();
 }
 
 // While visible, a missing heartbeat reply means the connection is dead: reconnect.
 function resetPong() {
   clearTimeout(S.pongTimer);
-  S.pongTimer = window.setTimeout(() => { if (visible()) S.ws?.close(); }, 50000);
+  S.pongTimer = window.setTimeout(dropDead, 50000);
 }
 
 // Only once signed in: before that the server accepts nothing but the (small) sign-in frame.
@@ -284,11 +305,11 @@ function wsSend(obj: unknown) {
 }
 
 // ---------- big frames in pieces (server/parts.js) ----------
-// A photo or a voice note goes in pieces, only WINDOW bytes of them on their way at a time, so a text
-// sent meanwhile goes straight out instead of waiting behind it on a weak signal. The same for what
-// comes in: the server sends big frames in pieces, and each one is answered as it arrives.
-const PART = 8192;
-const WINDOW = 32768;
+// A photo or a voice note goes in pieces, only a window of them on their way at a time, so a text
+// sent meanwhile goes straight out instead of waiting behind it on a weak signal. The window grows while
+// pieces come back quickly (a good connection is used in full) and shrinks once they queue up. The same
+// for what comes in: the server sends big frames in pieces, and each one is answered as it arrives.
+// (PART, WINDOW, MAX_WINDOW and QUEUED are at the top: the connection state starts with them.)
 let pieceId = 0;
 function piecesOut(s: string) {
   const id = 'c' + (++pieceId).toString(36);
@@ -298,12 +319,15 @@ function piecesOut(s: string) {
 }
 function pump() {
   const p = S.parts;
-  while (p.queue.length && p.inflight < WINDOW && S.ws?.readyState === 1) {
+  while (p.queue.length && p.inflight < p.win && S.ws?.readyState === 1) {
     const part = p.queue.shift()!;
-    p.sizes.push(part.length);
+    p.sizes.push([part.length, Date.now()]);
     p.inflight += part.length;
     S.ws.send(part);
   }
+}
+function newParts() {
+  return { on: false, queue: [] as string[], sizes: [] as [number, number][], inflight: 0, win: WINDOW, minRtt: Infinity, cut: 0, incoming: new Map<string, string[]>() };
 }
 /** Something big is still going out: reactions, edits and group keys wait behind it (they may be about it). */
 const sendingBig = () => S.parts.queue.length > 0;
@@ -312,7 +336,14 @@ const receivingBig = () => S.parts.incoming.size > 0;
 function pieceIn(ws: WebSocket, m: any) {
   const p = S.parts;
   if (m.t === '~a') {
-    if (p.sizes.length) p.inflight -= p.sizes.shift()!;
+    const sent = p.sizes.shift();
+    if (sent) {
+      const now = Date.now(), rtt = now - sent[1];
+      p.inflight -= sent[0];
+      p.minRtt = Math.min(p.minRtt, rtt);
+      if (rtt <= p.minRtt + QUEUED) p.win = Math.min(MAX_WINDOW, p.win + PART);
+      else if (now - p.cut > rtt) { p.win = Math.max(WINDOW, Math.floor(p.win / 2)); p.cut = now; }
+    }
     const was = p.queue.length;
     pump();
     if (was && !p.queue.length) void flushOutbox(); // what waited behind it can go now
@@ -359,7 +390,11 @@ document.addEventListener('visibilitychange', () => {
   if (visible()) {
     S.backoff = 1000;
     connect();
-    wsSend({ t: 'p' });
+    // After the phone slept the socket can look open but be dead: if nothing answers soon, start over.
+    if (wsSend({ t: 'p' })) {
+      clearTimeout(S.pongTimer);
+      S.pongTimer = window.setTimeout(dropDead, slowLink() ? 15_000 : 6_000);
+    }
     const active = getApp().active;
     if (active) markRead(active);
   }

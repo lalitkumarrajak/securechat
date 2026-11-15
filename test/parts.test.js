@@ -2,7 +2,7 @@
 // out at a time, and a client can't make the server hold more than a frame's worth.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { enableParts, PART, receivePart, sendText, WINDOW } from '../server/parts.js';
+import { adapt, enableParts, MAX_WINDOW, PART, receivePart, sendText, WINDOW } from '../server/parts.js';
 
 function socket() {
   const ws = { readyState: 1, sent: [], closed: null, send(s) { this.sent.push(s); }, close(code, why) { this.closed = [code, why]; this.readyState = 3; } };
@@ -57,5 +57,19 @@ describe('big frames in pieces', () => {
     const many = socket(); enableParts(many);
     for (let i = 0; i < 9 && !many.closed; i++) receivePart(many, { t: '~', id: 'f' + i, i: 0, n: 2, d: 'x' }, 1e6);
     assert.equal(many.closed?.[0], 1009, 'too many frames half sent');
+  });
+
+  it('the window grows on a good connection and shrinks once pieces queue up', () => {
+    const ws = socket(); enableParts(ws);
+    const p = ws.parts;
+    let now = 1000;
+    for (let i = 0; i < 200; i++) adapt(p, 80, now += 10); // pieces back in 80 ms each time
+    assert.equal(p.win, MAX_WINDOW, 'a fast link gets the whole window');
+    adapt(p, 2000, now += 10); // now they wait two seconds
+    assert.equal(p.win, MAX_WINDOW / 2);
+    adapt(p, 2000, now += 10);
+    assert.equal(p.win, MAX_WINDOW / 2, 'cut at most once a round trip');
+    for (let i = 0; i < 40; i++) adapt(p, 2000, now += 2500);
+    assert.equal(p.win, WINDOW, 'never below the smallest window');
   });
 });

@@ -2,14 +2,18 @@
 //
 // A photo, a voice note or a page of history can be megabytes; on a weak phone signal one such frame
 // held up every text, receipt and "typing…" behind it for minutes. A frame bigger than PART goes as
-// pieces ({t:'~', id, i, n, d}) and the other side says when each one has arrived ({t:'~a'}). Only
-// WINDOW bytes of pieces are on their way at a time, so whatever proxies sit in between, a small frame
-// sent meanwhile goes straight out and waits behind at most WINDOW bytes. Both sides do this: the
+// pieces ({t:'~', id, i, n, d}) and the other side says when each one has arrived ({t:'~a'}). Only a
+// window of pieces is on its way at a time, so whatever proxies sit in between, a small frame sent
+// meanwhile waits behind at most that window. The window adapts: it grows while pieces come back about
+// as fast as the quickest one did (a good connection, used in full) and shrinks once they start to queue
+// up (a weak one, where a text should only wait a moment). Both sides do this: the
 // client says it reads pieces in its 'auth' frame (ch: 1) and the server in its 'ok' frame, so either
 // side talking to an older one simply sends whole frames.
 
 export const PART = 8192;
-export const WINDOW = 32768;
+export const WINDOW = 32768; // the smallest window, and where it starts
+export const MAX_WINDOW = 1 << 20;
+const QUEUED = 250; // ms of waiting on top of the quickest round trip before the window shrinks
 let nextId = 0;
 
 /** Sending side, on a socket: whole small frames now, big ones in pieces as room frees up. */
@@ -24,9 +28,9 @@ export function sendText(ws, s) {
 
 function pump(ws) {
   const p = ws.parts;
-  while (p.queue.length && p.inflight < WINDOW && ws.readyState === 1) {
+  while (p.queue.length && p.inflight < p.win && ws.readyState === 1) {
     const part = p.queue.shift();
-    p.sizes.push(part.length);
+    p.sizes.push([part.length, Date.now()]);
     p.inflight += part.length;
     ws.send(part);
   }
@@ -36,13 +40,22 @@ function pump(ws) {
 function acked(ws) {
   const p = ws.parts;
   if (!p?.sizes.length) return;
-  p.inflight -= p.sizes.shift();
+  const [size, at] = p.sizes.shift();
+  p.inflight -= size;
+  adapt(p, Date.now() - at, Date.now());
   pump(ws);
+}
+
+/** Grow the window while pieces come back quickly, shrink it (at most once a round trip) when they queue. */
+export function adapt(p, rtt, now) {
+  p.minRtt = Math.min(p.minRtt, rtt);
+  if (rtt <= p.minRtt + QUEUED) p.win = Math.min(MAX_WINDOW, p.win + PART);
+  else if (now - p.cut > rtt) { p.win = Math.max(WINDOW, Math.floor(p.win / 2)); p.cut = now; }
 }
 
 /** Start sending in pieces (the client said it reads them). */
 export function enableParts(ws) {
-  ws.parts = { queue: [], sizes: [], inflight: 0, incoming: new Map(), held: 0 };
+  ws.parts = { queue: [], sizes: [], inflight: 0, win: WINDOW, minRtt: Infinity, cut: 0, incoming: new Map(), held: 0 };
 }
 
 /**
