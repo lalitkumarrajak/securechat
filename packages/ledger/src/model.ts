@@ -267,7 +267,7 @@ export async function payBill(b: CardBill, date: string, amount: number, from?: 
   await save({ ...(old ?? newEntry('transfer', from)), kind: 'transfer', account: from, to: b.card, amount, date, desc: old?.desc ?? '', ref: `bill:${b.id}` });
 }
 export async function unpayBill(b: CardBill) {
-  const { paid: _p, paidAmount: _a, ...rest } = b;
+  const { paid: _p, paidAmount: _a, carried: _c, ...rest } = b;
   await save(rest as CardBill);
   const old = billPayment(b);
   if (old) await remove(old);
@@ -319,7 +319,7 @@ export function settledBills(bills: CardBill[], statements: Pick<CardStatement, 
     const mine = byMonth.find((st) => st.month === b.month);
     const after = mine?.date ?? `${b.month}-01`;
     const pay = next.txns.filter((t) => t.a < 0 && t.c === 'payment' && t.d > after).sort((p, q) => p.d.localeCompare(q.d))[0];
-    out.push({ ...b, paid: pay?.d ?? b.due, paidAmount: b.amount });
+    out.push({ ...b, paid: pay?.d ?? b.due, paidAmount: b.amount, carried: next.month });
   }
   return out;
 }
@@ -327,6 +327,24 @@ export function settledBills(bills: CardBill[], statements: Pick<CardStatement, 
 /** Whether a later statement than `month` is already in for this card (an older one changes none of the card's settings). */
 export const newerStatement = (card: string, month: string, s: LedgerState = useLedger.getState()) =>
   live(Object.values(s.statements)).some((x) => x.card === card && x.month > month);
+
+/**
+ * Delete an imported statement (to import it again, or because it was the wrong one): its purchases
+ * leave the charts and its bill goes too, unless you marked that bill paid yourself. Bills only it had
+ * settled are unpaid again, unless another later statement still carries them forward.
+ */
+export async function deleteStatement(st: CardStatement) {
+  const s = useLedger.getState();
+  await remove(st);
+  const bill = s.bills[billId(st.card, st.month)];
+  if (bill && !bill.deleted && (!bill.paid || bill.carried)) await remove(bill);
+  const after = useLedger.getState();
+  const reopened = live(Object.values(after.bills)).filter((b) => b.card === st.card && b.carried === st.month)
+    .map((b) => { const { paid: _p, paidAmount: _a, carried: _c, ...rest } = b; return rest as CardBill; });
+  const left = live(Object.values(after.statements)).filter((x) => x.card === st.card);
+  const settled = new Map(settledBills(reopened, left).map((b) => [b.id, b]));
+  for (const b of reopened) await save(settled.get(b.id) ?? b);
+}
 
 export async function saveStatement(x: StatementInput) {
   const month = x.date.slice(0, 7);

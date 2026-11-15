@@ -136,7 +136,7 @@ describe('statements of other months', () => {
       [bill('2026-10', 6000, '2026-11-03'), bill('2026-11', 8447826, '2026-12-03')],
       [st('2026-10', '2026-10-13'), st('2026-11', '2026-11-13', [{ d: '2026-10-31', t: 'MB PAYMENT', a: -6000, c: 'payment' }, { d: '2026-11-08', t: 'Cashback', a: -13200, c: 'cashback' }])],
     );
-    expect(out.map((b) => [b.month, b.paid, b.paidAmount])).toEqual([['2026-10', '2026-10-31', 6000]]);
+    expect(out.map((b) => [b.month, b.paid, b.paidAmount, b.carried])).toEqual([['2026-10', '2026-10-31', 6000, '2026-11']]);
   });
   it('without a payment in the next statement, it is settled on its due date; the newest bill stays to pay', () => {
     const out = settledBills([bill('2026-09', 5000, '2026-10-03'), bill('2026-10', 7000, '2026-11-03')], [st('2026-10', '2026-10-13')]);

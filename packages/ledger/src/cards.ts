@@ -43,6 +43,7 @@ export interface CardBill {
   due: string;                 // YYYY-MM-DD
   paid?: string;               // YYYY-MM-DD it was paid
   paidAmount?: number;
+  carried?: string;            // settled because the statement of this month (YYYY-MM) carries it forward
   split?: boolean;             // already sent to Split as an expense
   none?: boolean;              // no bill this month (nothing spent, or a credit balance): nothing to pay or remind
   created: number; edited: number;

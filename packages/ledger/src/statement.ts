@@ -289,6 +289,15 @@ export function parseStatement(lines: Line[]): Parsed {
     return out;
   }
   out.txns = findTxns(lines, ref);
+  // A purchase belongs to the statement it's on: a line dated outside the statement's period (the
+  // original date of a purchase now paid in EMIs, a reference read as a date, "02 Jan" read in the
+  // wrong year) isn't this month's spending, and is left out. A few days' leeway for late postings.
+  const end = out.dateGuessed ? out.dueDate : out.statementDate;
+  if (end) {
+    const lo = out.from ? shiftDay(out.from, -5) : shiftDay(out.statementDate ?? end, -45);
+    const hi = shiftDay(end, 3);
+    out.txns = out.txns.filter((x) => x.date >= lo && x.date <= hi);
+  }
   if (out.dateGuessed && out.dueDate) {
     // The statement is made after its last purchase (and before the due date).
     const last = out.txns.reduce((m, x) => (x.date > m ? x.date : m), '');

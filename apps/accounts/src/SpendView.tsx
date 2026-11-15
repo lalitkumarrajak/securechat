@@ -3,13 +3,14 @@
 // purchase (change what it was for, and the charts follow). Cashback, from statements and added by hand,
 // is counted on its own: what came back, and as a share of what was spent.
 import { useMemo, useState } from 'react';
-import { FileUp, ListFilter, Search, X } from 'lucide-react';
+import { FileText, FileUp, ListFilter, Search, Trash2, X } from 'lucide-react';
 import { Button } from '@sanga/ui/button';
 import { Dialog } from '@sanga/ui/dialog';
 import { Input, Label } from '@sanga/ui/input';
 import { cn } from '@sanga/ui/utils';
 import { locale, t, tn } from '@sanga/i18n';
-import { addDays, cashbackList, creditCards, money, save, useLedger, type CardStatement } from '@sanga/ledger';
+import { addDays, cashbackList, creditCards, deleteStatement, money, save, useLedger, type CardStatement } from '@sanga/ledger';
+import { sdk } from '@sanga/sdk';
 import { CATS, CREDIT_CATS, savedCat, SPEND_CATS, type Cat } from '@sanga/ledger/statement';
 import { Columns, Ranking, type Bar } from './charts';
 import { monthTitle, SELECT, shortDay } from './util';
@@ -47,7 +48,10 @@ export function SpendView({ focus, onImport }: { focus?: string | null; onImport
     if (m === 'all' || !inScope.length) return null;
     const to = inScope.reduce((x, s) => (s.date > x ? s.date : x), inScope[0].date);
     const from = inScope.reduce((x, s) => { const f = s.from ?? addDays(s.date, -30); return f < x ? f : x; }, to);
-    return { from: allLines.reduce((x, l) => (l.d < x ? l.d : x), from), to };
+    // A purchase posted a few days before the period is shown too; a stray line from months before isn't
+    // allowed to stretch the chart over them.
+    const first = allLines.reduce((x, l) => (l.d < x ? l.d : x), from);
+    return { from: first < addDays(from, -7) ? from : first, to };
   }, [inScope, allLines, m]);
   const lines = useMemo(() => allLines.filter((l) => inRange(l.d)), [allLines, range]); // eslint-disable-line react-hooks/exhaustive-deps
   const [filtering, setFiltering] = useState(false);
@@ -207,6 +211,33 @@ export function SpendView({ focus, onImport }: { focus?: string | null; onImport
           {!shown.length && <li className="p-4 text-center text-sm text-muted">{t('Nothing here.')}</li>}
         </ul>
       </section>
+
+      {m !== 'all' && inScope.length > 0 && (
+        <section aria-label={t('Statements')} className="rounded-3xl border border-line/70 bg-panel shadow-sm">
+          <h3 className="border-b border-line p-3 font-semibold">{t('Statements')}</h3>
+          <ul className="divide-y divide-line">
+            {inScope.map((st) => {
+              const c = cards.find((x) => x.id === st.card);
+              const name = `${c?.name ?? ''} · ${monthTitle(st.month)}`;
+              return (
+                <li key={st.id} className="flex items-center gap-3 px-3 py-2.5">
+                  <FileText className="size-5 shrink-0 text-muted" aria-hidden />
+                  <span className="min-w-0 flex-1 text-sm">
+                    <span className="block break-words font-medium">{name}</span>
+                    <span className="block text-xs text-muted">{t('{n} lines · statement of {date}', { n: st.txns.length, date: shortDay(st.date) })}</span>
+                  </span>
+                  <Button variant="outline" size="sm" className="text-danger" aria-label={t('Delete the statement {name}', { name })} onClick={async () => {
+                    if (await sdk().confirm({ title: t('Delete this statement?'), description: t('{name}: its purchases and its bill go. You can import it again.', { name }), confirmText: t('Delete'), destructive: true })) {
+                      await deleteStatement(st);
+                      setMonth('latest'); setDay(null); setRange(null);
+                    }
+                  }}><Trash2 className="size-4" />{t('Delete')}</Button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }

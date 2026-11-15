@@ -105,6 +105,30 @@ describe('a statement that prints only its month, with a Debit/Credit column (Ax
   });
 });
 
+describe('lines dated outside the statement', () => {
+  const head = [
+    L([40, 'HDFC Bank Credit Card Statement']),
+    L([40, 'Statement Date: 14 Nov 2026'], [300, 'Payment Due Date: 04 Dec 2026']),
+    L([40, 'Total Amount Due: ₹12,000.00']),
+  ];
+  it('a line from another month (an EMI’s first purchase date, a date read in the wrong year) is left out', () => {
+    const p = parseStatement([...head,
+      L([40, '20 Oct'], [120, 'ZOMATO ONLINE ORDER'], [450, '610.00']),
+      L([40, '02 Jan'], [120, 'EMI PRINCIPAL LIMELIGHT 1/6'], [450, '58,000.00']),
+      L([40, '10 Nov 2026'], [120, 'BIGBASKET'], [450, '1,200.00']),
+      L([40, '02/01/2025'], [120, 'OLD REFERENCE'], [450, '9,999.00']),
+    ]);
+    expect(p.txns.map((x) => [x.date, x.amount])).toEqual([['2026-10-20', 61000], ['2026-11-10', 120000]]);
+  });
+  it('a statement period keeps what’s inside it, with a few days for late postings', () => {
+    const p = parseStatement([...head, L([40, 'Statement period: 15 Oct 2026 to 14 Nov 2026']),
+      L([40, '12 Oct 2026'], [120, 'POSTED LATE'], [450, '100.00']),
+      L([40, '01 Oct 2026'], [120, 'LAST MONTH'], [450, '200.00']),
+    ]);
+    expect(p.txns.map((x) => x.desc)).toEqual(['POSTED LATE']);
+  });
+});
+
 describe('SMS from the bank', () => {
   it('a statement SMS', () => {
     const p = parseStatement(textLines('Your SBI Card ending 4455 statement is generated. Total Amt Due: Rs.12,345.67, Min Amt Due: Rs.620.00, Payment Due Date: 05-Apr-25.'));

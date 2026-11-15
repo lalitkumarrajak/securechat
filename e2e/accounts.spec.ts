@@ -355,6 +355,27 @@ test('removing the card you have open goes back to the list, not a blank page', 
   await expect(balanceOf('Millennia')).toBeVisible();
 });
 
+test('delete a statement and import it again: the bill it carried forward is owed again, then settled again', async () => {
+  await acc().getByRole('tab', { name: 'Spending' }).click();
+  await acc().getByRole('combobox', { name: 'Card' }).selectOption({ label: 'Millennia' });
+  await acc().getByRole('combobox', { name: 'Statement' }).selectOption({ label: 'Oct 2026' });
+  const list = acc().getByRole('region', { name: 'Statements' });
+  await list.getByRole('button', { name: /Delete the statement Millennia · October 2026/ }).click();
+  await P.page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
+  await expect(acc().getByRole('combobox', { name: 'Statement' }).locator('option', { hasText: 'Oct 2026' })).toHaveCount(0);
+  await acc().getByRole('tab', { name: 'Bills' }).click();
+  const bills = acc().getByRole('region', { name: 'Bills' });
+  await expect(bills.getByRole('button', { name: /Millennia · September 2026/ })).not.toContainText(/paid/);
+  // Imported again: back as it was.
+  await acc().getByRole('button', { name: /Import a statement/ }).click();
+  await P.page.getByRole('dialog', { name: 'Import a statement' }).locator('input[type=file]').setInputFiles(fixture('statement-2.pdf'));
+  const r = P.page.getByRole('dialog', { name: 'Check the statement' });
+  await expect(r.getByLabel('Statement date')).toHaveValue('2026-10-14', { timeout: 15_000 });
+  await r.getByRole('button', { name: 'Save statement' }).click();
+  await acc().getByRole('tab', { name: 'Bills' }).click();
+  await expect(bills.getByRole('button', { name: /Millennia · September 2026/ })).toContainText(/paid Oct 4/);
+});
+
 test('the Calendar has no Cards tab; it shows card bills and opens Accounts', async () => {
   await tab(P, 'Calendar').click();
   const cal = P.page.getByRole('region', { name: 'Calendar' });
