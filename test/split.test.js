@@ -44,6 +44,22 @@ describe('split', () => {
     assert.deepEqual(got.items.map((i) => [i.id, i.body === '']), [['exp_00000002', false], ['exp_00000001', true]]);
   });
 
+  test('the history is only added to: a line is never changed or deleted, by anyone', async () => {
+    const line = C.b64(crypto.getRandomValues(new Uint8Array(40)));
+    const id = 'log-AbCdEf012345';
+    const put = (who, body, rid = id) => srv.api(`/api/split/records?gid=${gid}`, { id: rid, body }, who.token);
+    const first = await put(a, line);
+    assert.equal(first.status, 200);
+    // Sent again (a lost reply), or rewritten or emptied by anyone: answered, and left as it was.
+    assert.equal((await put(a, C.b64(crypto.getRandomValues(new Uint8Array(40))))).data.updated, first.data.updated);
+    assert.equal((await put(b, C.b64(crypto.getRandomValues(new Uint8Array(40))))).status, 200);
+    assert.equal((await put(b, '')).status, 400, 'a line can’t be deleted');
+    assert.equal((await put(a, line, 'log-short')).status, 400, 'only the history’s own shape of id');
+    const got = (await srv.api(`/api/split/records?gid=${gid}&since=0`, undefined, b.token)).data.items.find((i) => i.id === id);
+    assert.equal(got.body, line);
+    assert.equal(got.updated, first.data.updated);
+  });
+
   test('bills: members only, one at a time', async () => {
     const body = C.b64(crypto.getRandomValues(new Uint8Array(5000)));
     assert.equal((await srv.api(`/api/split/bill?gid=${gid}`, { id: 'bill_0001', body }, c.token)).status, 404);

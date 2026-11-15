@@ -11,7 +11,8 @@ import { CategoryChip } from './CategoryChip';
 import { PersonDot } from './PersonDot';
 
 /** An expense in full: who owes what, the bill, and edit / delete. */
-export function ExpenseDetail({ g, expense, onClose, onEdit }: { g: GroupData; expense: Expense | null; onClose: () => void; onEdit: (e: Expense) => void }) {
+/** An expense in full. Opened from the activity (`readOnly`), it's only shown: the history is never changed from there. */
+export function ExpenseDetail({ g, expense, onClose, onEdit, readOnly }: { g: GroupData; expense: Expense | null; onClose: () => void; onEdit: (e: Expense) => void; readOnly?: boolean }) {
   const name = useNames();
   const { meta, person, catOf } = useLedger(g);
   const currency = meta?.currency ?? 'INR';
@@ -58,10 +59,10 @@ export function ExpenseDetail({ g, expense, onClose, onEdit }: { g: GroupData; e
           </p>
           {e.notes && <p className="rounded-xl bg-panel-2 p-3 text-sm whitespace-pre-wrap">{e.notes}</p>}
           {e.bill && <div><h3 className="mb-1.5 text-sm font-semibold">{t('Bill')}</h3><BillView gid={g.gid} id={e.bill} /></div>}
-          <div className="flex gap-2">
+          {!readOnly && <div className="flex gap-2">
             <Button variant="secondary" className="flex-1" onClick={() => { onClose(); onEdit(e); }}><Pencil className="size-4" />{t('Edit')}</Button>
             <Button variant="outline" className="flex-1 text-danger" onClick={() => void remove()}><Trash2 className="size-4" />{t('Delete')}</Button>
-          </div>
+          </div>}
         </div>
       )}
     </Dialog>

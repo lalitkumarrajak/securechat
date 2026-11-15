@@ -35,6 +35,7 @@ export function GroupView({ gid, start, onBack, onGone }: { gid: string; start?:
   const [tab, setTab] = useState('expenses');
   const [editing, setEditing] = useState<Expense | null>(start ?? null);
   const [viewing, setViewing] = useState<Expense | null>(null);
+  const [fromActivity, setFromActivity] = useState(false); // opened from the activity: shown, not changed
   const [settings, setSettings] = useState(false);
   const [adding, setAdding] = useState(false);
   const unread = useUnread(gid);
@@ -79,7 +80,7 @@ export function GroupView({ gid, start, onBack, onGone }: { gid: string; start?:
           <TabsContent value="balances"><BalancesTab g={g} /></TabsContent>
           <TabsContent value="insights"><InsightsTab scope={{ kind: 'group', gid }} /></TabsContent>
           <TabsContent value="people"><PeopleTab g={g} /></TabsContent>
-          <TabsContent value="activity"><ActivityTab g={g} onOpenExpense={(id) => setViewing(g.expenses[id] ?? null)} /></TabsContent>
+          <TabsContent value="activity"><ActivityTab g={g} onOpenExpense={(id) => { setFromActivity(true); setViewing(g.expenses[id] ?? null); }} /></TabsContent>
         </div>
       </Tabs>
 
@@ -89,7 +90,7 @@ export function GroupView({ gid, start, onBack, onGone }: { gid: string; start?:
       </button>
 
       <ExpenseEditor g={g} expense={editing} onClose={() => setEditing(null)} />
-      <ExpenseDetail g={g} expense={viewing} onClose={() => setViewing(null)} onEdit={setEditing} />
+      <ExpenseDetail g={g} expense={viewing} onClose={() => { setViewing(null); setFromActivity(false); }} onEdit={setEditing} readOnly={fromActivity} />
       <GroupSettings g={g} open={settings} onClose={() => setSettings(false)} onLeft={onGone} />
       <AddPeopleDialog g={g} open={adding} onClose={() => setAdding(false)} />
     </div>

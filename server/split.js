@@ -12,6 +12,7 @@ import { sendTo } from './hub.js';
 
 const GID_RE = /^[A-Za-z0-9_-]{12,40}$/;
 const ID_RE = /^[A-Za-z0-9_-]{4,40}$/;
+const LOG_RE = /^log-[A-Za-z0-9_-]{12}$/; // a line of the group's history
 const MAX_RECORD = 60_000;
 const MAX_BILL = 2_500_000;          // one sealed bill photo (base64 text)
 const MAX_RECORDS = 20_000;          // per group
@@ -102,6 +103,13 @@ export const routes = {
     const { id, body } = await readJson(req, MAX_RECORD + 1000);
     if (typeof id !== 'string' || !ID_RE.test(id)) return sendJson(res, 400, { error: 'Invalid record' });
     if (typeof body !== 'string' || body.length > MAX_RECORD || (body && !B64_RE.test(body))) return sendJson(res, 400, { error: 'That is too long' });
+    // The group's history ("log-" ids) is only added to: written once, never changed or deleted, by anyone.
+    if (id.startsWith('log-')) {
+      if (!LOG_RE.test(id) || !body) return sendJson(res, 400, { error: 'The history can’t be changed' });
+      // Already there (sent again after a lost reply, or someone trying to rewrite it): kept as it was.
+      const had = await ctx.db.get('getSplitRecord', gid, id);
+      if (had) return sendJson(res, 200, { updated: Number(had.updated) });
+    }
     const stats = await ctx.db.get('splitStats', gid);
     if (stats.n >= MAX_RECORDS && !(await ctx.db.get('getSplitRecord', gid, id))) return sendJson(res, 400, { error: 'This group has reached its limit' });
     if (body && Number(stats.bytes) + body.length > MAX_BYTES) return sendJson(res, 400, { error: 'This group is out of space' });

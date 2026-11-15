@@ -104,6 +104,12 @@ function put(g: GroupData, r: Local<Record_> & { gid?: string }) {
   else if (r.type === 'activity') g.activity[r.id] = r;
 }
 
+/** The group's history can only be added to: an activity line is written once and never changed or
+ *  deleted, by anyone. Its id says so ("log-" and 12 characters, a shape no other record's id has), so
+ *  the server refuses to overwrite or empty it, and this device ignores any change to one it has. */
+const activityId = () => 'log-' + C.randomId(9);
+export const isActivityId = (id: string) => /^log-[A-Za-z0-9_-]{12}$/.test(id);
+
 const keep = (gid: string, r: Local<Record_>) => {
   patch(gid, (g) => { const n = { ...g, expenses: { ...g.expenses }, settles: { ...g.settles }, activity: { ...g.activity } }; put(n, r); return n; });
   return sdk().store.put(REC(gid, r.id), { ...r, gid });
@@ -130,7 +136,7 @@ export function save(gid: string, r: Record_) {
   // Who first added an expense, and when, stays through edits; `by` is whoever made this latest change.
   const rec = r.type === 'expense' ? { ...r, addedBy: (prev as Expense | undefined)?.addedBy ?? r.addedBy ?? me(), added: (prev as Expense | undefined)?.added ?? r.added ?? now } : r;
   // The history first: it is written whenever the change is, here and then up to the others.
-  for (const a of activityFor(prev, rec, me(), now)) void keep(gid, { ...a, id: 'a' + C.randomId(8), dirty: true });
+  for (const a of activityFor(prev, rec, me(), now)) void keep(gid, { ...a, id: activityId(), dirty: true });
   void keep(gid, { ...rec, by: me(), edited: now, dirty: true } as Local<Record_>).then(soon);
 }
 /** An expense or payment deleted (here, on another device, or by anyone in the group): what it took out
@@ -206,7 +212,7 @@ export async function linkPerson(gid: string, pid: string, u: string, friendName
     ? meta.people.filter((p) => p.id !== pid).map((p) => (p === existing ? { ...p, gone: undefined } : p))
     : meta.people.map((p) => (p === guest ? { id: u, name: friendName, u } : p));
   await keep(gid, { ...meta, people: people as Person[], by: me(), edited: now, dirty: true } as Local<Record_>);
-  await keep(gid, { type: 'activity', id: 'a' + C.randomId(8), kind: 'person_link', by: me(), ts: now, who: target, name: guest.name, dirty: true });
+  await keep(gid, { type: 'activity', id: activityId(), kind: 'person_link', by: me(), ts: now, who: target, name: guest.name, dirty: true });
   soon();
 }
 
@@ -343,10 +349,12 @@ async function receive(gid: string, k: CryptoKey, row: { id: string; body: strin
   const g = get().groups[gid];
   const local = row.id === 'meta' ? g?.meta : g?.expenses[row.id] ?? g?.settles[row.id] ?? g?.activity[row.id];
   if (local?.dirty) return null;                          // this device's newer change goes up next
+  if (g?.activity[row.id]) return null;                   // history is never changed or deleted
   if (local?.srv && local.srv >= row.updated) return null; // already have it
   if (!row.body) return local ? { drop: local } : null;
   try {
     const r = valid(await C.decryptItem(k, row.body, gid, 'split', row.id), row.id);
+    if (r && local && local.type !== r.type) return null;   // a record can't turn into another kind
     return r ? { keep: { ...r, srv: row.updated } } : null;
   } catch { return null; } // not sealed with this group's key, or damaged: ignore it
 }
@@ -385,6 +393,7 @@ const isMoneyMap = (x: unknown): x is Record<string, number> =>
 
 function valid(x: any, id: string): Record_ | null {
   if (!x || typeof x !== 'object' || x.id !== id) return null;
+  if (id.startsWith('log-') && !(isActivityId(id) && x.type === 'activity')) return null; // history's ids are for history only
   if (x.type === 'meta' && id === 'meta') {
     if (!isStr(x.name, 80) || !isStr(x.emoji, 16) || !isStr(x.currency, 8) || !Array.isArray(x.people) || x.people.length > 100) return null;
     const people = x.people.filter((p: any) => p && isStr(p.id, 40) && isStr(p.name, 60)).map((p: any) => ({ id: p.id, name: p.name, ...(isStr(p.u, 40) && { u: p.u }), ...(p.gone && { gone: true as const }) }));

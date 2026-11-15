@@ -96,6 +96,13 @@ test('expenses sync both ways, with a bill, and balances agree', async () => {
   await expect(feedB.getByText(`${A.u} added Beach dinner`)).toBeVisible();
   await expect(feedB.getByText('You added Auto to station')).toBeVisible();
   await B.page.screenshot({ path: shots('83-split-activity') });
+  // The history is never changed: an expense opened from it is only shown, with no Edit or Delete.
+  await feedB.getByText('You added Auto to station').click();
+  const shown = B.page.getByRole('dialog', { name: 'Auto to station' });
+  await expect(shown).toBeVisible();
+  await expect(shown.getByRole('button', { name: 'Edit' })).toHaveCount(0);
+  await expect(shown.getByRole('button', { name: 'Delete' })).toHaveCount(0);
+  await B.page.keyboard.press('Escape');
   // Edit: the feed says what changed, and the expense still says who first added it.
   await split(A).getByRole('tab', { name: 'Expenses' }).click();
   await split(A).getByRole('button', { name: /Auto to station/ }).click();
