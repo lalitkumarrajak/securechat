@@ -13,7 +13,7 @@ import crypto from 'node:crypto';
 import { config, USER_RE } from './config.js';
 import { ctx } from './context.js';
 import { rateLimited } from './http.js';
-import { awayFor, isActive, send, sendTo } from './hub.js';
+import { awayFor, hooks, isActive, send, sendTo } from './hub.js';
 import { canChat } from './friends.js';
 import { shareGroup } from './groups.js';
 import { getProfile, profileHooks } from './profiles.js';
@@ -25,7 +25,7 @@ const games = new Map();  // id -> game
 const timers = new Map(); // id -> timeout
 const MAX_OPEN = 5;       // unfinished games per person
 const CHAT_KEEP = 50;
-export const TEASES = ['tomato', 'egg', 'pie', 'slipper', 'bonk', 'splash', 'bomb', 'snow', 'fire', 'mosquito', 'alarm', 'chicken', 'clown', 'turtle', 'baby', 'lol', 'rose', 'cake', 'clap', 'crown']; // what can be thrown
+export const TEASES = ['tomato', 'egg', 'pie', 'slipper', 'bonk', 'splash', 'bomb', 'snow', 'fire', 'mosquito', 'alarm', 'chilli', 'lemon', 'coconut', 'balloon', 'cracker', 'socks', 'poop', 'roach', 'ghost', 'snake', 'chicken', 'clown', 'turtle', 'baby', 'lol', 'monkey', 'duck', 'popcorn', 'drum', 'cool', 'party', 'rose', 'cake', 'clap', 'crown']; // what can be thrown
 const KEEP_OVER_MS = 10 * 60e3;
 const rand = (n) => (n === 6 && config.gameTestDice.length ? config.gameTestDice.shift() - 1 : crypto.randomInt(n));
 const ID_RE = /^[A-Za-z0-9_-]{12}$/;
@@ -69,6 +69,19 @@ function schedule(g) {
   timers.set(g.id, t);
 }
 
+/** Back after a dropped connection, or the app opened again, with their turn running: a moment to see the board and play. */
+async function giveTime(u) {
+  const now = Date.now();
+  for (const g of mine(u)) {
+    if (g.status === 'play' && g.players[g.turn]?.u === u && g.deadline < now + BACK_MS) {
+      g.deadline = now + BACK_MS;
+      g.ev = [];
+      await commit(g);
+    }
+  }
+}
+hooks.back = giveTime;
+
 // Someone who reconnects during their turn has at least this long.
 const BACK_MS = 15_000;
 
@@ -95,8 +108,7 @@ function cancel(g, why) {
   return commit(g);
 }
 
-// The player whose turn it is ran out of time: the server plays for them, and removes them
-// after MISSES_OUT turns in a row. A turn counts once, however many bonus rolls it has; once
+// The player whose turn it is ran out of time: the server plays for them, and they lose a life. A turn counts once, however many bonus rolls it has; once
 // someone has timed out, the rest of that turn is played for them after a short pause.
 function timeout(g) {
   if (g.status !== 'play') return;
@@ -111,11 +123,12 @@ function timeout(g) {
   g.ev = [{ k: 'timeout', s: i }];
   const turnNo = g.turnNo || 0; // turns so far (unset before the first change of turn)
   if (g.missTurn !== turnNo) { pl.missed++; g.missTurn = turnNo; }
-  // Only someone who has really gone is removed: the app in the background, or no connection for a
-  // while. A weak signal (dropping out, or too slow to make the turn) just has their turns played.
+  // The life comes off the player whose turn ran out. Only someone who has really gone is removed after
+  // their last one: the app in the background, or no connection for a while. A weak signal (dropping
+  // out, or too slow to make the turn) keeps them in on their last life, their turns played for them.
   const gone = !isActive(pl.u) && (awayFor(pl.u) === 0 || awayFor(pl.u) >= config.gameGoneMs);
   if (pl.missed >= core.MISSES_OUT && gone) core.remove(g, def(g), i, 'out');
-  else if (pl.missed >= core.MISSES_OUT) { pl.missed = core.MISSES_OUT - 1; def(g).auto(g, rand); } // still here: one chance left
+  else if (pl.missed >= core.MISSES_OUT) { pl.missed = core.MISSES_OUT - 1; def(g).auto(g, rand); }
   else def(g).auto(g, rand);
   if (g.status === 'play' && g.turn === i) g.deadline = Date.now() + config.gameAnimMs + 500; // their bonus roll
   else turnDeadline(g);
@@ -294,15 +307,7 @@ export const handlers = {
   },
 
   async glist(ws) {
-    // Back after a dropped connection with their turn running: a moment to see the board and play.
-    const now = Date.now();
-    for (const g of mine(ws.user)) {
-      if (g.status === 'play' && g.players[g.turn]?.u === ws.user && g.deadline < now + BACK_MS) {
-        g.deadline = now + BACK_MS;
-        g.ev = [];
-        await commit(g);
-      }
-    }
+    await giveTime(ws.user);
     send(ws, { t: 'gl', games: mine(ws.user).map((g) => ({ ...pub(g, ws.user), chat: g.chat })) });
   },
 

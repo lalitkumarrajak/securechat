@@ -186,6 +186,7 @@ export const handlers = {
   async act(ws, m) {
     ws.active = !!m.on;
     await refreshPresence(ws.user);
+    if (ws.active) await hooks.back?.(ws.user); // a game whose turn is theirs gives them time to play
   },
 
   async p(ws) { send(ws, { t: 'P' }); },

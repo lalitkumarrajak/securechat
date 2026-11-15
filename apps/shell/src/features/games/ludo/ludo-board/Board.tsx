@@ -14,7 +14,7 @@ export function Board({ L, g, shown, home, movable, meIdx, onMove }: {
   const pad = 0.35;
   const vb = `${L.box.x - pad} ${L.box.y - pad} ${L.box.w + pad * 2} ${L.box.h + pad * 2}`;
   const used = new Set(g.s.arm);
-  const fillOf = (a: number) => (used.has(a) ? `url(#fill-${a})` : '#eef1f6'); // nobody's colour: plain
+  const fillOf = (a: number) => `url(#fill-${a})`; // a colour nobody plays keeps its colour, it just has no tokens
 
   // Tokens grouped by spot, so several on one square sit side by side, smaller.
   const tokens: { i: number; t: number; at: Pt; key: string }[] = [];
@@ -77,17 +77,14 @@ export function Board({ L, g, shown, home, movable, meIdx, onMove }: {
         const y = L.yard(a);
         const h = y.size / 2;
         const c = fillOf(a);
-        if (!used.has(a)) { // nobody plays this colour: the corner is left empty
-          return y.round ? <circle key={'y' + a} cx={y.c.x} cy={y.c.y} r={h} fill="#fdfcf8" data-free="" />
-            : <rect key={'y' + a} x={y.c.x - h} y={y.c.y - h} width={y.size} height={y.size} fill="#fdfcf8" data-free="" />;
-        }
+        const free = !used.has(a); // nobody plays this colour: its yard is there, empty
         return (
-          <g key={'y' + a}>
+          <g key={'y' + a} {...(free && { 'data-free': '' })}>
             {y.round ? <circle cx={y.c.x} cy={y.c.y} r={h} fill={c} stroke={DARK[a]} strokeWidth="0.06" />
               : <rect x={y.c.x - h} y={y.c.y - h} width={y.size} height={y.size} rx="0.2" fill={c} />}
             {y.round ? <circle cx={y.c.x} cy={y.c.y} r={h * 0.72} fill="#fff" filter="url(#inset)" />
               : <rect x={y.c.x - h * 0.66} y={y.c.y - h * 0.66} width={h * 1.32} height={h * 1.32} rx="0.45" fill="#fff" filter="url(#inset)" />}
-            {y.spots.map((s, k) => (
+            {!free && y.spots.map((s, k) => (
               <g key={k}>
                 <circle cx={s.x} cy={s.y} r="0.42" fill={c} />
                 <circle cx={s.x} cy={s.y} r="0.42" fill="none" stroke="#000" strokeOpacity="0.15" strokeWidth="0.05" />
@@ -99,18 +96,12 @@ export function Board({ L, g, shown, home, movable, meIdx, onMove }: {
 
       {/* track */}
       {L.track.map((c, sq) => <polygon key={'t' + sq} points={poly(c.poly)} fill="url(#cell)" stroke="#9aa3b2" strokeWidth="0.035" />)}
-      {Array.from({ length: L.n }, (_, a) => used.has(a) ? (
+      {Array.from({ length: L.n }, (_, a) => (
         <g key={'a' + a}>
           {L.homeCol(a).map((c, k) => <polygon key={k} points={poly(c.poly)} fill={fillOf(a)} stroke="#9aa3b2" strokeWidth="0.035" />)}
           <polygon points={poly(L.startCell(a).poly)} fill={fillOf(a)} stroke="#9aa3b2" strokeWidth="0.035" />
           <Arrow at={L.startCell(a)} ang={L.armAng(a) + Math.PI} color="#fff" />
           <Arrow at={L.entryCell(a)} ang={L.armAng(a) + Math.PI} color={COLORS[a]} />
-          <Star at={L.starCell(a)} />
-        </g>
-      ) : ( // nobody's colour: plain squares; its start square is still safe, so it gets a star
-        <g key={'a' + a}>
-          {L.homeCol(a).map((c, k) => <polygon key={k} points={poly(c.poly)} fill="url(#cell)" stroke="#9aa3b2" strokeWidth="0.035" />)}
-          <Star at={L.startCell(a)} />
           <Star at={L.starCell(a)} />
         </g>
       ))}

@@ -13,7 +13,7 @@ export const watchers = new Map(); // username -> Set<ws> subscribed to their pr
 const shownOnline = new Set();     // users whose last broadcast state was "online"
 
 // Set by index.js to avoid import cycles: (user, viewer) -> presence frame or null.
-export const hooks = { presenceFor: null };
+export const hooks = { presenceFor: null, back: null }; // back(user): they're looking again (games.js)
 
 // Big frames (a photo, a page of history) go in pieces to clients that read them (parts.js).
 export const send = (ws, obj) => { if (ws.readyState === 1) sendText(ws, JSON.stringify(obj)); };

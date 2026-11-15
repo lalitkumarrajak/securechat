@@ -79,7 +79,6 @@ describe('games', () => {
     for (const w of [A, B]) w.sendJson({ t: 'act', on: true });
     const out = over.players.find((p) => p.state === 'out');
     assert.equal(out.missed, 5);
-    assert.ok(over.players.some((p) => p.state === 'out'));
     assert.ok(over.players.some((p) => p.rank === 1));
   });
 
@@ -114,7 +113,7 @@ describe('games', () => {
       Y.close(); // Y's signal drops; X is there but too slow to ever make a turn
       const late = await frame(X, (v) => v.id === gid && v.turnNo >= 14, 15_000);
       assert.equal(late.status, 'play');
-      assert.ok(late.players.every((p) => p.state === 'playing' && p.missed <= 4), JSON.stringify(late.players));
+      assert.ok(late.players.every((p) => p.state === 'playing'), JSON.stringify(late.players));
       // Y is back: on their turn they get time to look and play, not a clock about to run out
       Y = await connect(s2, y.token);
       let back;
@@ -126,6 +125,32 @@ describe('games', () => {
       }
       assert.ok(back, 'a fresh moment on their turn after reconnecting');
       X.close(); Y.close();
+    } finally { await s2.stop(); }
+  });
+
+  it('someone goes offline: the lives come off them, never off the one still playing', async () => {
+    const s2 = await startServer({ GAME_TURN_MS: '1500', GAME_ANIM_MS: '0', GAME_GONE_MS: '0' });
+    try {
+      const us = await Promise.all(['ox', 'oy', 'oz'].map((v) => register(s2, name(v))));
+      for (const u of us.slice(1)) await befriend(s2, us[0], u);
+      const W = await Promise.all(us.map((u) => connect(s2, u.token)));
+      W[0].sendJson({ t: 'gnew', type: 'ludo', to: [us[1].u, us[2].u], ref: 'o' });
+      const gid = (await W[0].next('g', (m) => m.ref === 'o')).g.id;
+      for (const w of W.slice(1)) w.sendJson({ t: 'gjoin', id: gid });
+      W[2].close(); // the last seat's signal drops for good; the two before it play every turn
+      let g, worst = [0, 0];
+      const until = Date.now() + 60_000;
+      while (Date.now() < until) {
+        g = await frame(W[0], (v) => v.id === gid && v.status !== 'lobby', 5000);
+        worst = worst.map((m, k) => Math.max(m, g.players[k].missed));
+        if (g.status !== 'play' || g.players[2].state !== 'playing') break;
+        if (g.turn < 2) W[g.turn].sendJson({ t: 'gact', id: gid, a: g.s.phase === 'roll' ? { a: 'roll' } : { a: 'move', t: g.s.moves[0] } });
+      }
+      assert.equal(g.players[2].state, 'out');
+      assert.equal(g.players[2].missed, 5);
+      assert.deepEqual(worst, [0, 0], 'the players still there never lost a life');
+      assert.deepEqual(g.players.slice(0, 2).map((p) => p.state), ['playing', 'playing']);
+      for (const w of W.slice(0, 2)) w.close();
     } finally { await s2.stop(); }
   });
 

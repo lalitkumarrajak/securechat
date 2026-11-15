@@ -20,7 +20,7 @@ export function TurnRing({ active, deadline, color, children, total = TURN_TOTAL
   const low = frac < 0.25;
   const secs = Math.min(TURN_SECS, Math.max(0, Math.ceil((deadline - now) / 1000)));
   return (
-    <div className="relative rounded-[14px] p-[3px]" data-turn={active || undefined}
+    <div className="relative rounded-[14px] p-[3px]" data-turn={active || undefined} data-photo /* teases land here */
       style={active ? { background: `conic-gradient(${low ? '#ef4444' : color} ${frac * 360}deg, rgba(255,255,255,0.15) 0)` } : undefined}>
       {children}
       {active && (

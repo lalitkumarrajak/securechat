@@ -218,3 +218,60 @@ test('More → Games keeps the tabs on screen while it downloads, Back returns t
     await expect(more.getByRole('button', { name: /^Games/ })).toBeVisible();
   } finally { await P.ctx.close(); }
 });
+
+/** Plays this phone's whole turn (rolls, and moves the first token it may) until it's the next player's. */
+async function playTurn(p: Phone, next: Phone) {
+  const roll = p.page.getByRole('button', { name: 'Roll dice' });
+  const move = p.page.getByRole('button', { name: /^Move token/ }).first();
+  await expect(roll).toBeVisible({ timeout: 45_000 });
+  const until = Date.now() + 40_000;
+  while (Date.now() < until) {
+    if (await p.page.locator(`[data-player="${next.u}"] [data-turn]`).count()) return;
+    if (await roll.isVisible()) await roll.click().catch(() => {});
+    else if (await move.isVisible()) await move.click().catch(() => {});
+    await p.page.waitForTimeout(400);
+  }
+  throw new Error(`${p.u} never finished their turn`);
+}
+
+const lives = (p: Phone, u: string) => p.page.locator(`[data-player="${u}"] [role="img"][aria-label$="chances left"]`).getAttribute('aria-label');
+
+test('someone goes offline: the life comes off them, not the player before them', async () => {
+  test.setTimeout(240_000);
+  for (const p of [A, B, C]) { // out of the six-player game first
+    if (!(await p.page.getByRole('img', { name: 'Ludo board' }).isVisible())) continue;
+    await p.page.getByRole('button', { name: 'Game menu' }).click();
+    await p.page.getByRole('menuitem', { name: /Leave game|Close game/ }).click();
+    const sure = p.page.getByRole('alertdialog').getByRole('button', { name: 'Leave' });
+    if (await sure.isVisible().catch(() => false)) await sure.click();
+    await p.page.goto('/');
+  }
+  await newGame(A);
+  await A.page.getByRole('dialog', { name: 'Play a game' }).getByRole('button', { name: 'Create game and share link' }).click();
+  await A.page.getByRole('button', { name: 'Copy link' }).click();
+  const l3 = await A.page.evaluate(() => navigator.clipboard.readText());
+  for (const p of [B, C]) await p.page.goto(l3);
+  await expect(A.page.getByText('Ready', { exact: true })).toHaveCount(3);
+  await A.page.getByRole('button', { name: 'Start with 3 players' }).click();
+  for (const p of [A, B, C]) await expect(p.page.getByRole('img', { name: 'Ludo board' })).toBeVisible();
+  await C.page.close(); // C's phone loses its signal for good: A plays, then B, then C's turn runs out
+  await playTurn(A, B);
+  await playTurn(B, C);
+  await expect.poll(() => lives(A, C.u), { timeout: 60_000 }).toBe('4 of 5 chances left');
+  for (const p of [A, B]) {
+    expect(await lives(p, C.u)).toBe('4 of 5 chances left');
+    expect(await lives(p, A.u)).toBe('5 of 5 chances left');
+    expect(await lives(p, B.u)).toBe('5 of 5 chances left');
+  }
+  await A.page.screenshot({ path: shots('27-ludo-offline-life') });
+  await playTurn(A, B); // and again: still C's lives only
+  await playTurn(B, C);
+  await expect.poll(() => lives(B, C.u), { timeout: 60_000 }).toBe('3 of 5 chances left');
+  expect(await lives(B, A.u)).toBe('5 of 5 chances left');
+  expect(await lives(B, B.u)).toBe('5 of 5 chances left');
+  for (const p of [A, B]) {
+    await p.page.getByRole('button', { name: 'Game menu' }).click();
+    await p.page.getByRole('menuitem', { name: 'Leave game' }).click();
+    await p.page.getByRole('alertdialog').getByRole('button', { name: 'Leave' }).click().catch(() => {});
+  }
+});

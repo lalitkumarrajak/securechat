@@ -172,8 +172,6 @@ wss.on('connection', (ws, req) => {
     // Any frame from the client proves its JavaScript is running (not frozen in the background).
     ws.beat = Date.now();
     if (rateLimited('ws:' + ws.user, 300, 10e3)) return send(ws, { t: 'err', e: 'Slow down' });
-    // A heartbeat is answered, so a phone back from sleep can tell a dead socket from a live one.
-    if (m.t === 'p') return send(ws, { t: 'po' });
     const h = Object.hasOwn(handlers, m.t) ? handlers[m.t] : null;
     if (h) await h(ws, m);
   }
