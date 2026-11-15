@@ -106,6 +106,9 @@ test('the next month’s statement opens without asking for the password', async
   await expect(P.page.getByLabel('PDF password')).toHaveCount(0);
   await r.getByRole('button', { name: 'Save statement' }).click();
   await expect(acc().getByText('Month by month')).toBeVisible();
+  // October's statement carries September's bill forward: it's settled, not owed twice.
+  await acc().getByRole('tab', { name: 'Bills' }).click();
+  await expect(acc().getByRole('region', { name: 'Bills' }).getByRole('button', { name: /Millennia · September 2026/ })).toContainText(/paid Oct 4/);
 });
 
 test('pay the October bill from the bank: the bank goes down and the card is paid', async () => {
@@ -180,16 +183,16 @@ test('cashback: on the card it lowers what you owe; paid to the bank, it counts 
   await expect(balanceOf('HDFC Savings')).toContainText('₹43,879.50');
 });
 
-test('a payment SMS marks the September bill paid', async () => {
+test('a payment SMS with every bill settled is saved as a payment to the card', async () => {
   await acc().getByRole('tab', { name: 'Bills' }).click();
   await acc().getByRole('button', { name: /Import a statement/ }).click();
   const d = P.page.getByRole('dialog', { name: 'Import a statement' });
   await d.getByLabel(/paste the bank’s SMS/).fill('Payment of Rs 8,915.00 has been received on your HDFC Bank Credit Card XX4321 on 05-11-2026. Thank you.');
   await d.getByRole('button', { name: 'Read it' }).click();
   const p = P.page.getByRole('dialog', { name: 'A payment to your card' });
-  await expect(p).toContainText('Marks the September 2026 bill');
+  await expect(p).toContainText('There’s no unpaid bill on this card');
   await p.getByLabel('Paid from').selectOption({ label: 'An account not in Sanga' });
-  await p.getByRole('button', { name: 'Mark as paid' }).click();
+  await p.getByRole('button', { name: 'Save payment' }).click();
   await expect(acc().getByRole('region', { name: 'To pay' })).toContainText('All clear');
   await acc().getByRole('tab', { name: 'Accounts' }).click();
   await expect(balanceOf('HDFC Savings')).toContainText('₹43,879.50'); // not from a Sanga account

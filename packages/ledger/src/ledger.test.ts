@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { balances, cashbackList, cashbackOf, creditLine, effect, netWorth, valid, type LedgerState } from './model';
+import { balances, cashbackList, cashbackOf, creditLine, effect, netWorth, settledBills, valid, type LedgerState } from './model';
 import { awaitingBill, billState, cardReminders, unpaid, type CardBill, type CardStatement, type CreditCard } from './cards';
 import type { Account, Entry } from './types';
 
@@ -125,5 +125,25 @@ describe('cashback in statements imported before it had its own category', () =>
       txns: [{ d: '2026-08-02', t: 'CASHBACK CREDIT', a: -7000, c: 'refund' }, { d: '2026-08-03', t: 'AMAZON REFUND', a: -9000, c: 'refund' }] };
     const s: LedgerState = { ...state([acc('card', 'credit')], []), statements: { st0: st } };
     expect(cashbackList(s).map((x) => [x.desc, x.amount])).toEqual([['CASHBACK CREDIT', 7000]]);
+  });
+});
+
+describe('statements of other months', () => {
+  const bill = (month: string, amount: number, due: string, extra: Partial<CardBill> = {}): CardBill => ({ id: 'b' + month, type: 'bill', card: 'c1', month, amount, due, ...extra });
+  const st = (month: string, date: string, txns: CardStatement['txns'] = []) => ({ month, date, txns });
+  it('a bill a later statement carries forward is settled, on the payment that statement lists', () => {
+    const out = settledBills(
+      [bill('2026-10', 6000, '2026-11-03'), bill('2026-11', 8447826, '2026-12-03')],
+      [st('2026-10', '2026-10-13'), st('2026-11', '2026-11-13', [{ d: '2026-10-31', t: 'MB PAYMENT', a: -6000, c: 'payment' }, { d: '2026-11-08', t: 'Cashback', a: -13200, c: 'cashback' }])],
+    );
+    expect(out.map((b) => [b.month, b.paid, b.paidAmount])).toEqual([['2026-10', '2026-10-31', 6000]]);
+  });
+  it('without a payment in the next statement, it is settled on its due date; the newest bill stays to pay', () => {
+    const out = settledBills([bill('2026-09', 5000, '2026-10-03'), bill('2026-10', 7000, '2026-11-03')], [st('2026-10', '2026-10-13')]);
+    expect(out.map((b) => [b.month, b.paid])).toEqual([['2026-09', '2026-10-03']]);
+  });
+  it('paid, “no bill” and deleted bills are left as they are', () => {
+    const out = settledBills([bill('2026-08', 1, '2026-09-03', { paid: '2026-09-01' }), bill('2026-09', 0, '2026-10-03', { none: true }), bill('2026-07', 5, '2026-08-03', { deleted: true })], [st('2026-10', '2026-10-13')]);
+    expect(out).toEqual([]);
   });
 });

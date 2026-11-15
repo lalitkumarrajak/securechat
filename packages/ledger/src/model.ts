@@ -303,6 +303,31 @@ export interface StatementInput {
   setOutstanding?: boolean;    // make the card's balance what the statement says you owe
 }
 /** Save what was read from a statement: the card, its bill for that month (or "no bill" if nothing is due), and the statement. */
+/**
+ * A card's statement carries forward whatever was left of the bill before it, so once a later statement
+ * is in, the earlier bills are settled: counting them as still owed would count the same money twice.
+ * Each is marked paid on the first payment the next statement lists after it (or on its due date).
+ * `bills` and `statements` are the card's, with the one being saved (`month`) among them.
+ */
+export function settledBills(bills: CardBill[], statements: Pick<CardStatement, 'month' | 'date' | 'txns'>[]): CardBill[] {
+  const out: CardBill[] = [];
+  const byMonth = [...statements].sort((a, b) => a.month.localeCompare(b.month));
+  for (const b of bills) {
+    if (b.deleted || b.paid || b.none) continue;
+    const next = byMonth.find((st) => st.month > b.month);
+    if (!next) continue;
+    const mine = byMonth.find((st) => st.month === b.month);
+    const after = mine?.date ?? `${b.month}-01`;
+    const pay = next.txns.filter((t) => t.a < 0 && t.c === 'payment' && t.d > after).sort((p, q) => p.d.localeCompare(q.d))[0];
+    out.push({ ...b, paid: pay?.d ?? b.due, paidAmount: b.amount });
+  }
+  return out;
+}
+
+/** Whether a later statement than `month` is already in for this card (an older one changes none of the card's settings). */
+export const newerStatement = (card: string, month: string, s: LedgerState = useLedger.getState()) =>
+  live(Object.values(s.statements)).some((x) => x.card === card && x.month > month);
+
 export async function saveStatement(x: StatementInput) {
   const month = x.date.slice(0, 7);
   await save(x.card);
@@ -317,6 +342,10 @@ export async function saveStatement(x: StatementInput) {
   const sid = statementId(x.card.id, month);
   await save({ id: sid, type: 'statement', card: x.card.id, month, date: x.date, ...(x.from && { from: x.from }), ...(x.due && { due: x.due }), total: x.total, ...(x.minDue && { minDue: x.minDue }), ...(x.limit && { limit: x.limit }), txns, created: s.statements[sid]?.created ?? now(), edited: now() });
   if (x.setOutstanding) await setBalance(x.card, -x.total, x.date);
+  // Bills this statement (or a later one) already carries forward are settled.
+  const after = useLedger.getState();
+  const cardBills = live(Object.values(after.bills)).filter((b) => b.card === x.card.id);
+  for (const b of settledBills(cardBills, live(Object.values(after.statements)).filter((st) => st.card === x.card.id))) await save(b);
   return { month, bill: bid, statement: sid };
 }
 

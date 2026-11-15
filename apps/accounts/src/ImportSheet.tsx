@@ -12,7 +12,7 @@ import { Input, Label, Textarea } from '@sanga/ui/input';
 import { cn } from '@sanga/ui/utils';
 import { t, tn } from '@sanga/i18n';
 import {
-  creditCards, liveAccounts, money, newAccount, openBill, payBill, save, saveStatement, statementId, todayKey, useLedger, newEntry,
+  creditCards, liveAccounts, money, newAccount, newerStatement, openBill, payBill, save, saveStatement, statementId, todayKey, useLedger, newEntry,
   asCard, type CreditCard,
 } from '@sanga/ledger';
 import { CATS, CREDIT_CATS, SPEND_CATS, parseStatement, textLines, totals, type Cat, type Line, type Parsed, type Txn } from '@sanga/ledger/statement';
@@ -163,7 +163,9 @@ function Review({ p, password, onSaved }: { p: Parsed; password?: string; onSave
   const sum = totals(txns);
   const day = date ? Number(date.slice(8)) : 0;
   const gap = date && due ? Math.round((new Date(`${due}T12:00:00`).getTime() - new Date(`${date}T12:00:00`).getTime()) / 864e5) : null;
-  const changes = card ? [
+  // An older statement than one already in: it fills in that month, but changes nothing about the card now.
+  const older = !!card && !!date && newerStatement(card.id, date.slice(0, 7));
+  const changes = card && !older ? [
     !guessed && card.statementDay !== day && day ? t('statement day {a} → {b}', { a: card.statementDay, b: day }) : '',
     !guessed && gap !== null && gap >= 0 && gap <= 60 && card.dueAfter !== gap ? t('due {a} → {b} days after it', { a: card.dueAfter, b: gap }) : '',
     p.limit && card.limit !== p.limit ? t('limit → {amount}', { amount: money(p.limit, cur) }) : '',
@@ -175,16 +177,16 @@ function Review({ p, password, onSaved }: { p: Parsed; password?: string; onSave
     if (!ok || total === null) return;
     const base: CreditCard = card ?? asCard(newAccount('credit', { name: newName.trim(), bank: p.bank, last4: p.last4 }));
     const next: CreditCard = { ...base };
-    if (update || !card) {
+    if ((update && !older) || !card) {
       if (day && (!guessed || !card)) next.statementDay = day;
       if (!guessed && gap !== null && gap >= 0 && gap <= 60) next.dueAfter = gap;
       if (p.limit && !next.limitWith) next.limit = p.limit;
       if (p.last4 && !next.last4) next.last4 = p.last4;
     }
     if (password) next.pdfPass = password;
-    const holder = (update || !card) && p.limit && next.limitWith ? useLedger.getState().accounts[next.limitWith] : undefined;
+    const holder = ((update && !older) || !card) && p.limit && next.limitWith ? useLedger.getState().accounts[next.limitWith] : undefined;
     if (holder && !holder.deleted && holder.limit !== p.limit) await save({ ...holder, limit: p.limit }); // a shared limit is kept on the card holding it
-    const r = await saveStatement({ card: next, date, due: due || undefined, from: p.from, total: credit ? -total : total, minDue: minDue ?? undefined, limit: p.limit, txns, setOutstanding: setOwed });
+    const r = await saveStatement({ card: next, date, due: due || undefined, from: p.from, total: credit ? -total : total, minDue: minDue ?? undefined, limit: p.limit, txns, setOutstanding: setOwed && !older });
     onSaved(r.statement);
   };
   const setCat = (i: number, c: Cat) => setTxns((xs) => xs.map((x, j) => (j === i ? { ...x, cat: c } : x)));
@@ -214,7 +216,7 @@ function Review({ p, password, onSaved }: { p: Parsed; password?: string; onSave
           <span>{t('Update {card} from this statement: {changes}', { card: card.name, changes: changes.join(', ') })}</span>
         </label>
       )}
-      {total !== null && (
+      {total !== null && !older && (
         <label className="flex items-start gap-2 rounded-xl bg-panel-2 p-3 text-sm">
           <input type="checkbox" className="mt-1" checked={setOwed} onChange={(e) => setSetOwed(e.target.checked)} />
           <span>{t('Set what I owe on this card to {amount}', { amount: money(credit ? 0 : total, cur) })}
