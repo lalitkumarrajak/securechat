@@ -1,0 +1,1 @@
+{ "id": "passwords", "name": "Passwords", "icon": "key-round", "expose": "./App" }

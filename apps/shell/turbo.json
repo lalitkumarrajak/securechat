@@ -9,7 +9,8 @@
         "$TURBO_ROOT$/apps/notes/src/**",
         "$TURBO_ROOT$/apps/calendar/src/**",
         "$TURBO_ROOT$/apps/split/src/**",
-        "$TURBO_ROOT$/apps/accounts/src/**"
+        "$TURBO_ROOT$/apps/accounts/src/**",
+        "$TURBO_ROOT$/apps/passwords/src/**"
       ]
     }
   }

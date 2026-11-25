@@ -62,5 +62,7 @@
   "{n} friend requests": {
     "one": "{n} मैत्री विनंती",
     "other": "{n} मैत्री विनंत्या"
-  }
+  },
+  "Passwords": "पासवर्ड",
+  "Logins to copy or open in a tap": "एका टॅपमध्ये कॉपी करा किंवा उघडा"
 }

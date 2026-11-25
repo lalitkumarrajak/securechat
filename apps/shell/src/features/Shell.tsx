@@ -5,6 +5,7 @@ import { DiaryPage } from './notes/DiaryPage';
 import { CalendarPage } from './calendar/CalendarPage';
 import { SplitPage } from './split/SplitPage';
 import { AccountsPage } from './accounts/AccountsPage';
+import { PasswordsPage } from './passwords/PasswordsPage';
 import { ProfilePage } from './profile/ProfilePage';
 import { getApp, setApp, useApp } from '../state/app';
 import { go } from '../lib/nav';
@@ -29,6 +30,7 @@ export function Main() {
       {section === 'calendar' && <CalendarPage />}
       {section === 'split' && <SplitPage />}
       {section === 'accounts' && <AccountsPage />}
+      {section === 'passwords' && <PasswordsPage />}
       {section === 'profile' && <ProfilePage />}
       {section === 'more' && <MorePage />}
       {section === 'games' && <Suspense fallback={<GamesSkeleton />}><GamesHub /></Suspense>}
