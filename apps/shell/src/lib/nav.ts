@@ -16,6 +16,15 @@ export function go(section: Section) {
   setApp({ section });
 }
 
+/** The Diary's "Shared with me" (its filter value: apps/notes SHARED_WITH_ME). */
+export const SHARED_NOTES = '@in';
+/** Open the Diary at the notes friends shared with you (from their notification). */
+export function openSharedNotes() {
+  setApp({ notesChat: SHARED_NOTES });
+  history.replaceState(history.state, '', `${base()}#diary`);
+  setApp({ section: 'diary' });
+}
+
 /** Back from an app on the More page (Games, the Diary, Money, Passwords): to the More page. */
 export const back = () => go('more');
 

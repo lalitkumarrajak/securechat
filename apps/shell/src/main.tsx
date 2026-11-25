@@ -11,6 +11,7 @@ import { UI_DICTS } from '@sanga/ui/locale';
 import { SDK_DICTS } from '@sanga/sdk/locale';
 import { useCall } from './lib/calls';
 import './lib/reminders'; // reminders that come due while Sanga is open
+import './lib/sharedNotes'; // "Ravi shared a note with you" while Sanga is open
 
 (window as { __sangaUp?: boolean }).__sangaUp = true; // the start files loaded (theme-boot.js)
 initSettings();

@@ -195,6 +195,7 @@ self.addEventListener('push', (e) => {
       : d.t === 'missed' ? (d.v ? w('Missed video call', 'मिस्ड वीडियो कॉल', 'मिस्ड व्हिडिओ कॉल') : w('Missed voice call', 'मिस्ड वॉइस कॉल', 'मिस्ड व्हॉइस कॉल'))
       : d.t === 'stag' ? w('tagged you in their story', 'ने आपको अपनी स्टोरी में टैग किया', 'यांनी तुम्हाला त्यांच्या स्टोरीत टॅग केले')
       : d.t === 'scmt' ? w('commented on your story', 'ने आपकी स्टोरी पर कमेंट किया', 'यांनी तुमच्या स्टोरीवर कमेंट केली')
+      : d.t === 'nshare' ? w('shared a note with you 📔', 'ने आपके साथ एक नोट शेयर किया 📔', 'यांनी तुमच्यासोबत एक नोट शेअर केली 📔')
       : w('New message', 'नया मैसेज', 'नवीन मेसेज');
     // Don't notify if the app is open and visible: the page shows the message itself.
     const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
@@ -204,7 +205,7 @@ self.addEventListener('push', (e) => {
       // A missed call replaces its "incoming call" notification.
       tag: (call ? 'call' : d.t || 'msg') + '-' + (d.peer || d.from || ''), renotify: true,
       ...(d.t === 'call' && { requireInteraction: true, vibrate: [400, 200, 400, 200, 400] }),
-      data: { peer: d.t === 'msg' || call ? d.from : d.t === 'gmsg' ? d.peer : null, stories: d.t === 'stag' || d.t === 'scmt' },
+      data: { peer: d.t === 'msg' || call ? d.from : d.t === 'gmsg' ? d.peer : null, stories: d.t === 'stag' || d.t === 'scmt', diary: d.t === 'nshare' },
     });
   })());
 });
@@ -213,6 +214,7 @@ self.addEventListener('notificationclick', (e) => {
   e.notification.close();
   const peer = e.notification.data?.peer;
   const calendar = e.notification.data?.calendar;
+  const diary = e.notification.data?.diary;
   e.waitUntil((async () => {
     const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     const win = wins[0];
@@ -220,8 +222,9 @@ self.addEventListener('notificationclick', (e) => {
       await win.focus();
       if (peer) win.postMessage({ t: 'open', peer });
       if (calendar) win.postMessage({ t: 'open', section: 'calendar' });
+      if (diary) win.postMessage({ t: 'open', section: 'shared-notes' });
     } else {
-      await self.clients.openWindow(peer ? '/?chat=' + encodeURIComponent(peer) : calendar ? '/#calendar' : '/');
+      await self.clients.openWindow(peer ? '/?chat=' + encodeURIComponent(peer) : calendar ? '/#calendar' : diary ? '/#diary' : '/');
     }
   })());
 });

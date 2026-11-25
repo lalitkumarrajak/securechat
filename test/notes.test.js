@@ -88,6 +88,12 @@ describe('notes', () => {
     const put = await share(b, await seal(b));
     assert.equal(put.status, 200);
     await ws.next('notes'); // b hears about it at once
+    const told = await ws.next('nshare'); // and is told who shared it, not what it says
+    assert.equal(told.from, a.u);
+    assert.doesNotMatch(JSON.stringify(told), /Packing/);
+    assert.equal((await share(b, await seal(b))).status, 200); // an edit: synced, but no new "shared with you"
+    await ws.next('notes');
+    assert.equal(await ws.gets('nshare', () => true, 400), false);
 
     const got = (await srv.api('/api/notes/shared?since=0', undefined, b.token)).data.notes;
     assert.equal(got.length, 1);

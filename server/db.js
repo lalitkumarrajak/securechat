@@ -349,7 +349,7 @@ const SQL = {
   sharedNotesFor: 'SELECT owner, id, body, updated FROM shared_notes WHERE recipient = ? AND updated >= ? ORDER BY updated, owner, id LIMIT ?',
   putSharedNote: `INSERT INTO shared_notes (owner, id, recipient, body, updated) VALUES (?, ?, ?, ?, ?)
                   ON CONFLICT (owner, id, recipient) DO UPDATE SET body = excluded.body, updated = excluded.updated`,
-  getSharedNote: 'SELECT updated FROM shared_notes WHERE owner = ? AND id = ? AND recipient = ?',
+  getSharedNote: "SELECT updated, CASE WHEN body = '' THEN 0 ELSE 1 END AS live FROM shared_notes WHERE owner = ? AND id = ? AND recipient = ?",
   sharedNoteStats: 'SELECT COUNT(*) AS n, COALESCE(SUM(octet_length(body)), 0) AS bytes FROM shared_notes WHERE owner = ?',
   sharedNoteLast: 'SELECT COALESCE(MAX(updated), 0) AS last FROM shared_notes WHERE recipient = ?',
 
@@ -736,7 +736,10 @@ async function openMongo(uri) {
       await sharedNotes.replaceOne({ _id: `${owner}|${id}|${recipient}` }, { owner, id, recipient, body, updated }, { upsert: true });
       return changes(1);
     },
-    getSharedNote: async (owner, id, recipient) => (await sharedNotes.findOne({ _id: `${owner}|${id}|${recipient}` }, { projection: { updated: 1 } })) ?? undefined,
+    getSharedNote: async (owner, id, recipient) => {
+      const d = await sharedNotes.findOne({ _id: `${owner}|${id}|${recipient}` }, { projection: { updated: 1, body: 1 } });
+      return d ? { updated: d.updated, live: d.body ? 1 : 0 } : undefined;
+    },
     sharedNoteStats: async (owner) => ({ n: await sharedNotes.countDocuments({ owner }), bytes: await sumBytes(sharedNotes, { owner }) }),
     sharedNoteLast: async (u) => ({ last: (await sharedNotes.find({ recipient: u }).sort({ updated: -1 }).limit(1).next())?.updated ?? 0 }),
 

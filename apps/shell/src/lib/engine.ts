@@ -10,7 +10,7 @@ import { groupIdOf, isGroup } from './types';
 import { prepareFile } from './files';
 import type { LocationContent } from './location';
 import { getApp, setApp } from '../state/app';
-import { go } from './nav';
+import { go, openSharedNotes } from './nav';
 import { deviceHints, deviceName, placeName } from './device';
 import { setSettings, useSettings } from '../state/settings';
 import './swLang'; // push notifications in the language now on
@@ -1673,6 +1673,7 @@ navigator.serviceWorker?.addEventListener('message', (e) => {
   if (e.data?.t !== 'open' || getApp().status !== 'app') return;
   if (e.data.peer) openChat(e.data.peer);
   else if (e.data.section === 'calendar') go('calendar');
+  else if (e.data.section === 'shared-notes') openSharedNotes();
 });
 
 export const me = () => S.me;

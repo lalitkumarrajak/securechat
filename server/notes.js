@@ -8,7 +8,9 @@ import { B64_RE } from './config.js';
 import { ctx } from './context.js';
 import { canChat } from './friends.js';
 import { readJson, sendJson } from './http.js';
-import { sendTo } from './hub.js';
+import { isActive, sendTo } from './hub.js';
+import { getProfile } from './profiles.js';
+import { notify } from './push.js';
 
 const ID_RE = /^[A-Za-z0-9_-]{16,32}$/;
 const MAX_BODY = 120_000; // base64 of a sealed note; the app caps the text well below this
@@ -69,6 +71,13 @@ export const routes = {
     const updated = Math.max(Date.now(), Number((await ctx.db.get('sharedNoteLast', to)).last) + 1);
     await ctx.db.run('putSharedNote', me, id, to, body, updated);
     sendTo(to, { t: 'notes' });
+    // Newly shared with them (not each edit after): a pop-up if Sanga is open, else a notification.
+    // Only who shared it, never what the note says.
+    if (body && !Number(had?.live)) {
+      const name = (await getProfile(me)).name || me;
+      sendTo(to, { t: 'nshare', from: me, name });
+      if (!isActive(to)) notify(to, { t: 'nshare', from: me, name }, `${to}|n|${me}`).catch(() => {});
+    }
     sendJson(res, 200, { updated });
   },
 };
