@@ -1,11 +1,14 @@
-import { CloudOff, NotebookPen } from 'lucide-react';
+import { CloudOff, NotebookPen, Users } from 'lucide-react';
 import { t } from '@sanga/i18n';
 import { fmtClock } from '@sanga/ui/format';
 import { cn } from '@sanga/ui/utils';
 import type { Note } from '../notes';
+
+/** A note in the list: yours, or a friend's shared with you (`from`). */
+export type Listed = Note & { from?: string };
 import { Avatar } from './Avatar';
 
-export function NoteCard({ n, active, showChat, chatName, onOpen }: { n: Note; active: boolean; showChat: boolean; chatName: (p: string) => string; onOpen: () => void }) {
+export function NoteCard({ n, active, showChat, chatName, onOpen }: { n: Listed; active: boolean; showChat: boolean; chatName: (p: string) => string; onOpen: () => void }) {
   const lines = n.text.trim().split('\n');
   const head = n.title.trim() || lines[0] || (n.mood ? t('Mood') : t('Untitled'));
   const rest = n.title.trim() ? n.text.trim() : lines.slice(1).join('\n').trim();
@@ -20,13 +23,19 @@ export function NoteCard({ n, active, showChat, chatName, onOpen }: { n: Note; a
         <span className="priv block truncate font-semibold">{head}</span>
         {rest && <span className="priv mt-0.5 line-clamp-2 block text-sm whitespace-pre-wrap text-muted">{rest}</span>}
         <span className="mt-2 flex items-center gap-2 text-xs text-muted">
-          {showChat && (
+          {n.from ? (
+            <span className="flex min-w-0 items-center gap-1 rounded-full bg-accent/10 py-0.5 pr-2 pl-0.5 text-accent-ink">
+              <Avatar u={n.from} name={chatName(n.from)} size={16} />
+              <span className="truncate">{t('From {name}', { name: chatName(n.from) })}</span>
+            </span>
+          ) : showChat && (
             <span className="flex min-w-0 items-center gap-1 rounded-full bg-panel-2 py-0.5 pr-2 pl-0.5">
               {n.chat ? <Avatar u={n.chat} name={chatName(n.chat)} size={16} /> : <NotebookPen className="ml-1 size-3" />}
               <span className="priv truncate">{chatName(n.chat)}</span>
             </span>
           )}
           <span>{fmtClock(n.edited)}</span>
+          {!!n.shared?.length && <Users className="size-3.5" aria-label={t('Shared')} />}
           {n.dirty && <CloudOff className="size-3.5" aria-label={t('Not synced yet')} />}
         </span>
       </span>

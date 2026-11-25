@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, CalendarDays, Check, Lock, NotebookPen, Trash2 } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Check, Lock, NotebookPen, Share2, Trash2, Users } from 'lucide-react';
 import { t, tn } from '@sanga/i18n';
 import { IconButton } from '@sanga/ui/button';
 import { cn } from '@sanga/ui/utils';
@@ -8,6 +8,7 @@ import { deleteNote, isEmpty, MAX_TEXT, MAX_TITLE, MOODS, saveNote, useNotes, ty
 import { Avatar } from './Avatar';
 import { dayLabel } from './dayLabel';
 import { useChatName } from './useChatName';
+import { ShareDialog } from './ShareDialog';
 
 /** Write or change a note. Everything saves as you type; an emptied note is removed when you leave. */
 export function Editor({ note, onDone }: { note: Note; onDone: (day?: string) => void }) {
@@ -18,6 +19,7 @@ export function Editor({ note, onDone }: { note: Note; onDone: (day?: string) =>
   const chatName = useChatName();
   const saved = useRef(note);
   const latest = useRef(n);
+  const [sharing, setSharing] = useState(false);
   latest.current = n;
 
   const flush = (x: Note) => {
@@ -73,6 +75,11 @@ export function Editor({ note, onDone }: { note: Note; onDone: (day?: string) =>
                 {options.map((p) => <option key={p} value={p}>{chatName(p)}</option>)}
               </select>
             </label>
+            <button type="button" onClick={() => setSharing(true)} aria-label={t('Share with friends')}
+              className={cn('flex min-w-0 items-center gap-2 rounded-full border px-3 py-1.5 text-sm', n.shared?.length ? 'border-accent/50 bg-accent/10 text-accent-ink' : 'border-line bg-panel-2/60')}>
+              {n.shared?.length ? <Users className="size-4 shrink-0" /> : <Share2 className="size-4 text-muted" />}
+              <span className="truncate">{n.shared?.length ? n.shared.map(chatName).join(', ') : t('Share')}</span>
+            </button>
           </div>
           <p className="mt-5 mb-2 text-xs font-semibold tracking-wide text-muted uppercase">{t('How are you feeling?')}</p>
           <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1.5 py-1.5" role="group" aria-label={t('Mood')}>
@@ -89,9 +96,12 @@ export function Editor({ note, onDone }: { note: Note; onDone: (day?: string) =>
           <textarea value={n.text} onChange={(e) => set({ text: e.target.value })} maxLength={MAX_TEXT} autoFocus={!stored}
             placeholder={n.chat ? t('Notes about {name}…', { name: chatName(n.chat) }) : t('Write about your day…')} aria-label={t('Note')}
             className="mt-3 min-h-[45vh] flex-1 resize-none bg-transparent text-[1.05rem] leading-relaxed outline-none placeholder:text-muted/70" />
-          <p className="mt-3 flex items-center gap-1.5 text-xs text-muted"><Lock className="size-3.5" />{tn(words, '{n} word · Only you can read this', '{n} words · Only you can read this')}</p>
+          <p className="mt-3 flex items-center gap-1.5 text-xs text-muted">{n.shared?.length ? <Users className="size-3.5 shrink-0" /> : <Lock className="size-3.5 shrink-0" />}
+            {n.shared?.length ? tn(words, '{n} word · You and {names} can read this', '{n} words · You and {names} can read this', { names: n.shared.map(chatName).join(', ') }) : tn(words, '{n} word · Only you can read this', '{n} words · Only you can read this')}</p>
         </div>
       </div>
+      {sharing && <ShareDialog shared={n.shared ?? []} suggest={n.chat && !n.chat.startsWith('g:') ? n.chat : undefined} onClose={() => setSharing(false)}
+        onDone={(people) => set({ shared: people.length ? people : undefined })} />}
     </div>
   );
 }

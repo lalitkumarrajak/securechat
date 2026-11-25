@@ -129,6 +129,15 @@ const SCHEMA = (pg) => `
     PRIMARY KEY (username, id)
   );
   CREATE INDEX IF NOT EXISTS notes_updated ON notes(username, updated);
+  CREATE TABLE IF NOT EXISTS shared_notes (
+    owner     TEXT NOT NULL,
+    id        TEXT NOT NULL,
+    recipient TEXT NOT NULL,
+    body      TEXT NOT NULL,
+    updated   BIGINT NOT NULL,
+    PRIMARY KEY (owner, id, recipient)
+  );
+  CREATE INDEX IF NOT EXISTS shared_notes_in ON shared_notes(recipient, updated);
   CREATE TABLE IF NOT EXISTS items (
     username TEXT NOT NULL,
     app      TEXT NOT NULL,
@@ -336,6 +345,14 @@ const SQL = {
   // octet_length: bytes, from the stored size rather than by reading every body (SQLite 3.43+, Postgres).
   noteStats: 'SELECT COUNT(*) AS n, COALESCE(MAX(updated), 0) AS last, COALESCE(SUM(octet_length(body)), 0) AS bytes FROM notes WHERE username = ?',
 
+  // A note's copy for one friend it's shared with, sealed with the key the two of them share. An empty body: no longer shared.
+  sharedNotesFor: 'SELECT owner, id, body, updated FROM shared_notes WHERE recipient = ? AND updated >= ? ORDER BY updated, owner, id LIMIT ?',
+  putSharedNote: `INSERT INTO shared_notes (owner, id, recipient, body, updated) VALUES (?, ?, ?, ?, ?)
+                  ON CONFLICT (owner, id, recipient) DO UPDATE SET body = excluded.body, updated = excluded.updated`,
+  getSharedNote: 'SELECT updated FROM shared_notes WHERE owner = ? AND id = ? AND recipient = ?',
+  sharedNoteStats: 'SELECT COUNT(*) AS n, COALESCE(SUM(octet_length(body)), 0) AS bytes FROM shared_notes WHERE owner = ?',
+  sharedNoteLast: 'SELECT COALESCE(MAX(updated), 0) AS last FROM shared_notes WHERE recipient = ?',
+
   // Other apps' records (the calendar's events…): ciphertext only, like notes. An empty body is a deleted one.
   itemsSince: 'SELECT id, body, updated FROM items WHERE username = ? AND app = ? AND updated >= ? ORDER BY updated, id LIMIT ?',
   putItem: `INSERT INTO items (username, app, id, body, updated) VALUES (?, ?, ?, ?, ?)
@@ -483,9 +500,9 @@ async function openMongo(uri) {
   const mdb = client.db(client.options.dbName === 'test' ? 'securechat' : undefined);
   const c = (name) => mdb.collection(name);
   const [users, sessions, messages, hidden, avatars, friendships, blocks, profiles, pushSubs, games, config, groups, groupMembers, groupPhotos, notes,
-    stories, storyKeys, storyViews, storyComments, items, reminders, splitMembers, splitRecords, splitBills] =
+    stories, storyKeys, storyViews, storyComments, items, reminders, splitMembers, splitRecords, splitBills, sharedNotes] =
     ['users', 'sessions', 'messages', 'message_hidden', 'avatars', 'friendships', 'blocks', 'profiles', 'push_subs', 'games', 'config',
-      'groups', 'group_members', 'group_photos', 'notes', 'stories', 'story_keys', 'story_views', 'story_comments', 'items', 'reminders', 'split_members', 'split_records', 'split_bills'].map(c);
+      'groups', 'group_members', 'group_photos', 'notes', 'stories', 'story_keys', 'story_views', 'story_comments', 'items', 'reminders', 'split_members', 'split_records', 'split_bills', 'shared_notes'].map(c);
   await Promise.all([
     users.createIndex({ email: 1 }, { unique: true, partialFilterExpression: { email: { $type: 'string' } } }),
     sessions.createIndex({ expires: 1 }),
@@ -504,6 +521,8 @@ async function openMongo(uri) {
     blocks.createIndex({ blocked: 1 }),
     pushSubs.createIndex({ username: 1 }),
     notes.createIndex({ username: 1, updated: 1 }),
+    sharedNotes.createIndex({ recipient: 1, updated: 1 }),
+    sharedNotes.createIndex({ owner: 1 }),
     items.createIndex({ username: 1, app: 1, updated: 1 }),
     splitMembers.createIndex({ gid: 1 }),
     splitMembers.createIndex({ username: 1 }),
@@ -710,6 +729,16 @@ async function openMongo(uri) {
       last: (await notes.find({ username: u }).sort({ updated: -1 }).limit(1).next())?.updated ?? 0,
       bytes: await sumBytes(notes, { username: u }),
     }),
+
+    sharedNotesFor: async (u, since, limit) => (await sharedNotes.find({ recipient: u, updated: { $gte: since } })
+      .sort({ updated: 1, owner: 1, id: 1 }).limit(limit).toArray()).map((d) => ({ owner: d.owner, id: d.id, body: d.body, updated: d.updated })),
+    putSharedNote: async (owner, id, recipient, body, updated) => {
+      await sharedNotes.replaceOne({ _id: `${owner}|${id}|${recipient}` }, { owner, id, recipient, body, updated }, { upsert: true });
+      return changes(1);
+    },
+    getSharedNote: async (owner, id, recipient) => (await sharedNotes.findOne({ _id: `${owner}|${id}|${recipient}` }, { projection: { updated: 1 } })) ?? undefined,
+    sharedNoteStats: async (owner) => ({ n: await sharedNotes.countDocuments({ owner }), bytes: await sumBytes(sharedNotes, { owner }) }),
+    sharedNoteLast: async (u) => ({ last: (await sharedNotes.find({ recipient: u }).sort({ updated: -1 }).limit(1).next())?.updated ?? 0 }),
 
     itemsSince: async (u, app, since, limit) => (await items.find({ username: u, app, updated: { $gte: since } })
       .sort({ updated: 1, id: 1 }).limit(limit).toArray()).map((d) => ({ id: d.id, body: d.body, updated: d.updated })),

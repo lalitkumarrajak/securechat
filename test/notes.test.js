@@ -1,7 +1,7 @@
 // Notes and diary: stored as ciphertext only the account's own devices can open, synced between them.
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { C, connect, name, register, startServer } from './helpers.js';
+import { befriend, C, connect, name, register, startServer } from './helpers.js';
 
 let srv;
 before(async () => { srv = await startServer({ NOTES_MAX_BYTES: '300000' }); });
@@ -71,5 +71,42 @@ describe('notes', () => {
     assert.equal((await srv.api('/api/notes', { id: ok, body: 'A'.repeat(120_004) }, a.token)).status, 400);
     assert.equal((await srv.api('/api/notes', { id: ok, body: 42 }, a.token)).status, 400);
     assert.equal((await srv.api('/api/notes?since=-5', undefined, a.token)).status, 400);
+  });
+
+  it('a note shared with a friend reaches only them, sealed with the key the two share, and can be taken back', async () => {
+    const a = await register(srv, name('sana'));
+    const b = await register(srv, name('sami'));
+    const c = await register(srv, name('sid'));
+    const id = C.randomId(18);
+    const note = { day: '2026-11-25', title: 'Trip', text: 'Packing list', mood: '' };
+    const seal = async (to) => C.encryptItem(await C.conversationKey(a.priv, to.pub, a.u, to.u), note, `${a.u}>${to.u}`, 'sharednote', id);
+    const share = (to, body) => srv.api('/api/notes/share', { id, to: to.u, body }, a.token);
+
+    assert.equal((await share(b, await seal(b))).status, 400); // not friends yet
+    await befriend(srv, a, b);
+    const ws = await connect(srv, b.token);
+    const put = await share(b, await seal(b));
+    assert.equal(put.status, 200);
+    await ws.next('notes'); // b hears about it at once
+
+    const got = (await srv.api('/api/notes/shared?since=0', undefined, b.token)).data.notes;
+    assert.equal(got.length, 1);
+    assert.equal(got[0].owner, a.u);
+    assert.doesNotMatch(JSON.stringify(got), /Packing/);
+    const bKey = await C.conversationKey(b.priv, a.pub, b.u, a.u);
+    assert.deepEqual(await C.decryptItem(bKey, got[0].body, `${a.u}>${b.u}`, 'sharednote', id), note);
+    await assert.rejects(C.decryptItem(bKey, got[0].body, `${a.u}>${c.u}`, 'sharednote', id)); // can't be passed off as for someone else
+
+    assert.equal((await srv.api('/api/notes/shared?since=0', undefined, c.token)).data.notes.length, 0); // nobody else sees it
+    assert.equal((await srv.api('/api/notes/shared?since=0', undefined, a.token)).data.notes.length, 0); // nor the owner's own inbox
+
+    const off = await share(b, ''); // stop sharing
+    assert.equal(off.status, 200);
+    assert.ok(off.data.updated > put.data.updated);
+    const after = (await srv.api(`/api/notes/shared?since=${off.data.updated}`, undefined, b.token)).data.notes;
+    assert.deepEqual(after.map((n) => [n.id, n.body]), [[id, '']]);
+    assert.equal((await share(c, '')).status, 200); // taking back one never shared: nothing happens
+    assert.equal((await srv.api('/api/notes/share', { id, to: a.u, body: 'QQ==' }, a.token)).status, 400); // not with yourself
+    ws.close();
   });
 });

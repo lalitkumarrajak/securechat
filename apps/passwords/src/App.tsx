@@ -74,7 +74,7 @@ function Row({ x, onOpen }: { x: Login; onOpen: () => void }) {
   const name = x.title || host(x.url) || x.username || t('Untitled');
   const sub = [host(x.url), x.username].filter(Boolean).join(' · ');
   return (
-    <li className="flex items-center gap-1 pr-2">
+    <li className="flex items-center gap-0.5 pr-2">
       <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left hover:bg-hover">
         <span className="grid size-10 shrink-0 place-items-center rounded-xl text-lg font-bold text-white uppercase" style={{ background: colorOf(name) }} aria-hidden>{[...name][0]}</span>
         <span className="min-w-0">
@@ -82,9 +82,10 @@ function Row({ x, onOpen }: { x: Login; onOpen: () => void }) {
           {sub && <span className="block truncate text-sm text-muted">{sub}</span>}
         </span>
       </button>
-      {x.username && <CopyButton kind="username" value={x.username} />}
-      {x.password && <CopyButton kind="password" value={x.password} />}
-      <OpenButton url={x.url} />
+      {x.url && <CopyButton small kind="link" value={x.url} />}
+      {x.username && <CopyButton small kind="username" value={x.username} />}
+      {x.password && <CopyButton small kind="password" value={x.password} />}
+      <OpenButton small url={x.url} />
     </li>
   );
 }

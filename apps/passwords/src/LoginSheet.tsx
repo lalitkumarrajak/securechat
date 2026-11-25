@@ -45,6 +45,7 @@ function Form({ l0, onClose }: { l0: Login; onClose: () => void }) {
         <div><Label htmlFor="p-url" hint={t('optional')}>{t('Link')}</Label>
           <div className="flex gap-1">
             <Input id="p-url" type="url" inputMode="url" autoCapitalize="none" spellCheck={false} maxLength={LIMITS.url} value={l.url ?? ''} onChange={(e) => set({ url: e.target.value || undefined })} placeholder="https://example.com" />
+            {l.url?.trim() && <CopyButton kind="link" value={l.url.trim()} className="shrink-0" />}
             {urlOk && <OpenButton url={l.url} className="shrink-0" />}
           </div>
           {!urlOk && <p className="mt-1 text-sm text-danger" role="alert">{t('That isn’t a web link.')}</p>}
@@ -59,9 +60,13 @@ function Form({ l0, onClose }: { l0: Login; onClose: () => void }) {
 
         <div><Label htmlFor="p-pass">{t('Password')}</Label>
           <div className="flex gap-1">
-            <Input id="p-pass" type={show ? 'text' : 'password'} autoCapitalize="none" spellCheck={false} autoComplete="new-password" maxLength={LIMITS.password}
-              className="font-mono" value={l.password ?? ''} onChange={(e) => set({ password: e.target.value || undefined })} />
-            <IconButton label={show ? t('Hide password') : t('Show password')} className="shrink-0" onClick={() => setShow(!show)}>{show ? <EyeOff /> : <Eye />}</IconButton>
+            <div className="relative min-w-0 flex-1">
+              <Input id="p-pass" type={show ? 'text' : 'password'} autoCapitalize="none" spellCheck={false} autoComplete="new-password" maxLength={LIMITS.password}
+                className="pr-11 font-mono" value={l.password ?? ''} onChange={(e) => set({ password: e.target.value || undefined })} />
+              <IconButton label={show ? t('Hide password') : t('Show password')} size="icon-sm" className="absolute top-1/2 right-1.5 -translate-y-1/2 [&_svg]:size-[1.1rem]" onClick={() => setShow(!show)}>
+                {show ? <EyeOff /> : <Eye />}
+              </IconButton>
+            </div>
             {l.password && <CopyButton kind="password" value={l.password} className="shrink-0" />}
           </div>
           <Button variant="ghost" size="sm" className="mt-1 -ml-2 text-accent" onClick={() => { set({ password: generate() }); setShow(true); }}><Wand2 className="size-4" />{t('Make a strong password')}</Button>

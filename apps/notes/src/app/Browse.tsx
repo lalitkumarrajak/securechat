@@ -1,16 +1,16 @@
 import { useMemo, useState } from 'react';
-import { ArrowLeft, BookOpen, Flame, NotebookPen, PenLine, Plus, Search, X } from 'lucide-react';
+import { ArrowLeft, BookOpen, Flame, Inbox, NotebookPen, PenLine, Plus, Search, X } from 'lucide-react';
 import { locale, t, tn } from '@sanga/i18n';
 import { IconButton } from '@sanga/ui/button';
 import { cn } from '@sanga/ui/utils';
-import { dayDate, dayKey, newNote, today, useNotes, type Note } from '../notes';
+import { dayDate, dayKey, newNote, SHARED_WITH_ME, today, useNotes, type SharedNote } from '../notes';
 import { Avatar } from './Avatar';
 import { Calendar } from './Calendar';
 import { Chip } from './Chip';
 import { DIARY_GRADIENT } from './constants';
 import { dayLabel } from './dayLabel';
 import { DayHeading } from './DayHeading';
-import { NoteCard } from './NoteCard';
+import { NoteCard, type Listed } from './NoteCard';
 import { useChatName } from './useChatName';
 
 /** Days in a row, up to today (or yesterday, if today is still blank), with something written. */
@@ -24,16 +24,20 @@ function streak(days: Set<string>) {
 
 export function Browse({ day, setDay, month, setMonth, onOpen, onClose, open, className }: {
   day: string | null; setDay: (d: string | null) => void; month: string; setMonth: (m: string) => void;
-  onOpen: (n: Note) => void; onClose?: () => void; open?: string; className?: string;
+  onOpen: (n: Listed) => void; onClose?: () => void; open?: string; className?: string;
 }) {
   const all = useNotes((s) => s.notes);
+  const inbox = useNotes((s) => s.inbox);
   const loaded = useNotes((s) => s.loaded);
   const filter = useNotes((s) => s.filter);
   const chatName = useChatName();
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState('');
 
-  const notes = useMemo(() => Object.values(all).filter((n) => !n.deleted && (filter === null || n.chat === filter)), [all, filter]);
+  const mine = useMemo(() => Object.values(all).filter((n) => !n.deleted), [all]);
+  // Friends' notes shared with you show under "All" and "Shared with me", marked with who wrote them.
+  const theirs = useMemo(() => Object.values(inbox).map((x: SharedNote): Listed => ({ id: 'in:' + x.key, from: x.from, day: x.day, chat: '', title: x.title, text: x.text, mood: x.mood, created: x.created, edited: x.edited })), [inbox]);
+  const notes = useMemo<Listed[]>(() => filter === SHARED_WITH_ME ? theirs : filter === null ? [...mine, ...theirs] : mine.filter((n) => n.chat === filter), [mine, theirs, filter]);
   const perDay = useMemo(() => {
     const m = new Map<string, number>();
     for (const n of notes) m.set(n.day, (m.get(n.day) || 0) + 1);
@@ -48,15 +52,16 @@ export function Browse({ day, setDay, month, setMonth, onOpen, onClose, open, cl
   // Chats you have notes about, for the filter chips (and the open one, even with none yet).
   const chats = useMemo(() => {
     const set = new Set(Object.values(all).filter((n) => !n.deleted && n.chat).map((n) => n.chat));
-    if (filter) set.add(filter);
+    if (filter && filter !== SHARED_WITH_ME) set.add(filter);
     return [...set].sort((a, b) => chatName(a).localeCompare(chatName(b)));
   }, [all, filter, chatName]);
-  const thisMonth = useMemo(() => notes.filter((n) => n.day.startsWith(today().slice(0, 7))).length, [notes]);
-  const inARow = useMemo(() => streak(new Set(perDay.keys())), [perDay]);
-  const wroteToday = perDay.has(today());
+  // Your own writing only: friends' notes don't count towards your streak.
+  const thisMonth = useMemo(() => mine.filter((n) => n.day.startsWith(today().slice(0, 7))).length, [mine]);
+  const inARow = useMemo(() => streak(new Set(mine.map((n) => n.day))), [mine]);
+  const wroteToday = useMemo(() => mine.some((n) => n.day === today()), [mine]);
 
-  const create = () => onOpen(newNote(day || today(), filter ?? ''));
-  const title = filter === null ? t('Diary') : filter === '' ? t('Personal diary') : t('Notes · {name}', { name: chatName(filter) });
+  const create = () => onOpen(newNote(day || today(), filter === null || filter === SHARED_WITH_ME ? '' : filter));
+  const title = filter === null ? t('Diary') : filter === '' ? t('Personal diary') : filter === SHARED_WITH_ME ? t('Shared with me') : t('Notes · {name}', { name: chatName(filter) });
 
   let lastDay = '';
   return (
@@ -100,6 +105,9 @@ export function Browse({ day, setDay, month, setMonth, onOpen, onClose, open, cl
         <div className={cn('flex gap-2 overflow-x-auto pb-1', !searching && filter === null ? 'mt-4' : 'mt-1')} role="group" aria-label={t('Show notes for')}>
           <Chip on={filter === null} onClick={() => useNotes.setState({ filter: null })}>{t('All')}</Chip>
           <Chip on={filter === ''} onClick={() => useNotes.setState({ filter: '' })}><NotebookPen className="size-3.5" />{t('Personal')}</Chip>
+          {(theirs.length > 0 || filter === SHARED_WITH_ME) && (
+            <Chip on={filter === SHARED_WITH_ME} onClick={() => useNotes.setState({ filter: SHARED_WITH_ME })}><Inbox className="size-3.5" />{t('Shared with me')}</Chip>
+          )}
           {chats.map((c) => (
             <Chip key={c} on={filter === c} onClick={() => useNotes.setState({ filter: c })}>
               <Avatar u={c} name={chatName(c)} size={18} />{chatName(c)}
@@ -120,10 +128,11 @@ export function Browse({ day, setDay, month, setMonth, onOpen, onClose, open, cl
             <div className="mx-auto mb-3 grid size-14 place-items-center rounded-2xl bg-amber-500/12 text-amber-600"><BookOpen className="size-7" /></div>
             <p className="text-sm text-muted">
               {query ? t('No notes match your search.')
+                : filter === SHARED_WITH_ME ? t('When a friend shares a note with you, it shows here.')
                 : day ? t('Nothing written on this day yet.')
                 : t('Write about your day, or keep notes about a chat. Only you can read them: they’re end-to-end encrypted like your messages.')}
             </p>
-            {!query && <button onClick={create} className="mt-4 inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-white"><PenLine className="size-4" />{t('Write a note')}</button>}
+            {!query && filter !== SHARED_WITH_ME && <button onClick={create} className="mt-4 inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-white"><PenLine className="size-4" />{t('Write a note')}</button>}
           </div>
         ) : (
           <ul className="pt-1">

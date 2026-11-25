@@ -48,5 +48,20 @@
   "{n} words · Only you can read this": { "one": "{n} शब्द · इसे सिर्फ़ आप पढ़ सकते हैं", "other": "{n} शब्द · इसे सिर्फ़ आप पढ़ सकते हैं" },
   "Untitled": "बिना शीर्षक",
   "Not synced yet": "अभी सिंक नहीं हुआ",
-  "Group": "ग्रुप"
+  "Group": "ग्रुप",
+  "Shared with me": "मेरे साथ शेयर किए गए",
+  "When a friend shares a note with you, it shows here.": "जब कोई दोस्त आपके साथ नोट शेयर करेगा, तो वह यहाँ दिखेगा।",
+  "Share with friends": "दोस्तों के साथ शेयर करें",
+  "Share": "शेयर करें",
+  "{n} words · You and {names} can read this": { "one": "{n} शब्द · इसे आप और {names} पढ़ सकते हैं", "other": "{n} शब्द · इसे आप और {names} पढ़ सकते हैं" },
+  "From {name}": "{name} की ओर से",
+  "Shared": "शेयर किया गया",
+  "Share this note": "यह नोट शेयर करें",
+  "They can read it in their diary, but not change it. Only the people you pick can read it.": "वे इसे अपनी डायरी में पढ़ सकते हैं, पर बदल नहीं सकते। इसे सिर्फ़ वही पढ़ सकते हैं जिन्हें आप चुनें।",
+  "Add friends to share notes with them.": "नोट शेयर करने के लिए पहले दोस्त जोड़ें।",
+  "Friends": "दोस्त",
+  "Cancel": "रद्द करें",
+  "Done": "हो गया",
+  "This note isn’t shared with you any more.": "यह नोट अब आपके साथ शेयर नहीं है।",
+  "Shared with you by {name}. Only they can change it.": "{name} ने आपके साथ शेयर किया। इसे सिर्फ़ वही बदल सकते हैं।"
 }

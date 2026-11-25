@@ -7,15 +7,19 @@ import { UI_DICTS } from '@sanga/ui/locale';
 import { NOTES_DICTS } from './locale';
 import { useState } from 'react';
 import type { AppProps } from '@sanga/sdk';
-import { newNote, startNotes, today, useNotes, type Note } from './notes';
+import { newNote, SHARED_WITH_ME, startNotes, today, useNotes, type Note } from './notes';
 import { Blank } from './app/Blank';
 import { Browse } from './app/Browse';
 import { Editor } from './app/Editor';
+import { Viewer } from './app/Viewer';
+import type { Listed } from './app/NoteCard';
 
 /** The diary. `params.chat` opens one chat's notes ('' for the personal diary). On a wide screen the
  *  list and the open note sit side by side; on a phone the note takes the screen. */
 function NotesAppInner({ onClose, params, tab }: AppProps) {
   const [editing, setEditing] = useState<Note | null>(null);
+  const [viewing, setViewing] = useState<string | null>(null); // a friend's shared note: "<owner>|<id>"
+  const open = (n: Listed) => { if (n.from) { setEditing(null); setViewing(n.id.slice(3)); } else { setViewing(null); setEditing(n); } };
   const [day, setDay] = useState<string | null>(null); // null: every day
   const [month, setMonth] = useState(() => today().slice(0, 7));
   // Before the first render: show the chat it was opened for, and start syncing (once per session).
@@ -24,11 +28,11 @@ function NotesAppInner({ onClose, params, tab }: AppProps) {
 
   return (
     <div className="flex min-h-0 flex-1 bg-bg">
-      <Browse day={day} setDay={setDay} month={month} setMonth={setMonth} onOpen={setEditing} onClose={tab ? undefined : onClose}
-        open={editing?.id} className={editing ? 'hidden md:flex' : 'flex'} />
-      {editing
-        ? <Editor key={editing.id} note={editing} onDone={done} />
-        : <Blank onNew={() => setEditing(newNote(day || today(), useNotes.getState().filter ?? ''))} />}
+      <Browse day={day} setDay={setDay} month={month} setMonth={setMonth} onOpen={open} onClose={tab ? undefined : onClose}
+        open={editing?.id ?? (viewing ? 'in:' + viewing : undefined)} className={editing || viewing ? 'hidden md:flex' : 'flex'} />
+      {editing ? <Editor key={editing.id} note={editing} onDone={done} />
+        : viewing !== null ? <Viewer key={viewing} noteKey={viewing} onDone={() => setViewing(null)} />
+        : <Blank onNew={() => { const f = useNotes.getState().filter; setEditing(newNote(day || today(), f === null || f === SHARED_WITH_ME ? '' : f)); }} />}
     </div>
   );
 }
