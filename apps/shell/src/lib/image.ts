@@ -3,9 +3,13 @@ import { t, tk } from '@sanga/i18n';
 
 // Photos are downscaled and re-encoded on the device before encryption: a 4 MB camera
 // photo typically becomes 100–250 KB, which matters a lot on slow connections.
+// Long, thin pictures (phone screenshots, panoramas) keep their short side up to 1080 px, so the text
+// in a screenshot stays readable: the long side may then go up to 2560. (Not for small previews.)
 export async function compressImage(file: Blob, maxDim = 1280) {
   const bmp = await decode(file);
-  const scale = Math.min(1, maxDim / Math.max(bmp.width, bmp.height));
+  const long = Math.max(bmp.width, bmp.height), short = Math.min(bmp.width, bmp.height);
+  const limit = maxDim >= 1024 && long / short > 1.6 ? Math.min(2560, Math.max(maxDim, (1080 * long) / short)) : maxDim;
+  const scale = Math.min(1, limit / long);
   const w = Math.round(bmp.width * scale);
   const h = Math.round(bmp.height * scale);
   const canvas = document.createElement('canvas');

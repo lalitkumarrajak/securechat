@@ -4,7 +4,8 @@ import { openGallery } from '../chatUi';
 import { Marked } from './Marked';
 import { t, tn } from '@sanga/i18n';
 
-/** Photos sent together: a grid of up to four, the last showing "+N" for the rest, like WhatsApp. */
+/** Photos sent together: a grid of up to four, the last showing "+N" for the rest, like WhatsApp. Each
+ *  photo is shown whole (a screenshot too), over a blurred copy of itself that fills the rest of its tile. */
 export function Album({ album }: { album: Msg[] }) {
   const shown = album.slice(0, 4);
   const more = album.length - shown.length;
@@ -15,7 +16,8 @@ export function Album({ album }: { album: Msg[] }) {
         {shown.map((x, n) => (
           <button key={x.k} onClick={(e) => { e.stopPropagation(); openGallery(x); }} aria-label={t('View photo {n} of {total}', { n: n + 1, total: album.length })}
             className={cn('relative block aspect-square overflow-hidden rounded-xl bg-panel-2', shown.length === 3 && n === 0 && 'col-span-2 aspect-[2/1]')}>
-            <img src={x.src} alt={t('Photo')} loading="lazy" className="size-full object-cover" />
+            <img src={x.src} alt="" aria-hidden loading="lazy" className="absolute inset-0 size-full scale-110 object-cover opacity-60 blur-lg" />
+            <img src={x.src} alt={t('Photo')} loading="lazy" className="relative size-full object-contain" />
             {more > 0 && n === 3 && <span className="absolute inset-0 grid place-items-center bg-black/50 text-2xl font-semibold text-white">+{more}</span>}
           </button>
         ))}

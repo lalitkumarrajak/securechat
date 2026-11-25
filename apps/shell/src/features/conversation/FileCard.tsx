@@ -16,7 +16,7 @@ export function FileCard({ m }: { m: Msg }) {
         <video src={m.src} poster={f.thumb} controls playsInline preload="none" className="mb-1 block max-h-72 w-full rounded-xl bg-black" />
       ) : f.thumb ? (
         <button onClick={() => setChatUi({ viewer: f.thumb! })} className="mb-1 block w-full overflow-hidden rounded-xl border border-line bg-white" aria-label={t('Preview')}>
-          <img src={f.thumb} alt="" className="block max-h-56 w-full object-cover object-top" />
+          <img src={f.thumb} alt="" className="mx-auto block max-h-56 max-w-full object-contain" />
         </button>
       ) : f.text ? (
         <pre className="mb-1 max-h-32 overflow-hidden rounded-xl bg-ink/5 p-2.5 font-mono text-xs leading-relaxed whitespace-pre-wrap text-muted">{f.text}</pre>

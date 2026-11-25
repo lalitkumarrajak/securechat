@@ -31,7 +31,7 @@ export function Body({ m, emoji, me, members }: { m: Msg; emoji: string[] | null
       <>
         <button className="block" onClick={(e) => { e.stopPropagation(); openGallery(m); }} aria-label={t('View photo')}>
           <img src={m.src} alt={t('Photo')} loading="lazy" width={m.w || undefined} height={m.h || undefined}
-            className="block h-auto max-h-80 w-auto max-w-[min(300px,70vw)] rounded-xl object-cover" />
+            className="block h-auto max-h-[min(26rem,60vh)] w-auto max-w-[min(300px,70vw)] rounded-xl object-contain" />
         </button>
         {m.text && <p className="px-1.5 pt-1 whitespace-pre-wrap [overflow-wrap:anywhere]"><Marked text={m.text} /></p>}
       </>
@@ -46,7 +46,7 @@ export function Body({ m, emoji, me, members }: { m: Msg; emoji: string[] | null
     return (
       <span className="relative block">
         <img src={m.src} alt="GIF" loading="lazy" referrerPolicy="no-referrer" width={m.w || undefined} height={m.h || undefined}
-          className="block h-auto max-h-72 w-auto max-w-[min(260px,65vw)] rounded-xl bg-panel-2 object-cover" />
+          className="block h-auto max-h-72 w-auto max-w-[min(260px,65vw)] rounded-xl bg-panel-2 object-contain" />
         <span className="absolute top-1.5 left-1.5 rounded bg-black/50 px-1 text-[10px] font-bold text-white">GIF</span>{/* i18n-ok */}
       </span>
     );
