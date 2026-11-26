@@ -11,8 +11,9 @@
   if (meta) meta.content = dark ? '#0f1419' : '#f7f8fa';
 })();
 
-// A start file that won't load (a page saved before an update, whose files the server no longer has)
-// would leave a blank screen: drop the saved page and load again, once. main.tsx says when it's up.
+// A start file that won't load (a page saved before an update, whose files the server no longer has),
+// or one that fails as it starts (a broken version that has since been replaced), would leave a blank
+// screen: drop the saved page and load again, once. main.tsx says when it's up.
 (function () {
   var done = false;
   function recover() {
@@ -32,9 +33,12 @@
   addEventListener('error', function (e) {
     var el = e.target, u = el && (el.src || el.href);
     if (typeof u === 'string' && /\/(assets\/|remoteEntry-)/.test(u)) recover();
+    // An error thrown by a start file before the app is up.
+    else if (typeof e.filename === 'string' && /\/(assets\/|remoteEntry-)/.test(e.filename)) recover();
   }, true);
   addEventListener('unhandledrejection', function (e) {
-    var r = e.reason, m = String((r && r.message) || r);
+    var r = e.reason, m = String((r && r.message) || r), stack = String((r && r.stack) || '');
     if (/dynamically imported module|Importing a module script failed|error loading dynamically/i.test(m)) recover();
+    else if (/\/(assets\/|remoteEntry-)/.test(stack)) recover();
   });
 })();

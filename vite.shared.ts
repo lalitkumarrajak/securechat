@@ -15,6 +15,30 @@ export const SHARED = {
   '@sanga/sdk': { singleton: true },
 };
 
+/** Settings every app passes to federation(). The plugin writes the list of shared libraries an app
+ *  provides only once it has read the whole module graph, but stops waiting after a quiet spell (10 s
+ *  by default). On a slow build machine (Render's free tier, six apps at once) it gave up too early,
+ *  wrote the SDK down as "not provided", and the deployed page stopped on a blank screen. A normal
+ *  build still goes on as soon as the graph is read; these are only the limits. */
+export const FEDERATION = { shared: SHARED, dts: false, moduleParseTimeout: 900, moduleParseIdleTimeout: 300 } as const;
+
+/** Fails the build if an app's list of shared libraries says it doesn't provide one of them (see
+ *  FEDERATION): a failed build leaves the version already online in place, a blank page doesn't. */
+export function sharedCheck(): Plugin {
+  return {
+    name: 'shared-check',
+    apply: 'build',
+    generateBundle(_, bundle) {
+      for (const chunk of Object.values(bundle)) {
+        if (chunk.type !== 'chunk' || !chunk.fileName.includes('localSharedImportMap')) continue;
+        if (/materialize\s*:\s*(!1|false)\b/.test(chunk.code)) {
+          this.error(`${chunk.fileName}: a shared library (${Object.keys(SHARED).join(', ')}) was left out of the build. Build again.`);
+        }
+      }
+    },
+  };
+}
+
 /** In development the API, live connection and the other apps' built files come from the Node server. */
 export const DEV_PROXY = {
   '/api': 'http://localhost:3000',

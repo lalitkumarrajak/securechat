@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { federation } from '@module-federation/vite';
-import { DEV_PROXY, precompress, SHARED } from '../../vite.shared';
+import { DEV_PROXY, FEDERATION, precompress, sharedCheck } from '../../vite.shared';
 
 // The main app. The Node server (server/index.js) serves apps/shell/dist in production. In development,
 // run `npm run dev`: Vite serves the UI and forwards API, WebSocket and emoji requests to Node.
@@ -10,7 +10,7 @@ import { DEV_PROXY, precompress, SHARED } from '../../vite.shared';
 // first opened, so none of their code is downloaded before that.
 export default defineConfig({
   root: import.meta.dirname,
-  plugins: [react(), tailwindcss(), federation({ name: 'shell', remotes: {}, shared: SHARED, dts: false }), precompress()],
+  plugins: [react(), tailwindcss(), federation({ name: 'shell', remotes: {}, ...FEDERATION }), precompress(), sharedCheck()],
   build: {
     outDir: 'dist',
     emptyOutDir: true,

@@ -1,5 +1,5 @@
 // Service worker: offline app shell and push notifications.
-const CACHE = 'chattrix-v5'; // bumping it empties the saved copy: the next start waits for the network // bump when the shell files change
+const CACHE = 'chattrix-v6'; // bumping it empties the saved copy: the next start waits for the network // bump when the shell files change
 // On a weak signal a new version is fetched a while after opening, not while Chat is catching up.
 const UPDATE_DELAY = 15000;
 const slowLink = () => { const c = self.navigator.connection; return !!c && (c.saveData === true || c.effectiveType === '2g' || c.effectiveType === 'slow-2g' || (c.rtt || 0) >= 1000); };
