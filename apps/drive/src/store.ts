@@ -268,12 +268,12 @@ async function pump() {
       setUpload(u.id, { state: 'sending' });
       await refreshUsage();
       const room = get().usage;
-      if (room && u.size * 1.34 + 1000 > room.max - room.used) { setUpload(u.id, { state: 'failed', error: 'full' }); continue; }
+      if (room && u.size > room.max - room.used) { setUpload(u.id, { state: 'failed', error: 'full' }); continue; }
       try {
         await send(u, file);
         files.delete(u.id);
         setUpload(u.id, { state: 'done', sent: u.size });
-        set((s) => ({ usage: s.usage && { ...s.usage, used: s.usage.used + Math.ceil(u.size * 1.34) } }));
+        set((s) => ({ usage: s.usage && { ...s.usage, used: s.usage.used + u.size } }));
       } catch (e) {
         void sdk().api('/api/drive/delete', { file: u.id }).catch(() => {});
         if (cancelled.has(u.id)) setUpload(u.id, { state: 'cancelled' });

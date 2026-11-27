@@ -403,14 +403,12 @@ function Row({ e, n, sub: s, onAction }: { e: Entry; n: number; sub: string; onA
 }
 
 function Usage({ used, max }: { used: number; max: number }) {
-  // The server counts the sealed pieces as stored (base64): about 4/3 of the files themselves.
-  const u = Math.round(used * 0.75), m = Math.round(max * 0.75);
-  const pct = Math.min(100, (used / max) * 100);
+  const pct = max > 0 ? Math.min(100, (used / max) * 100) : 100;
   return (
     <div className="mt-8 rounded-2xl border border-line/70 bg-panel p-4 shadow-sm">
       <div className="flex items-center justify-between text-sm">
         <span className="font-medium">{t('Storage')}</span>
-        <span className="text-muted">{t('{used} of {max} used', { used: fmtSize(u), max: fmtSize(m) })}</span>
+        <span className="text-muted">{t('{used} of {max} used', { used: fmtSize(used), max: fmtSize(max) })}</span>
       </div>
       <div className="mt-2 h-2 overflow-hidden rounded-full bg-panel-2">
         <div className={cn('h-full rounded-full', pct > 90 ? 'bg-danger' : 'bg-accent')} style={{ width: `${Math.max(pct, used ? 1 : 0)}%` }} />

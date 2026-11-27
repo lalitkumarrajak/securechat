@@ -79,6 +79,30 @@ Caddy gets a free HTTPS certificate automatically.
 | `CLOUDFLARE_TURN_KEY_ID`, `CLOUDFLARE_TURN_API_TOKEN` | – | A TURN relay for calls ([Cloudflare Realtime TURN](https://developers.cloudflare.com/realtime/turn/), free tier). Without one, most calls connect directly, but some mobile networks block that |
 | `TURN_URLS` + `TURN_USERNAME`, `TURN_CREDENTIAL` | – | Or any other TURN service (comma-separated `turn:` URLs) |
 | `TURN_URLS` + `TURN_SECRET` | – | Or your own coturn with `use-auth-secret` (short-lived credentials per user) |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | – | Keep Drive's files in [Cloudflare R2](https://developers.cloudflare.com/r2/) (free up to 10 GB) instead of the database. Files uploaded before move there by themselves. See *Drive's files in R2* below |
+| `GDRIVE_CLIENT_ID`, `GDRIVE_CLIENT_SECRET`, `GDRIVE_REFRESH_TOKEN` | – | Keep Drive's files in a Google Drive instead (used first if both are set). See *Drive's files in Google Drive* below. `GDRIVE_FOLDER` names the folder (default `Sanga Drive`) |
+| `DRIVE_MAX_BYTES` | 50 GB with Google Drive, 2 GB with R2, else 200 MB | Drive space per person, as stored (in the database base64 takes a third more) |
+| `DRIVE_TOTAL_MAX_BYTES` | 1 TB with Google Drive, 9 GB with R2, else 250 MB | Drive space for everyone together, so it can't fill the storage or the database |
+
+### Drive's files in Google Drive
+
+Sanga's Drive can keep everyone's files (encrypted pieces, with random names) in a folder of one Google account's Drive, using that account's storage. It asks only for the *drive.file* permission, so it can see nothing else in that Drive. Don't delete or move the `Sanga Drive` folder or its files.
+
+1. Open [console.cloud.google.com](https://console.cloud.google.com), create a project (e.g. *Sanga*).
+2. **APIs & Services → Library**: find **Google Drive API** and **Enable** it.
+3. **Google Auth Platform → Branding** (the OAuth consent screen): app name *Sanga*, your email, audience **External**, then create.
+4. **Audience → Publish app**, so it says **In production**. Left in *Testing*, Google ends the sign-in after 7 days and Drive stops working.
+5. **Clients → Create client**: type **Desktop app**. Copy the **Client ID** and **Client secret**.
+6. On your computer, in this repo: `npm run google-drive-login`. Paste the ID and secret; a browser opens. Sign in with the account whose Drive to use. Google may say it *hasn't verified this app*: it's your own, so choose **Advanced → Go to Sanga**, then **Continue**.
+7. The terminal prints `GDRIVE_CLIENT_ID`, `GDRIVE_REFRESH_TOKEN` and a link to the new folder. In Render → your service → **Environment**, add those two and `GDRIVE_CLIENT_SECRET`, and save. The log then says `drive: files kept in Google Drive`, and files uploaded before move there by themselves.
+
+### Drive's files in R2
+
+1. In the Cloudflare dashboard open **R2 Object Storage** and turn it on (it asks for a card even for the free plan, which includes 10 GB of storage).
+2. **Create bucket**, e.g. `sanga-drive`. Leave it private: Sanga signs every request, and the files are encrypted on the device anyway.
+3. **Manage API tokens → Create API token**: permission *Object Read & Write*, applied to that bucket only. Copy the **Access Key ID** and **Secret Access Key** (the secret is shown once).
+4. Your **Account ID** is on the R2 overview page.
+5. In Render → your service → **Environment**, add `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and `R2_BUCKET`, and save (it redeploys). The log then says `drive: files kept in R2`.
 
 ## Adding a game
 

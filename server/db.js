@@ -229,6 +229,7 @@ const COLUMNS = [
   "ALTER TABLE session_info ADD COLUMN device TEXT NOT NULL DEFAULT ''", // phone model etc., JSON
   'ALTER TABLE users ADD COLUMN email TEXT', // verified, lowercase; NULL for accounts without one
   'CREATE UNIQUE INDEX IF NOT EXISTS users_email ON users (email)', // NULLs don't clash
+  "ALTER TABLE drive_chunks ADD COLUMN ref TEXT NOT NULL DEFAULT ''", // where a piece kept outside the database is ('gd:<id>', 'r2:<key>')
 ];
 
 // Queries written once with `?` placeholders; converted to $1, $2… for Postgres.
@@ -369,12 +370,17 @@ const SQL = {
   itemStats: 'SELECT COUNT(*) AS n, COALESCE(MAX(updated), 0) AS last, COALESCE(SUM(octet_length(body)), 0) AS bytes FROM items WHERE username = ? AND app = ?',
 
   // Drive: each file's sealed pieces (the file's name, folder and key are an item of app 'drive').
-  putDriveChunk: `INSERT INTO drive_chunks (username, file, idx, body, size) VALUES (?, ?, ?, ?, ?)
-                  ON CONFLICT (username, file, idx) DO UPDATE SET body = excluded.body, size = excluded.size`,
-  getDriveChunk: 'SELECT body FROM drive_chunks WHERE username = ? AND file = ? AND idx = ?',
-  driveChunkSize: 'SELECT size FROM drive_chunks WHERE username = ? AND file = ? AND idx = ?',
+  putDriveChunk: `INSERT INTO drive_chunks (username, file, idx, body, size, ref) VALUES (?, ?, ?, ?, ?, ?)
+                  ON CONFLICT (username, file, idx) DO UPDATE SET body = excluded.body, size = excluded.size, ref = excluded.ref`,
+  getDriveChunk: 'SELECT body, ref FROM drive_chunks WHERE username = ? AND file = ? AND idx = ?',
+  driveChunkSize: 'SELECT size, ref FROM drive_chunks WHERE username = ? AND file = ? AND idx = ?',
   driveStats: 'SELECT COALESCE(SUM(size), 0) AS bytes FROM drive_chunks WHERE username = ?',
   delDriveFile: 'DELETE FROM drive_chunks WHERE username = ? AND file = ?',
+  driveFileChunks: 'SELECT idx, ref FROM drive_chunks WHERE username = ? AND file = ?',
+  driveTotal: 'SELECT COALESCE(SUM(size), 0) AS bytes FROM drive_chunks',
+  // Pieces still kept in the database, once files go to R2: moved there a few at a time.
+  driveInDb: "SELECT username, file, idx, body FROM drive_chunks WHERE body <> '' LIMIT ?",
+  driveMoved: "UPDATE drive_chunks SET body = '', size = ?, ref = ? WHERE username = ? AND file = ? AND idx = ?",
 
   // Split: groups of people sharing expenses. The server knows who is in a group and keeps sealed records
   // and sealed bill photos; the group key is wrapped for each member and never seen in the clear.
@@ -773,14 +779,25 @@ async function openMongo(uri) {
       bytes: await sumBytes(items, { username: u, app }),
     }),
 
-    putDriveChunk: async (u, file, idx, body, size) => {
-      await driveChunks.replaceOne({ _id: `${u}|${file}|${idx}` }, { username: u, file, idx, body, size }, { upsert: true });
+    putDriveChunk: async (u, file, idx, body, size, ref) => {
+      await driveChunks.replaceOne({ _id: `${u}|${file}|${idx}` }, { username: u, file, idx, body, size, ref }, { upsert: true });
       return changes(1);
     },
-    getDriveChunk: async (u, file, idx) => (await driveChunks.findOne({ _id: `${u}|${file}|${idx}` }, { projection: { body: 1 } })) ?? undefined,
-    driveChunkSize: async (u, file, idx) => (await driveChunks.findOne({ _id: `${u}|${file}|${idx}` }, { projection: { size: 1 } })) ?? undefined,
+    getDriveChunk: async (u, file, idx) => {
+      const d = await driveChunks.findOne({ _id: `${u}|${file}|${idx}` }, { projection: { body: 1, ref: 1 } });
+      return d ? { body: d.body, ref: d.ref ?? '' } : undefined;
+    },
+    driveChunkSize: async (u, file, idx) => {
+      const d = await driveChunks.findOne({ _id: `${u}|${file}|${idx}` }, { projection: { size: 1, ref: 1 } });
+      return d ? { size: d.size, ref: d.ref ?? '' } : undefined;
+    },
     driveStats: async (u) => ({ bytes: (await driveChunks.aggregate([{ $match: { username: u } }, { $group: { _id: null, bytes: { $sum: '$size' } } }]).next())?.bytes ?? 0 }),
     delDriveFile: async (u, file) => changes((await driveChunks.deleteMany({ username: u, file })).deletedCount),
+    driveFileChunks: async (u, file) => (await driveChunks.find({ username: u, file }, { projection: { idx: 1, ref: 1 } }).toArray()).map((d) => ({ idx: d.idx, ref: d.ref ?? '' })),
+    driveTotal: async () => ({ bytes: (await driveChunks.aggregate([{ $group: { _id: null, bytes: { $sum: '$size' } } }]).next())?.bytes ?? 0 }),
+    driveInDb: async (limit) => (await driveChunks.find({ body: { $ne: '' } }).limit(limit).toArray())
+      .map((d) => ({ username: d.username, file: d.file, idx: d.idx, body: d.body })),
+    driveMoved: async (size, ref, u, file, idx) => changes((await driveChunks.updateOne({ _id: `${u}|${file}|${idx}` }, { $set: { body: '', size, ref } })).modifiedCount),
 
     splitMember: async (gid, u) => {
       const d = await splitMembers.findOne({ _id: gid + '|' + u });

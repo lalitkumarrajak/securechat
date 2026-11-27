@@ -13,7 +13,8 @@
     "test": "node --test --test-concurrency=1 'test/*.test.js'",
     "test:unit": "turbo run test",
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
-    "cert": "sh scripts/gen-cert.sh"
+    "cert": "sh scripts/gen-cert.sh",
+    "google-drive-login": "node scripts/google-drive-login.mjs"
   },
   "engines": {
     "node": ">=22.13"
