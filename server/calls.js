@@ -14,13 +14,16 @@
 // forgotten once no member's connection has been back for DROP_MS.
 import crypto from 'node:crypto';
 import { B64_RE, USER_RE } from './config.js';
-import { rateLimited, sendJson } from './http.js';
+import { clientIp, rateLimited, readJson, sendJson } from './http.js';
 import { online, send, sendTo } from './hub.js';
 import { canChat } from './friends.js';
 import { getProfile } from './profiles.js';
 import { notify } from './push.js';
 
 const RING_MS = Number(process.env.CALL_RING_MS) || 45e3;
+// A phone with Sanga closed hears a call only through notifications: one every REPEAT_MS while it
+// rings (each sounds and vibrates again), so it rings like a call rather than pinging once.
+const REPEAT_MS = Number(process.env.CALL_RING_REPEAT_MS) || 4000;
 const GRACE_MS = Number(process.env.CALL_GRACE_MS) || 5000; // a caller's reload or network blip
 const DROP_MS = Number(process.env.CALL_DROP_MS) || 60e3;   // everyone gone from an answered call
 const MAX_CALLS = Number(process.env.CALL_MAX) || 10_000;
@@ -30,7 +33,8 @@ const MAX_SIGNAL = 20_000; // a sealed offer or answer (SDP); candidates are far
 const ID_RE = /^[A-Za-z0-9_-]{16,32}$/;
 
 // id -> { id, from, video, answered, timer, ts, members: Map<user, Member> }
-// Member: { u, ws (their device on the call), in (answered), by (who rang them), offer (sealed, while ringing), timer }
+// Member: { u, ws (their device on the call), in (answered), by (who rang them), offer (sealed, while ringing), timer,
+//          key (lets their notification's Decline button end it without signing in), rep (the notifications' repeat) }
 const calls = new Map();
 export const activeCalls = calls; // tests
 
@@ -43,7 +47,19 @@ const inside = (c) => [...c.members.values()].filter((x) => x.in);
 function end(c, reason, byWs) {
   if (!calls.delete(c.id)) return;
   clearTimeout(c.timer);
-  for (const x of c.members.values()) { clearTimeout(x.timer); sendTo(x.u, { t: 'cend', id: c.id, r: reason }, byWs); }
+  for (const x of c.members.values()) {
+    clearTimeout(x.timer);
+    if (!x.in) hush(c, x, reason);
+    sendTo(x.u, { t: 'cend', id: c.id, r: reason }, byWs);
+  }
+}
+
+/** Someone stops being rung: no more notifications, and the one showing on their phones goes (a missed
+ *  call replaces it with its own notification instead). */
+function hush(c, x, reason) {
+  if (!x.rep) return;
+  clearInterval(x.rep); x.rep = 0;
+  if (reason !== 'missed' && reason !== 'cancelled') notifyCall(x.u, x.by, { t: 'cstop', id: c.id, r: reason }, true, 120);
 }
 
 // Once answered, each person talks to one device; if its connection dropped, to whichever of their
@@ -69,12 +85,18 @@ function ring(c, u, by, offer) {
     notifyCall(u, by, { t: 'missed', v: c.video ? 1 : 0 });
   }, RING_MS);
   sendTo(u, ringFrame(c, x));
-  notifyCall(u, by, { t: 'call', v: c.video ? 1 : 0 }, true); // to their devices not showing Sanga
+  // To their devices not showing Sanga, again and again until it's answered or over.
+  x.key = crypto.randomBytes(18).toString('base64url');
+  const push = () => notifyCall(u, by, { t: 'call', id: c.id, k: x.key, v: c.video ? 1 : 0 }, true, 30);
+  push();
+  x.rep = setInterval(() => { if (c.members.get(u) === x && !x.in && calls.get(c.id) === c) push(); else hush(c, x, 'ended'); }, REPEAT_MS);
+  x.rep.unref?.();
 }
 
 /** Someone leaves (or never answered): the others are told; with one person left, it's over. */
 function leave(c, x, reason, byWs) {
   clearTimeout(x.timer);
+  if (!x.in) hush(c, x, reason);
   c.members.delete(x.u);
   sendTo(x.u, { t: 'cend', id: c.id, r: x.in ? 'ended' : reason }, byWs); // stops ringing on their other devices
   if (inside(c).length <= 1) return end(c, x.in ? 'ended' : reason, byWs); // anyone still ringing stops too
@@ -125,6 +147,7 @@ export const handlers = {
     x.ws = ws;
     x.offer = null; // only needed to ring devices; it can be most of MAX_SIGNAL
     clearTimeout(x.timer);
+    hush(c, x, 'elsewhere');
     if (!c.answered) {
       c.answered = true;
       c.timer = setTimeout(() => calls.delete(c.id), 12 * 3600e3); // forgotten calls don't pile up
@@ -165,12 +188,19 @@ export const handlers = {
     leave(c, x, r, ws);
   },
 
-  // This device reconnected during a call it's on: route the call's messages to it again.
+  // This device reconnected during a call it's on: route the call's messages to it again. `back`: Sanga
+  // was closed and opened again, so its connections are gone: the others connect to it afresh.
   async cre(ws, m) {
     const c = calls.get(m.id);
     const x = c?.members.get(ws.user);
-    if (!x) return send(ws, { t: 'cend', id: m.id, r: 'ended' });
-    if (x.in) x.ws = ws;
+    if (!x || (m.back && !x.in)) return send(ws, { t: 'cend', id: m.id, r: 'ended' });
+    if (!x.in) return;
+    if (m.back && x.ws !== ws && live(x.ws)) return send(ws, { t: 'cend', id: m.id, r: 'elsewhere' }); // still on it on another device
+    x.ws = ws;
+    if (m.back) {
+      if (rateLimited('cback:' + ws.user, 10, 60e3)) return;
+      toOthers(c, x.u, { t: 'cback', id: c.id, u: x.u });
+    }
   },
 };
 
@@ -209,10 +239,10 @@ export function onClose(ws) {
   }
 }
 
-async function notifyCall(to, from, payload, away = false) {
+async function notifyCall(to, from, payload, away = false, ttl) {
   try {
     const name = (await getProfile(from)).name || from;
-    await notify(to, { ...payload, from, name }, undefined, away);
+    await notify(to, { ...payload, from, name }, undefined, away, ttl);
   } catch (err) { console.error('push', err.message); }
 }
 
@@ -248,7 +278,22 @@ async function turnServers(me) {
   return [];
 }
 
+const sameKey = (a, b) => typeof b === 'string' && a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+
+/** Routes that work without signing in: the Decline button on a call's notification (the service
+ *  worker has no sign-in; the notification carries that ringing's own key instead). */
+export const PUBLIC = ['POST /api/calls/decline'];
+
 export const routes = {
+  'POST /api/calls/decline': async (req, res) => {
+    if (rateLimited('cdecline:' + clientIp(req), 30, 60e3)) return sendJson(res, 429, { error: 'Too many requests' });
+    const { id, k } = await readJson(req, 500);
+    const c = typeof id === 'string' ? calls.get(id) : null;
+    const x = c && [...c.members.values()].find((y) => !y.in && y.key && sameKey(y.key, k));
+    if (x) { if (!c.answered) end(c, 'declined'); else leave(c, x, 'declined'); }
+    sendJson(res, 200, {}); // over already, or never was: the same answer
+  },
+
   'GET /api/ice': async (req, res, me) => {
     let turn = [];
     try { turn = await turnServers(me); } catch (err) { console.error('turn servers', err.message); }

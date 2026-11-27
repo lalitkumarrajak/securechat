@@ -25,7 +25,7 @@ import { routes as splitRoutes } from './split.js';
 import { moveDriveOut, tidyDrive, PUBLIC as DRIVE_PUBLIC, storage as driveStorage, routes as driveRoutes } from './drive.js';
 import { routes as reminderRoutes, startReminders } from './reminders.js';
 import { purgeStories, routes as storyRoutes } from './stories.js';
-import { handlers as callHandlers, onClose as callClosed, onConnect as callConnected, routes as callRoutes } from './calls.js';
+import { handlers as callHandlers, onClose as callClosed, onConnect as callConnected, PUBLIC as CALL_PUBLIC, routes as callRoutes } from './calls.js';
 import { handlers as messageHandlers } from './messages.js';
 import { handlers as gameHandlers, loadGames, purgeGames } from './games.js';
 import { EMOJI_RE, serveEmoji } from './emoji.js';
@@ -60,6 +60,7 @@ if (driveStorage) {
 loadStatic();
 
 for (const r of DRIVE_PUBLIC) PUBLIC_ROUTES.add(r); // a Drive share link opens without signing in
+for (const r of CALL_PUBLIC) PUBLIC_ROUTES.add(r); // Decline, on a call's notification
 const handlers = { ...messageHandlers, ...gameHandlers, ...callHandlers };
 
 // ---------- HTTP ----------

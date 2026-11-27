@@ -26,7 +26,7 @@ before(async () => {
   });
   await new Promise((r) => push.listen(0, r));
   pushPort = push.address().port;
-  srv = await startServer({ PUSH_ALLOW_ANY_HOST: '1', NODE_TLS_REJECT_UNAUTHORIZED: '0' });
+  srv = await startServer({ PUSH_ALLOW_ANY_HOST: '1', NODE_TLS_REJECT_UNAUTHORIZED: '0', CALL_RING_REPEAT_MS: '300' });
 });
 after(async () => { await srv.stop(); push.close(); });
 
@@ -121,6 +121,36 @@ describe('push notifications', () => {
     await sleep(400);
     assert.equal(hits.length, 0);
     onPhone.close(); laptop.close();
+  });
+
+  it('a call rings a closed phone again and again until it is declined, then clears it', async () => {
+    const e = await register(srv, name('xe'));
+    await befriend(srv, a, e);
+    const { auth } = await C.deriveFromPassword(e.u, e.pw);
+    const phone = (await srv.api('/api/login', { u: e.u, auth })).data.token;
+    assert.equal((await srv.api('/api/push/subscribe', { sub: subscription('e-phone') }, phone)).status, 200);
+    const laptop = await connect(srv, e.token); // Sanga open on the computer: it rings there itself
+    hits.length = 0;
+    const id = C.randomId(18);
+    wa.sendJson({ t: 'call', id, to: e.u, v: 0, b: 'AAAA' });
+    assert.equal((await laptop.next('call')).id, id);
+    await sleep(1100);
+    const rang = hits.filter((h) => h.path === '/push/e-phone').length;
+    assert.ok(rang >= 3, `rang ${rang} times`); // once, then every 300 ms here (4 s for real)
+
+    // Decline from a notification needs that ringing's key: a wrong one changes nothing.
+    assert.equal((await srv.api('/api/calls/decline', { id, k: 'not-the-key' })).status, 200);
+    await sleep(400);
+    assert.ok(hits.length > rang, 'still ringing');
+
+    // Declined on the computer: the phone hears once more (to clear its notification), then stops.
+    laptop.sendJson({ t: 'cend', id, r: 'declined' });
+    assert.equal((await wa.next('cend')).r, 'declined');
+    await sleep(500);
+    const after = hits.length;
+    await sleep(800);
+    assert.equal(hits.length, after, 'stopped ringing');
+    laptop.close();
   });
 
   it('an endpoint stays with its account: others can neither take it over nor remove it', async () => {

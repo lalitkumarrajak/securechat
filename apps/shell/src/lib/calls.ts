@@ -447,14 +447,22 @@ frameHooks.call = async (m: { id: string; f: string; v: number; b: string; m?: s
     minimized: false, remotes: {},
   });
   useStories.setState({ viewer: null }); // full screen too: the call goes on top
+  if (answerFor?.id === m.id && answerFor.until > Date.now()) { answerFor = null; void accept(); return; }
   startTone('ring');
-  if (document.visibilityState !== 'visible' && 'Notification' in window && Notification.permission === 'granted') {
-    const name = displayName(getApp().friends[m.f], m.f);
-    navigator.serviceWorker?.ready.then((reg) => reg.showNotification(name, {
-      body: others.length ? (m.v ? t('Incoming group video call') : t('Incoming group voice call')) : m.v ? t('Incoming video call') : t('Incoming voice call'), icon: '/icon-192.png', tag: 'call-' + m.f, requireInteraction: true, data: { peer: m.f },
-    })).catch(() => {});
-  }
+  // In the background, the server's notifications ring this phone (sw.js), with Answer and Decline.
 };
+
+// Answer pressed on a call's notification: Sanga opens (or comes forward) and answers it as soon as the
+// call reaches it, or straight away if it's already ringing here.
+let answerFor: { id: string; until: number } | null = null;
+export function answerWhenRinging(id: string) {
+  const c = cur();
+  if (c?.id === id && c.phase === 'incoming') { void accept(); return; }
+  answerFor = { id, until: Date.now() + 60_000 };
+}
+navigator.serviceWorker?.addEventListener('message', (e) => {
+  if (e.data?.t === 'answer' && typeof e.data.id === 'string') answerWhenRinging(e.data.id);
+});
 
 frameHooks.cring = (m: { id: string; on: boolean; u?: string }) => { if (cur()?.id === m.id && !m.u) set({ ringing: m.on }); };
 
@@ -576,14 +584,70 @@ frameHooks.cend = (m: { id: string; r: string }) => {
     case 'missed': return finish('missed', c.out ? tk('No answer') : tk('Missed call'));
     case 'cancelled': return finish('cancelled', tk('Missed call'));
     case 'failed': return finish('failed', tk('Call failed'));
-    default: return finish(anyAnswered() ? 'ok' : 'cancelled', tk('Call ended'));
+    default: return finish(anyAnswered() || c.started ? 'ok' : 'cancelled', tk('Call ended'));
   }
 };
 
-// Reconnected during a call: tell the server this device is still on it.
+// Someone on the call closed Sanga and opened it again: their old connection is gone, so mine to them
+// starts afresh (an offer from me; their reopened Sanga answers it, see resume below).
+frameHooks.cback = async (m: { id: string; u: string }) => {
+  const c = cur();
+  if (!c || c.id !== m.id || c.phase === 'ended' || c.phase === 'incoming' || m.u === myName()) return;
+  const old = R.links.get(m.u);
+  if (old) { clearTimeout(old.drop); old.pc.close(); R.links.delete(m.u); }
+  useCall.setState((st) => { const r = { ...st.remotes }; delete r[m.u]; return { remotes: r }; });
+  setMember(m.u, { state: 'connecting' });
+  try {
+    const { l, sdp } = await offerTo(c.id, m.u);
+    sendFrame({ t: 'csig', id: c.id, k: 'offer', to: m.u, b: await seal(m.u, c.id, 'reoffer', { sdp }) });
+    l.drop = window.setTimeout(() => { if (l.pc.connectionState !== 'connected') lost(m.u); }, RECONNECT_MS);
+  } catch { lost(m.u); }
+};
+
+// ---------- closing Sanga during a call ----------
+// Closing the app (or the phone closing it) stops its microphone: a web page can't go on without its
+// page. But the call isn't over: the others see "Reconnecting…", a notification says how to get back,
+// and opening Sanga again within RECONNECT_MS picks the same call up. Hanging up is the red button.
+const RESUME = 'sanga-call-resume';
+interface Resume { id: string; peer: string; video: boolean; out: boolean; started?: number; members: string[]; at: number; me: string }
+
+function keepForResume(c: Call) {
+  const r: Resume = { id: c.id, peer: c.peer, video: c.video, out: c.out, started: c.started, members: c.members.map((x) => x.u), at: Date.now(), me: myName() };
+  try { localStorage.setItem(RESUME, JSON.stringify(r)); } catch { /* no storage: it ends for them after a while */ }
+  const name = displayName(getApp().friends[c.peer], c.peer);
+  navigator.serviceWorker?.controller?.postMessage({ t: 'oncall', name: isGroupCall(c) ? t('Group call · {n} people', { n: c.members.length + 1 }) : name, ms: RECONNECT_MS });
+}
+
+async function resume() {
+  let r: Resume | null = null;
+  try { r = JSON.parse(localStorage.getItem(RESUME) || 'null'); localStorage.removeItem(RESUME); } catch { /* none */ }
+  navigator.serviceWorker?.ready.then(async (reg) => { for (const n of await reg.getNotifications({ tag: 'oncall' })) n.close(); }).catch(() => {});
+  if (!r || typeof r.id !== 'string' || r.me !== myName() || Date.now() - r.at > RECONNECT_MS - 3000 || cur() || !supported()) return;
+  const members = (Array.isArray(r.members) ? r.members : []).filter((u) => typeof u === 'string' && getApp().friends[u]).slice(0, MAX_PEOPLE);
+  if (!members.length) return;
+  useCall.setState({
+    call: { id: r.id, peer: r.peer, video: !!r.video, out: !!r.out, phase: 'connecting', started: r.started, members: members.map((u) => ({ u, state: 'reconnecting' as const })), muted: false, camOff: false, facing: 'user' },
+    minimized: false, remotes: {},
+  });
+  try {
+    const local = await getMedia(!!r.video);
+    if (cur()?.id !== r.id) { local.getTracks().forEach((tr) => tr.stop()); return; }
+    useCall.setState({ local });
+  } catch (e) {
+    toast.error((e as Error).message);
+    sendFrame({ t: 'cend', id: r.id, r: 'ended' }); finish('ok', null); return;
+  }
+  sendFrame({ t: 'cre', id: r.id, back: 1 }); // the others connect to me afresh (cback)
+  const id = r.id;
+  R.timers.push(window.setTimeout(() => { if (cur()?.id === id && !anyAnswered()) { sendFrame({ t: 'cend', id, r: 'ended' }); finish('ok', tk('Connection lost')); } }, 30_000));
+}
+
+// Reconnected during a call: tell the server this device is still on it. Just opened after closing
+// Sanga on a call: go back to it.
 readyHooks.push(() => {
   const c = cur();
   if (c && c.phase !== 'ended' && c.phase !== 'incoming') sendFrame({ t: 'cre', id: c.id });
+  else if (!c) void resume();
 });
 // Back in Sanga during a call: any connection that went quiet while away gets a fresh route now.
 document.addEventListener('visibilitychange', () => {
@@ -611,8 +675,15 @@ useCall.subscribe((s, prev) => {
   } catch { /* no media controls */ }
 });
 
-// Closing the app hangs up (capture: before the engine closes the connection on the same event).
-window.addEventListener('pagehide', (e) => { if (!e.persisted) hangUp(); }, { capture: true });
+// Closing the app (capture: before the engine closes the connection on the same event): a call I'm
+// placing that nobody answered yet is cancelled; one that's ringing here keeps ringing my other
+// devices (and this one, through notifications); one I'm on can be picked up again (see resume).
+window.addEventListener('pagehide', (e) => {
+  const c = cur();
+  if (e.persisted || !c || c.phase === 'ended' || c.phase === 'incoming') return;
+  if (c.out && !anyAnswered() && !c.started) { hangUp(); return; }
+  keepForResume(c);
+}, { capture: true });
 
 // ---------- sounds ----------
 let audio: AudioContext | null = null;

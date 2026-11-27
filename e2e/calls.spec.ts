@@ -76,6 +76,28 @@ test('a voice call: ring, answer, talk, mute, hang up', async () => {
   await expect(Q.page.getByRole('button', { name: new RegExp(P.u) }).filter({ hasText: 'Incoming voice call' }).first()).toBeVisible();
 });
 
+test('closing Sanga mid-call and opening it again picks the same call back up', async () => {
+  await P.page.getByRole('button', { name: 'Voice call' }).click();
+  await callScreen(Q).getByRole('button', { name: 'Accept' }).click();
+  await expect(callScreen(P).getByText(/^0:0\d$/)).toBeVisible({ timeout: 20_000 });
+
+  await P.page.reload(); // as good as closing the app and opening it again
+  // Back on the same call, still counting from when it started; Q hears P again.
+  await expect(callScreen(P).getByText(/^0:\d\d$/)).toBeVisible({ timeout: 30_000 });
+  await expect(callScreen(Q).getByText(/^0:\d\d$/)).toBeVisible();
+  await expect.poll(() => Q.page.evaluate(() => [...document.querySelectorAll('audio')].some((a) =>
+    !!a.srcObject && (a.srcObject as MediaStream).getAudioTracks().some((t) => t.readyState === 'live'))), { timeout: 20_000 }).toBe(true);
+  await expect.poll(() => P.page.evaluate(() => [...document.querySelectorAll('audio')].some((a) =>
+    !!a.srcObject && (a.srcObject as MediaStream).getAudioTracks().some((t) => t.readyState === 'live'))), { timeout: 20_000 }).toBe(true);
+
+  await callScreen(Q).getByRole('button', { name: 'End call' }).click();
+  await expect(callScreen(P)).toContainText('Call ended');
+  await expect(callScreen(P)).toHaveCount(0, { timeout: 5000 });
+  await expect(callScreen(Q)).toHaveCount(0, { timeout: 5000 });
+  await openChat(P, Q); // the reload left the chat
+  await expect(P.page.locator('[data-k]').filter({ hasText: 'Outgoing voice call' })).toHaveCount(2); // logged once
+});
+
 test('a video call: both see each other', async () => {
   await P.page.getByRole('button', { name: 'Video call' }).click();
   await callScreen(Q).getByRole('button', { name: 'Accept video call' }).click();

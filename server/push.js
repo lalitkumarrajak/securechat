@@ -40,7 +40,9 @@ const lastSent = new Map(); // "to|kind|from" -> ts, so a burst of messages make
  *  shows the message itself there), whatever the others are doing, so a phone in a pocket still hears
  *  of a message while Sanga is open on a computer. A subscription from before devices were told apart
  *  goes only while none of them is looking. */
-export async function notify(user, payload, coalesceKey, away = false) {
+/** `ttl`: seconds the push service may hold it for a phone that's off (a ringing call's is short:
+ *  hearing it a minute later would be wrong). */
+export async function notify(user, payload, coalesceKey, away = false, ttl = 86400) {
   if (!publicKey) return;
   if (coalesceKey) {
     const now = Date.now();
@@ -53,7 +55,7 @@ export async function notify(user, payload, coalesceKey, away = false) {
   await Promise.all(subs.map(async (s) => {
     try {
       await webpush.sendNotification({ endpoint: s.endpoint, keys: JSON.parse(s.keys) }, JSON.stringify(payload),
-        { TTL: 86400, urgency: 'high' });
+        { TTL: ttl, urgency: 'high' });
     } catch (err) {
       if (err.statusCode === 404 || err.statusCode === 410) await ctx.db.run('deletePushSub', s.endpoint);
       else console.error('push failed', err.statusCode || err.message);

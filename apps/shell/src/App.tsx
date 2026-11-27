@@ -11,7 +11,7 @@ import { Main } from './features/Shell';
 import { joinFromLink } from './features/games/store';
 import { LockScreen } from './features/lock/LockScreen';
 import { useLock } from './lib/applock';
-import { useCall } from './lib/calls';
+import { answerWhenRinging, useCall } from './lib/calls';
 import { rememberGroupInvite, rememberInvite } from './lib/invite';
 
 let booted = false;
@@ -34,6 +34,8 @@ export function App() {
     // "Join me on Sanga": /?add=<username>, offered as a friend request once signed in.
     const add = params.get('add');
     if (add) { history.replaceState(null, '', '/'); rememberInvite(add); }
+    const answer = params.get('answer'); // Answer, on a call's notification
+    if (answer) { history.replaceState(null, '', '/'); answerWhenRinging(answer); }
     const group = params.get('group'); // group invite link
     if (group) { history.replaceState(null, '', '/'); rememberGroupInvite(group); }
     boot().then(() => {

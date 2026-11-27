@@ -146,8 +146,21 @@ async function newer(saved, res) {
 self.addEventListener('message', (e) => {
   if (e.data?.t === 'pong') { if (e.source?.id) answered.add(e.source.id); return; }
   if (e.data?.t === 'lang') { e.waitUntil?.(saveLang(e.data.lang)); return; }
+  if (e.data?.t === 'oncall') { e.waitUntil?.(onCall(e.data)); return; }
   if (e.data?.t === 'build' && latest && e.data.build && e.data.build !== latest) e.source?.postMessage({ t: 'update', build: latest });
 });
+
+// Sanga closed during a call: the call waits a little for it to come back (lib/calls.ts, resume).
+async function onCall(d) {
+  const w = await words();
+  await self.registration.showNotification(String(d.name || 'Sanga').slice(0, 100), {
+    body: w('Call in progress. Tap to go back to it.', 'कॉल चल रही है। वापस जाने के लिए टैप करें।', 'कॉल सुरू आहे. परत जाण्यासाठी टॅप करा.'),
+    icon: '/icon-192.png', badge: '/icon-192.png', tag: 'oncall', requireInteraction: true, silent: true,
+    data: { oncall: true },
+  });
+  await new Promise((r) => setTimeout(r, Math.min(Number(d.ms) || 45_000, 60_000)));
+  for (const n of await self.registration.getNotifications({ tag: 'oncall' })) n.close();
+}
 
 // ---------- language ----------
 // Notifications are worded here, so they follow the language picked in Settings. The page can't share
@@ -176,6 +189,7 @@ self.addEventListener('push', (e) => {
   let d = {};
   try { d = e.data.json(); } catch {}
   if (d.t === 'remind') { e.waitUntil(remind(d)); return; }
+  if (d.t === 'cstop') { e.waitUntil(callOver(d)); return; }
   const call = d.t === 'call' || d.t === 'missed';
   e.waitUntil((async () => {
     const w = await words();
@@ -201,6 +215,22 @@ self.addEventListener('push', (e) => {
     // Don't notify if the app is open and visible: the page shows the message itself.
     const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     if (wins.some((w) => w.visibilityState === 'visible')) return;
+    if (d.t === 'call') {
+      // A ringing call comes again every few seconds: each one sounds and vibrates anew, like a ringtone,
+      // until it's answered, declined or over, or you swipe it away on this phone.
+      if (hushed.has(d.id)) return;
+      await self.registration.showNotification(title, {
+        body, icon: '/icon-192.png', badge: '/icon-192.png',
+        tag: 'call-' + (d.from || ''), renotify: true, requireInteraction: true, silent: false,
+        vibrate: [800, 400, 800, 400, 800, 400, 800],
+        actions: [
+          { action: 'answer', title: w('Answer', 'उठाएँ', 'उचला') },
+          { action: 'decline', title: w('Decline', 'काटें', 'नाकारा') },
+        ],
+        data: { peer: d.from, call: { id: d.id, k: d.k } },
+      });
+      return;
+    }
     await self.registration.showNotification(title, {
       body, icon: '/icon-192.png', badge: '/icon-192.png',
       // A missed call replaces its "incoming call" notification.
@@ -211,8 +241,39 @@ self.addEventListener('push', (e) => {
   })());
 });
 
+// Calls this phone stopped ringing for (swiped away): the repeats that follow don't show again.
+const hushed = new Set();
+self.addEventListener('notificationclose', (e) => {
+  const id = e.notification.data?.call?.id;
+  if (id) { hushed.add(id); setTimeout(() => hushed.delete(id), 120_000); }
+});
+
+/** The call was answered on another device, declined, or ended: its ringing notification goes. */
+async function callOver(d) {
+  const open = await self.registration.getNotifications({ tag: 'call-' + (d.from || '') });
+  const ringing = open.filter((n) => n.data?.call?.id === d.id);
+  if (!ringing.length) return;
+  for (const n of ringing) n.close();
+  // Shown for a moment, so the phone knows this message did something.
+  const w = await words();
+  const tag = 'call-over-' + (d.from || '');
+  await self.registration.showNotification(d.name || d.from || 'Sanga', {
+    body: d.r === 'elsewhere' ? w('Answered on another device', 'दूसरे डिवाइस पर उठाया गया', 'दुसऱ्या डिव्हाइसवर उचलला')
+      : d.r === 'declined' ? w('Call declined', 'कॉल काट दी गई', 'कॉल नाकारला') : w('Call ended', 'कॉल खत्म हुई', 'कॉल संपला'),
+    icon: '/icon-192.png', badge: '/icon-192.png', tag, silent: true,
+  });
+  await new Promise((r) => setTimeout(r, 4000));
+  for (const n of await self.registration.getNotifications({ tag })) n.close();
+}
+
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
+  const call = e.notification.data?.call;
+  if (call) { e.waitUntil(callAction(call, e.action, e.notification.data.peer)); return; }
+  if (e.notification.data?.oncall) {
+    e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => (wins[0] ? wins[0].focus() : self.clients.openWindow('/'))));
+    return;
+  }
   const peer = e.notification.data?.peer;
   const calendar = e.notification.data?.calendar;
   const diary = e.notification.data?.diary;
@@ -229,6 +290,25 @@ self.addEventListener('notificationclick', (e) => {
     }
   })());
 });
+
+/** A ringing call's notification: Decline ends it from here; Answer (or a tap) opens Sanga, which
+ *  answers it as soon as it has it (a tap just shows the call, to answer or not). */
+async function callAction(call, action, peer) {
+  if (action === 'decline') {
+    hushed.add(call.id);
+    await fetch('/api/calls/decline', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: call.id, k: call.k }) }).catch(() => {});
+    return;
+  }
+  const answer = action === 'answer';
+  const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  const win = wins[0];
+  if (win) {
+    await win.focus().catch(() => {});
+    if (answer) win.postMessage({ t: 'answer', id: call.id });
+  } else {
+    await self.clients.openWindow(answer ? '/?answer=' + encodeURIComponent(call.id) : '/?chat=' + encodeURIComponent(peer || ''));
+  }
+}
 
 // ---------- reminders ----------
 // A calendar reminder: the push carries its title sealed with a key only this account's devices can
