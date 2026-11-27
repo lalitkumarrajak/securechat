@@ -37,7 +37,8 @@ const RATIO = storage ? 1 : 4 / 3;
 const env = (k, d) => Number(process.env[k]) || d;
 // Space per person, and for everyone together, as stored. In the database it's kept small (Atlas's free
 // cluster holds 512 MB for everything); R2's free plan holds 10 GB; a Google Drive what its plan has.
-const [MAX_BYTES, MAX_TOTAL] = gd ? [50e9, 1e12] : r2 ? [2e9, 9e9] : [200e6, 250e6];
+const GB = 1024 ** 3; // as the app shows sizes, so "50 GB" reads 50 GB
+const [MAX_BYTES, MAX_TOTAL] = gd ? [50 * GB, 1024 * GB] : r2 ? [2 * GB, 9 * GB] : [200e6, 250e6];
 const maxEach = env('DRIVE_MAX_BYTES', MAX_BYTES), maxAll = env('DRIVE_TOTAL_MAX_BYTES', MAX_TOTAL);
 
 const fileOf = (url) => {

@@ -210,7 +210,7 @@ describe('drive pieces in Google Drive', () => {
     assert.equal((await srv.api(`/api/drive/chunk?file=${f}&i=0`, { body: again }, a.token)).status, 200); // sent again: replaces
     assert.equal(pieces().length, 2);
     assert.equal((await srv.api(`/api/drive/chunk?file=${f}&i=0`, undefined, a.token)).data.body, again);
-    assert.deepEqual((await srv.api('/api/drive/usage', undefined, a.token)).data, { used: 1500, max: 50e9 });
+    assert.deepEqual((await srv.api('/api/drive/usage', undefined, a.token)).data, { used: 1500, max: 50 * 1024 ** 3 });
 
     assert.equal((await srv.api('/api/drive/delete', { file: f }, a.token)).status, 200);
     assert.equal(pieces().length, 1);
