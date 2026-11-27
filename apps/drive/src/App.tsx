@@ -60,6 +60,55 @@ function DriveAppInner({ onClose, tab }: AppProps) {
   useEffect(() => { if (loaded && folder && !folderOk(folder, map)) setFolder(pathTo(folder, map).filter((x) => folderOk(x.id, map)).at(-1)?.id ?? ''); }, [loaded, folder, map]);
   useEffect(() => { if (!undo) return; const id = setTimeout(() => setUndo(null), 6000); return () => clearTimeout(id); }, [undo]);
 
+  // The phone's Back steps back inside Drive (closes the preview or a window, leaves the search, goes up a
+  // folder, back to My Drive from Recent, Starred or the Trash) before it leaves Drive. Like an open chat,
+  // Drive adds one history entry while you're anywhere but My Drive, and puts it back after each step.
+  const atRoot = view === 'drive' && !folder && !opened && !searching && !q && !pop;
+  const now = useRef({ view, folder, opened, searching, q, pop, map, onClose });
+  now.current = { view, folder, opened, searching, q, pop, map, onClose };
+  const skipPop = useRef(false), leaving = useRef(false);
+  useEffect(() => {
+    if (!atRoot && !history.state?.drive) history.pushState({ ...history.state, drive: 1 }, '');
+    else if (atRoot && history.state?.drive) { skipPop.current = true; history.back(); }
+  }, [atRoot]);
+  useEffect(() => {
+    const onPop = () => {
+      if (skipPop.current) { skipPop.current = false; return; }
+      if (history.state?.drive) return;
+      if (leaving.current) { leaving.current = false; now.current.onClose(); return; }
+      const c = now.current;
+      if (c.pop) setPop(null);
+      else if (c.opened) setOpened(null);
+      else if (c.searching || c.q) { setQ(''); setSearching(false); }
+      else if (c.view === 'drive' && c.folder) setFolder(c.map[c.folder]?.parent ?? '');
+      else { setView('drive'); setFolder(''); }
+      // Still somewhere inside: the entry goes back, for the next Back.
+      queueMicrotask(() => { if (!history.state?.drive) history.pushState({ ...history.state, drive: 1 }, ''); });
+    };
+    addEventListener('popstate', onPop);
+    return () => {
+      removeEventListener('popstate', onPop);
+      if (history.state?.drive) history.replaceState({ ...history.state, drive: undefined }, ''); // left by switching tabs
+    };
+  }, []);
+  /** The arrow at the top: one step back, like the phone's Back; out of Drive from My Drive. */
+  const up = () => {
+    if (history.state?.drive) { if (atRoot) leaving.current = true; history.back(); }
+    else onClose();
+  };
+
+  // A safety net: if a window ever closes but leaves the page not taking taps, give them back.
+  useEffect(() => {
+    const fix = () => {
+      if (document.body.style.pointerEvents !== 'none') return;
+      if (document.querySelector('[role=dialog][data-state=open],[role=alertdialog][data-state=open],[role=menu][data-state=open]')) return;
+      document.body.style.pointerEvents = '';
+    };
+    const mo = new MutationObserver(() => setTimeout(fix, 350));
+    mo.observe(document.body, { attributes: true, attributeFilter: ['style'], childList: true });
+    return () => mo.disconnect();
+  }, []);
+
   const setLayout = (l: Layout) => { setLayoutS(l); keepPref('layout', l); };
   const setSort = (s: Sort) => { if (s === sort) setDesc(!desc); else { setSortS(s); setDesc(false); keepPref('sort', s); } };
   const go = (v: View) => { setView(v); setFolder(''); setQ(''); setSearching(false); };
@@ -121,10 +170,10 @@ function DriveAppInner({ onClose, tab }: AppProps) {
   };
 
   const newMenu = (trigger: ReactNode) => (
-    <Menu>
+    <Menu modal={false}>
       <MenuTrigger asChild>{trigger}</MenuTrigger>
       <MenuContent align="end" className="min-w-56">
-        <MenuItem icon={<FolderPlus />} onSelect={() => setPop({ kind: 'folder' })}>{t('New folder')}</MenuItem>
+        <MenuItem icon={<FolderPlus />} onSelect={() => { setTimeout(() => setPop({ kind: 'folder' }), 0); }}>{t('New folder')}</MenuItem>
         <MenuSeparator />
         <MenuItem icon={<Upload />} onSelect={() => filesIn.current?.click()}>{t('Upload files')}</MenuItem>
         <MenuItem icon={<FolderUp />} onSelect={() => folderIn.current?.click()}>{t('Upload a folder')}</MenuItem>
@@ -142,7 +191,7 @@ function DriveAppInner({ onClose, tab }: AppProps) {
       onDragLeave={(ev) => { if (ev.currentTarget === ev.target || !ev.currentTarget.contains(ev.relatedTarget as Node)) setDragging(false); }}
       onDrop={(ev) => void onDrop(ev)}>
       <header className="flex h-16 shrink-0 items-center gap-1 px-3">
-        {!tab && !searching && <IconButton label={t('Back')} onClick={onClose}><ArrowLeft /></IconButton>}
+        {(!tab || !atRoot) && !searching && <IconButton label={t('Back')} onClick={up}><ArrowLeft /></IconButton>}
         {searching ? (
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" aria-hidden />
@@ -193,7 +242,7 @@ function DriveAppInner({ onClose, tab }: AppProps) {
           }}>{t('Empty Trash')}</Button>
         )}
         {view !== 'recent' && view !== 'trash' && (
-          <Menu>
+          <Menu modal={false}>
             <MenuTrigger asChild><IconButton label={t('Sort')} size="icon-sm" className="[&_svg]:size-[1.15rem]"><ArrowUpDown /></IconButton></MenuTrigger>
             <MenuContent className="min-w-48">
               {([['name', t('Name')], ['edited', t('Last modified')], ['size', t('Size')]] as const).map(([s, label]) => (

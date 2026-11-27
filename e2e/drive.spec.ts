@@ -128,3 +128,61 @@ test('Drive: make a folder, upload, preview, trash and restore, then open on ano
   expect(b.errors.filter((e) => !/Failed to load resource/.test(e))).toEqual([]);
   await a.ctx.close(); await b.ctx.close();
 });
+
+test('Drive on a phone: the Trash never leaves the page stuck, and Back steps back inside Drive', async ({ browser }) => {
+  const a = await phone(browser, uname('drt'));
+  await signUp(a);
+  await openApp(a, 'Drive');
+  const page = a.page;
+  const back = async () => { await page.goBack(); await page.waitForTimeout(150); };
+
+  // A folder with a photo in it, and three files to throw away.
+  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'New folder' }).click();
+  await page.getByRole('dialog').getByRole('textbox').fill('Docs');
+  await page.getByRole('dialog').getByRole('button', { name: 'Create' }).click();
+  await page.locator('input[type=file]:not([webkitdirectory])').setInputFiles(['a', 'b', 'c', 'd'].map((n, i) =>
+    ({ name: `${n}.png`, mimeType: 'image/png', buffer: testPng(40 + i, 40) })));
+  await expect(page.getByRole('button', { name: 'd.png', exact: true })).toBeVisible({ timeout: 30_000 });
+  for (const n of ['a.png', 'b.png', 'c.png']) {
+    await page.getByRole('button', { name: `More for ${n}` }).click();
+    await page.getByRole('menuitem', { name: 'Move to Trash' }).click();
+    await expect(page.getByRole('button', { name: n, exact: true })).toBeHidden();
+  }
+
+  // Delete one forever, then empty the Trash: every button still answers afterwards.
+  await page.getByRole('button', { name: 'Trash', exact: true }).click();
+  await page.getByRole('button', { name: 'More for a.png' }).click();
+  await page.getByRole('menuitem', { name: 'Delete forever' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete forever' }).click();
+  await expect(page.getByRole('button', { name: 'a.png', exact: true })).toBeHidden();
+  expect(await page.evaluate(() => getComputedStyle(document.body).pointerEvents)).not.toBe('none');
+  await page.getByRole('button', { name: 'Empty Trash' }).click({ timeout: 5000 });
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Empty Trash' }).click();
+  await expect(page.getByRole('heading', { name: 'The Trash is empty' })).toBeVisible();
+  expect(await page.evaluate(() => getComputedStyle(document.body).pointerEvents)).not.toBe('none');
+
+  // Back from the Trash: My Drive. Back from a folder: up. Back from a preview: closed.
+  await back();
+  await expect(page.getByRole('button', { name: 'Docs', exact: false }).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'The Trash is empty' })).toBeHidden();
+  await page.getByRole('button', { name: /^Docs/ }).click();
+  await expect(page.getByRole('heading', { name: 'This folder is empty' })).toBeVisible();
+  await back();
+  await expect(page.getByRole('button', { name: 'd.png', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'd.png', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'd.png' })).toBeVisible();
+  await back();
+  await expect(page.getByRole('dialog', { name: 'd.png' })).toBeHidden();
+  // The arrow at the top does the same; from My Drive it leaves Drive, and the tabs work.
+  await page.getByRole('button', { name: 'Starred', exact: true }).click();
+  await page.getByRole('button', { name: 'Back' }).click();
+  await expect(page.getByRole('button', { name: 'd.png', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Back' }).click();
+  await expect(page.getByRole('region', { name: 'More' })).toBeVisible();
+  await page.getByRole('tab', { name: /Chats$/ }).click();
+  await expect(page.getByRole('heading', { name: a.u, level: 1 })).toBeVisible();
+
+  expect(a.errors.filter((e) => !/Failed to load resource/.test(e))).toEqual([]);
+  await a.ctx.close();
+});

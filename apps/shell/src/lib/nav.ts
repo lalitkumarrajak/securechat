@@ -25,6 +25,14 @@ export function openSharedNotes() {
   setApp({ section: 'diary' });
 }
 
+// The phone's Back (or a link) changed the address to another tab or app: show it, so the screen never
+// stays on a page the address has left. Entries an open chat, game or app adds keep the same address.
+window.addEventListener('popstate', () => {
+  if (getApp().status !== 'app') return;
+  const s = sectionFromHash();
+  if (s !== getApp().section) setApp({ section: s });
+});
+
 /** Back from an app on the More page (Games, the Diary, Money, Passwords, Drive): to the More page. */
 export const back = () => go('more');
 

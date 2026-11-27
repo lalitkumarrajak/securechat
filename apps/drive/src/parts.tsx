@@ -55,10 +55,11 @@ export type Action = 'open' | 'download' | 'share' | 'rename' | 'move' | 'star' 
 export function ItemMenu({ e, onAction, trigger, className }: { e: Entry; onAction: (a: Action, e: Entry) => void; trigger?: ReactNode; className?: string }) {
   const trashed = inTrash(e);
   const item = (a: Action, icon: ReactNode, label: string, danger?: boolean) => (
-    <MenuItem key={a} icon={icon} danger={danger} onSelect={() => onAction(a, e)}>{label}</MenuItem>
+    // After the menu has closed: a window opened while it is still closing can leave the page not taking taps.
+    <MenuItem key={a} icon={icon} danger={danger} onSelect={() => { setTimeout(() => onAction(a, e), 0); }}>{label}</MenuItem>
   );
   return (
-    <Menu>
+    <Menu modal={false}>
       <MenuTrigger asChild>
         {trigger ?? (
           <IconButton label={t('More for {name}', { name: e.name })} size="icon-sm" className={cn('shrink-0 [&_svg]:size-[1.15rem]', className)} onClick={(ev) => ev.stopPropagation()}>
