@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, Mic, MicOff, MonitorUp, MonitorX, Phone, PhoneOff, SwitchCamera, UserPlus, Video, VideoOff } from 'lucide-react';
+import { ChevronDown, PictureInPicture2, Mic, MicOff, MonitorUp, MonitorX, Phone, PhoneOff, SwitchCamera, UserPlus, Video, VideoOff } from 'lucide-react';
 import { Avatar } from '../../../components/Avatar';
 import { accept, canShareScreen, decline, hangUp, isGroupCall, MAX_PEOPLE, setMinimized, shareScreen, stopSharing, switchCamera, toggleCamera, toggleMute, useCall, type Call } from '../../../lib/calls';
 import { cn } from '@sanga/ui/utils';
@@ -10,6 +10,7 @@ import { Sharing } from './Sharing';
 import { Grid } from './Grid';
 import { AddPeople } from './AddPeople';
 import { Round } from './Round';
+import { canPip, enterPip } from '../pip';
 
 export function Full({ call }: { call: Call }) {
   const local = useCall((s) => s.local);
@@ -39,7 +40,11 @@ export function Full({ call }: { call: Call }) {
           </button>
         )}
         <span className="flex-1 text-center text-xs text-white/70">{t('🔒 End-to-end encrypted')}</span>
-        <span className="size-10" />
+        {call.phase !== 'incoming' && call.phase !== 'ended' && canPip() ? (
+          <button onClick={() => void enterPip()} aria-label={t('Small window')} title={t('Small window')} className="grid size-10 place-items-center rounded-full bg-black/25 hover:bg-black/40">
+            <PictureInPicture2 className="size-5" />
+          </button>
+        ) : <span className="size-10" />}
       </header>
 
       {group && call.phase !== 'incoming' ? (

@@ -7,6 +7,7 @@ import { useCall } from '../../lib/calls';
 import { RemoteAudio } from './call-screen/RemoteAudio';
 import { Full } from './call-screen/Full';
 import { CallBar } from './call-screen/CallBar';
+import './pip'; // the small floating window, while a call is on
 
 export function CallScreen() {
   const call = useCall((s) => s.call);

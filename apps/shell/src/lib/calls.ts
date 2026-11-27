@@ -638,13 +638,39 @@ function beep(freqs: number[], len: number, vol: number) {
     }
   } catch { /* no audio */ }
 }
+/** One marimba note, `delay` seconds from now: a wooden knock that rings briefly (the fundamental plus
+ *  the bar's bright overtone near four times it, which fades faster). */
+function mallet(freq: number, delay: number, vol: number) {
+  try {
+    audio ??= new AudioContext();
+    if (audio.state === 'suspended') void audio.resume();
+    const at = audio.currentTime + delay;
+    for (const [mult, v, len] of [[1, 1, 0.55], [3.93, 0.35, 0.12], [9.2, 0.08, 0.04]] as const) {
+      const o = audio.createOscillator();
+      const g = audio.createGain();
+      o.type = 'sine'; o.frequency.value = freq * mult;
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.exponentialRampToValueAtTime(vol * v, at + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + len);
+      o.connect(g); g.connect(audio.destination);
+      o.start(at); o.stop(at + len + 0.02);
+    }
+  } catch { /* no audio */ }
+}
+// Someone calling me: a bouncy marimba tune (our own), quite unlike the steady ringback of my own call.
+const N = { B4: 493.88, D5: 587.33, E5: 659.25, Fs5: 739.99, A5: 880, B5: 987.77, D6: 1174.66, E6: 1318.51 };
+const RING_TUNE: [number, number][] = [
+  [N.E5, 0], [N.B5, 0.13], [N.A5, 0.26], [N.B5, 0.39], [N.E5, 0.52], [N.B5, 0.65], [N.D6, 0.78], [N.B5, 0.91],
+  [N.Fs5, 1.04], [N.B5, 1.17], [N.A5, 1.30], [N.B5, 1.43], [N.D5, 1.56], [N.Fs5, 1.69], [N.E6, 1.82], [N.B4, 1.95],
+];
+const RING_EVERY = 2600;
 function startTone(kind: 'ring' | 'ringback') {
   stopTone();
   const play = kind === 'ring'
-    ? () => { beep([480, 620], 0.4, 0.12); window.setTimeout(() => beep([480, 620], 0.4, 0.12), 550); }
-    : () => beep([440, 480], 1.2, 0.05);
+    ? () => { for (const [f, d] of RING_TUNE) mallet(f, d, 0.3); }
+    : () => beep([440, 480], 1.2, 0.05); // calling out: the soft, steady phone ringback
   play();
-  tone = window.setInterval(play, kind === 'ring' ? 2500 : 4000);
+  tone = window.setInterval(play, kind === 'ring' ? RING_EVERY : 4000);
   if (kind === 'ring' && 'vibrate' in navigator) {
     vibrating = true;
     try { navigator.vibrate([700, 500, 700, 500, 700, 500, 700, 500, 700]); } catch { /* not allowed */ }

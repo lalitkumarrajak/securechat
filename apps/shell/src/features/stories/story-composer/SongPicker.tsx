@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { FileAudio, Search } from 'lucide-react';
+import { FileAudio, HardDrive, Search } from 'lucide-react';
 import { Spinner } from '@sanga/ui/button';
 import { Dialog } from '@sanga/ui/dialog';
 import { Input } from '@sanga/ui/input';
-import { CLIP_SECONDS, clipFromFile, searchSongs, type Song, type SongHit } from '../../../lib/songs';
+import { CLIP_SECONDS, decodeSong, searchSongs, songTitle, type Song, type SongHit } from '../../../lib/songs';
 import { SongRow } from './SongRow';
+import { SongTrim } from './SongTrim';
+import { DriveSongs } from './DriveSongs';
 import { t } from '@sanga/i18n';
 
-/** Add a song to a story: search for one (30-second previews), or use a file from your phone. */
+/** Add a song to a story: search for one (30-second previews), or pick one from your Drive or your phone
+ *  and choose which part of it to use. */
 export function SongPicker({ onPick, onClose }: { onPick: (song: Song) => void; onClose: () => void }) {
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<SongHit[] | null>(null);
@@ -16,6 +19,8 @@ export function SongPicker({ onPick, onClose }: { onPick: (song: Song) => void; 
   const [err, setErr] = useState('');
   const [playing, setPlaying] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
+  const [view, setView] = useState<'search' | 'drive'>('search');
+  const [trim, setTrim] = useState<{ song: AudioBuffer; title: string; from: 'search' | 'drive' } | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
   const file = useRef<HTMLInputElement>(null);
 
@@ -44,16 +49,21 @@ export function SongPicker({ onPick, onClose }: { onPick: (song: Song) => void; 
   };
   const use = (s: Song) => { stop(); onPick({ title: s.title, artist: s.artist, src: s.src, ...(s.art && { art: s.art }) }); };
 
-  const pickFile = async (f: File | undefined) => {
+  // A file (from the phone or the Drive): open it, then choose the part.
+  const pickFile = async (f: File | undefined, from: 'search' | 'drive' = 'search') => {
     if (!f) return;
-    setReading(true);
-    try { use(await clipFromFile(f)); }
+    stop(); setReading(true);
+    try { setTrim({ song: await decodeSong(f), title: songTitle(f.name), from }); }
     catch (e) { toast.error((e as Error).message); }
     setReading(false);
   };
 
   return (
-    <Dialog open onOpenChange={(o) => !o && (stop(), onClose())} title={t('Add a song')} description={t('Search for a song, or use one from your phone.')}>
+    <Dialog open onOpenChange={(o) => !o && (stop(), onClose())} title={trim ? t('Choose the part') : view === 'drive' ? t('Songs in your Drive') : t('Add a song')}
+      description={trim || view === 'drive' ? undefined : t('Search for a song, or use one from your Drive or your phone.')}>
+      {trim ? <SongTrim song={trim.song} title={trim.title} onPick={use} onBack={() => { setView(trim.from); setTrim(null); }} />
+      : view === 'drive' ? (reading ? <div className="grid place-items-center py-16"><Spinner /></div> : <DriveSongs onOpen={(f) => void pickFile(f, 'drive')} onBack={() => setView('search')} />)
+      : <>
       <div className="relative">
         <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted" />
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('Search songs or artists')} aria-label={t('Search songs')} className="pl-10" autoFocus />
@@ -71,14 +81,23 @@ export function SongPicker({ onPick, onClose }: { onPick: (song: Song) => void; 
           )}
       </div>
 
+      <button onClick={() => { stop(); setView('drive'); }} disabled={reading}
+        className="mt-3 flex w-full items-center gap-3 rounded-xl border border-line p-3 text-left hover:bg-hover disabled:opacity-60">
+        <HardDrive className="size-6 text-muted" />
+        <span>
+          <span className="block font-medium">{t('From my Drive')}</span>
+          <span className="block text-sm text-muted">{t('Search the songs you keep in Drive, and pick the part you like.')}</span>
+        </span>
+      </button>
       <button onClick={() => file.current?.click()} disabled={reading}
         className="mt-3 flex w-full items-center gap-3 rounded-xl border border-line p-3 text-left hover:bg-hover disabled:opacity-60">
         {reading ? <Spinner /> : <FileAudio className="size-6 text-muted" />}
         <span>
           <span className="block font-medium">{t('From my phone')}</span>
-          <span className="block text-sm text-muted">{t('An MP3, M4A or WAV file. The first {n} seconds are used.', { n: CLIP_SECONDS })}</span>
+          <span className="block text-sm text-muted">{t('An MP3, M4A or WAV file. You pick which {n} seconds.', { n: CLIP_SECONDS })}</span>
         </span>
       </button>
+      </>}
       <input ref={file} type="file" accept="audio/*" hidden aria-label={t('Choose an audio file')} onChange={(e) => { void pickFile(e.target.files?.[0]); e.target.value = ''; }} />
     </Dialog>
   );

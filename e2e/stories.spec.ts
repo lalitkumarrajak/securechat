@@ -129,6 +129,7 @@ test('a story with a song: from a file, and from search; Q hears it and can mute
   await c.getByRole('button', { name: 'Add song' }).click();
   const picker = P.page.getByRole('dialog', { name: 'Add a song' });
   await picker.getByLabel('Choose an audio file').setInputFiles({ name: 'Monsoon_drive.wav', mimeType: 'audio/wav', buffer: testWav(4) });
+  await P.page.getByRole('dialog', { name: 'Choose the part' }).getByRole('button', { name: 'Use this part' }).click();
   await expect(c.getByRole('button', { name: /Song: Monsoon drive/ })).toBeVisible();
   await P.page.screenshot({ path: 'e2e/.artifacts/screens/74-story-song-composer.png' });
   await c.getByRole('button', { name: 'Share story' }).click();

@@ -80,7 +80,7 @@ Caddy gets a free HTTPS certificate automatically.
 | `TURN_URLS` + `TURN_USERNAME`, `TURN_CREDENTIAL` | – | Or any other TURN service (comma-separated `turn:` URLs) |
 | `TURN_URLS` + `TURN_SECRET` | – | Or your own coturn with `use-auth-secret` (short-lived credentials per user) |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | – | Keep Drive's files in [Cloudflare R2](https://developers.cloudflare.com/r2/) (free up to 10 GB) instead of the database. Files uploaded before move there by themselves. See *Drive's files in R2* below |
-| `GDRIVE_CLIENT_ID`, `GDRIVE_CLIENT_SECRET`, `GDRIVE_REFRESH_TOKEN` | – | Keep Drive's files in a Google Drive instead (used first if both are set). See *Drive's files in Google Drive* below. `GDRIVE_FOLDER` names the folder (default `Sanga Drive`) |
+| `GDRIVE_CLIENT_ID`, `GDRIVE_CLIENT_SECRET`, `GDRIVE_REFRESH_TOKEN` | – | Keep Drive's files in a Google Drive instead (used first if both are set). See *Drive's files in Google Drive* below. `GDRIVE_FOLDER` names the folder (default `Sanga Drive`; each person's pieces go in a folder named after them inside it) |
 | `DRIVE_MAX_BYTES` | 50 GB with Google Drive, 2 GB with R2, else 200 MB | Drive space per person, as stored (in the database base64 takes a third more) |
 | `DRIVE_TOTAL_MAX_BYTES` | 1 TB with Google Drive, 9 GB with R2, else 250 MB | Drive space for everyone together, so it can't fill the storage or the database |
 

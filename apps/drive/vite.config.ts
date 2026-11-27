@@ -11,7 +11,7 @@ export default defineConfig({
   base: '/apps/drive/',
   plugins: [
     react(), tailwindcss(),
-    federation({ name: 'drive', filename: 'remoteEntry.js', exposes: { './App': './src/App.tsx' }, ...FEDERATION }),
+    federation({ name: 'drive', filename: 'remoteEntry.js', exposes: { './App': './src/App.tsx', './picker': './src/picker.ts' }, ...FEDERATION }),
     precompress(), sharedCheck(),
   ],
   build: {

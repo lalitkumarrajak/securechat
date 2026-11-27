@@ -22,7 +22,7 @@ import { routes as groupRoutes } from './groups.js';
 import { routes as noteRoutes } from './notes.js';
 import { routes as itemRoutes } from './items.js';
 import { routes as splitRoutes } from './split.js';
-import { moveDriveOut, PUBLIC as DRIVE_PUBLIC, storage as driveStorage, routes as driveRoutes } from './drive.js';
+import { moveDriveOut, tidyDrive, PUBLIC as DRIVE_PUBLIC, storage as driveStorage, routes as driveRoutes } from './drive.js';
 import { routes as reminderRoutes, startReminders } from './reminders.js';
 import { purgeStories, routes as storyRoutes } from './stories.js';
 import { handlers as callHandlers, onClose as callClosed, onConnect as callConnected, routes as callRoutes } from './calls.js';
@@ -53,7 +53,9 @@ startReminders();
 if (driveStorage) {
   console.log(`drive: files kept in ${driveStorage.name}`);
   // Not awaited: files uploaded before this was set up move there in the background.
-  moveDriveOut().then((n) => n && console.log(`drive: moved ${n} piece(s) out of the database`), (e) => console.error('drive: moving files out failed (tried again next start):', e.message));
+  moveDriveOut().then((n) => n && console.log(`drive: moved ${n} piece(s) out of the database`), (e) => console.error('drive: moving files out failed (tried again next start):', e.message))
+    .then(() => tidyDrive())
+    .then((n) => n && console.log(`drive: moved ${n} piece(s) into a folder per person in Google Drive`), (e) => console.error('drive: sorting files into folders failed (tried again next start):', e.message));
 }
 loadStatic();
 

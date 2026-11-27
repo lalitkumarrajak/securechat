@@ -28,7 +28,7 @@ const keyOf = (u, file, i) => `drive/${u}/${file}/${i}`;
 
 /** Where new pieces go, or null for the database. Pieces already elsewhere stay readable there. */
 export const storage = gd
-  ? { name: `Google Drive (folder “${gd.where}”)`, put: async (u, file, i, buf) => 'gd:' + (await gd.put(`${u}-${file}-${i}`, buf)) }
+  ? { name: `Google Drive (folder “${gd.where}”, a folder per person in it)`, put: async (u, file, i, buf) => 'gd:' + (await gd.put(`${file}-${i}`, buf, u)) }
   : r2
     ? { name: `R2 (${r2.endpoint}, bucket ${r2.bucket})`, put: async (u, file, i, buf) => { const k = keyOf(u, file, i); await r2.put(k, buf); return 'r2:' + k; } }
     : null;
@@ -213,6 +213,9 @@ export const routes = {
     sendJson(res, 200, {});
   },
 };
+
+/** In Google Drive: pieces saved loose in "Sanga Drive" before there was a folder per person move into theirs. */
+export const tidyDrive = () => (gd ? gd.tidy() : Promise.resolve(0));
 
 /** With outside storage set up: move the pieces kept in the database before, a few at a time. */
 export async function moveDriveOut() {

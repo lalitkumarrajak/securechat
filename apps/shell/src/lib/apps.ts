@@ -35,6 +35,14 @@ export function appComponent(id: string) {
   return loaded.get(id)!;
 }
 
+/** Another module an app shares with the rest of Sanga (Drive's './picker'), downloaded when first asked for. */
+export async function appModule<T>(id: string, expose: string): Promise<T> {
+  if (!(await apps()).some((a) => a.id === id)) throw new Error(`No app “${id}”`);
+  const mod = await loadRemote<T>(`${id}/${expose.replace(/^\.\//, '')}`);
+  if (!mod) throw new Error(`Couldn’t load “${id}”`);
+  return mod;
+}
+
 /** Forget a failed load, so "Try again" downloads it afresh: the runtime and the browser both remember
  *  a failed download, so the app is registered again under a new address. */
 let attempts = 0;

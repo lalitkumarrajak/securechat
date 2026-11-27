@@ -1,4 +1,4 @@
-// Google Drive, for Drive's sealed file pieces: each piece is a file in one folder ("Sanga Drive") of the
+// Google Drive, for Drive's sealed file pieces: each piece is a file in "Sanga Drive/<username>" of the
 // Google account that signed in with `npm run google-drive-login`. The app only asks for the drive.file
 // permission, so it can see and change only the files it made itself, nothing else in that Drive.
 //
@@ -57,27 +57,63 @@ export function gdriveFromEnv(env = process.env) {
     }
   }
 
-  // ---------- the folder ----------
+  // ---------- the folders: "Sanga Drive", and in it one per person ----------
+  const FOLDER = 'application/vnd.google-apps.folder';
+  const quote = (v) => `'${v.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+  async function findOrMake(name, parent) {
+    const q = `name = ${quote(name)} and mimeType = '${FOLDER}' and trashed = false${parent ? ` and ${quote(parent)} in parents` : ''}`;
+    const found = await (await call('GET', `${API}/files?${new URLSearchParams({ q, spaces: 'drive', fields: 'files(id)', pageSize: '1' })}`)).json();
+    if (found.files?.[0]?.id) return found.files[0].id;
+    const made = await (await call('POST', `${API}/files?fields=id`, {
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, mimeType: FOLDER, ...(parent ? { parents: [parent] } : {}) }),
+    })).json();
+    return made.id;
+  }
   let folderP = env.GDRIVE_FOLDER_ID?.trim() ? Promise.resolve(env.GDRIVE_FOLDER_ID.trim()) : null;
   function folder() {
-    return (folderP ??= (async () => {
-      const q = `name = '${folderName.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
-      const found = await (await call('GET', `${API}/files?${new URLSearchParams({ q, spaces: 'drive', fields: 'files(id)', pageSize: '1' })}`)).json();
-      if (found.files?.[0]?.id) return found.files[0].id;
-      const made = await (await call('POST', `${API}/files?fields=id`, {
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: folderName, mimeType: 'application/vnd.google-apps.folder' }),
-      })).json();
-      return made.id;
-    })().catch((e) => { folderP = null; throw e; }));
+    return (folderP ??= findOrMake(folderName).catch((e) => { folderP = null; throw e; }));
+  }
+  const users = new Map(); // username -> Promise<folder id>
+  function userFolder(u) {
+    let p = users.get(u);
+    if (!p) {
+      p = folder().then((root) => findOrMake(u, root)).catch((e) => { users.delete(u); throw e; });
+      users.set(u, p);
+    }
+    return p;
+  }
+
+  /** Pieces saved straight in "Sanga Drive" before there were folders per person ("<user>-<file>-<i>"):
+   *  each moves into its owner's folder. Returns how many moved. */
+  async function tidy() {
+    const root = await folder();
+    let moved = 0, pageToken = '';
+    const loose = [];
+    do {
+      const q = `${quote(root)} in parents and mimeType != '${FOLDER}' and trashed = false`;
+      const page = await (await call('GET', `${API}/files?${new URLSearchParams({ q, spaces: 'drive', fields: 'nextPageToken,files(id,name)', pageSize: '1000', ...(pageToken ? { pageToken } : {}) })}`)).json();
+      loose.push(...(page.files ?? []));
+      pageToken = page.nextPageToken || '';
+    } while (pageToken);
+    for (const f of loose) {
+      const u = /^([a-z0-9_.]{3,24})-/.exec(f.name ?? '')?.[1];
+      if (!u) continue;
+      const to = await userFolder(u);
+      await call('PATCH', `${API}/files/${encodeURIComponent(f.id)}?${new URLSearchParams({ addParents: to, removeParents: root, fields: 'id' })}`, {
+        headers: { 'Content-Type': 'application/json' }, body: '{}',
+      });
+      moved++;
+    }
+    return moved;
   }
 
   return {
-    name: 'Google Drive', where: folderName, folder,
-    /** Saves the bytes as a new file; its Google Drive id. */
-    async put(name, buf) {
+    name: 'Google Drive', where: folderName, folder, userFolder, tidy,
+    /** Saves the bytes as a new file, in `user`'s folder (or "Sanga Drive" itself); its Google Drive id. */
+    async put(name, buf, user) {
       const boundary = 'sanga' + Math.random().toString(36).slice(2);
-      const meta = JSON.stringify({ name, parents: [await folder()], mimeType: 'application/octet-stream' });
+      const meta = JSON.stringify({ name, parents: [user ? await userFolder(user) : await folder()], mimeType: 'application/octet-stream' });
       const body = Buffer.concat([
         Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/octet-stream\r\n\r\n`),
         buf,

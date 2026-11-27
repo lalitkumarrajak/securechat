@@ -145,8 +145,10 @@ function fakeGoogle() {
       }
       if (req.headers.authorization !== 'Bearer test-access') return json(401, { error: 'unauthorized' });
       if (u.pathname === '/drive/v3/files' && req.method === 'GET') {
-        const name = /name = '([^']+)'/.exec(u.searchParams.get('q'))?.[1];
-        return json(200, { files: [...files].filter(([, f]) => f.folder && f.name === name).map(([id]) => ({ id })) });
+        const q = u.searchParams.get('q');
+        const name = /name = '([^']+)'/.exec(q)?.[1], parent = /'([^']+)' in parents/.exec(q)?.[1];
+        const folders = !q.includes("mimeType != 'application/vnd.google-apps.folder'");
+        return json(200, { files: [...files].filter(([, f]) => !!f.folder === folders && (!name || f.name === name) && (!parent || f.parents?.includes(parent))).map(([id, f]) => ({ id, name: f.name })) });
       }
       if (u.pathname === '/drive/v3/files' && req.method === 'POST') {
         const id = 'folder' + ++nextId;
@@ -170,6 +172,12 @@ function fakeGoogle() {
         if (!f) return json(404, { error: 'notFound' });
         res.writeHead(200); return res.end(f.data);
       }
+      if (m && req.method === 'PATCH') {
+        const f = files.get(m[1]);
+        if (!f) return json(404, { error: 'notFound' });
+        f.parents = [...f.parents.filter((p) => p !== u.searchParams.get('removeParents')), u.searchParams.get('addParents')];
+        return json(200, { id: m[1] });
+      }
       if (m && req.method === 'DELETE') { const had = files.delete(m[1]); res.writeHead(had ? 204 : 404); return res.end(); }
       json(404, { error: 'unknown call' });
     });
@@ -190,19 +198,25 @@ describe('drive pieces in Google Drive', () => {
   });
   const pieces = () => [...google.files.values()].filter((f) => !f.folder);
 
-  it('keeps pieces as files in a "Sanga Drive" folder, moves old ones over, replaces and deletes them', async () => {
+  it('keeps pieces as files in "Sanga Drive/<username>", moves old ones over, replaces and deletes them', async () => {
     let srv = await startServer({ DATA_DIR: dataDir });
     const a = await register(srv, name('drg'));
     const old = C.randomId(12), oldBody = piece(500);
     assert.equal((await srv.api(`/api/drive/chunk?file=${old}&i=0`, { body: oldBody }, a.token)).status, 200);
     await srv.stop();
+    // From before there was a folder per person: a piece loose in "Sanga Drive".
+    google.files.set('root0', { name: 'Sanga Drive', folder: true });
+    google.files.set('loose0', { name: `${a.u}-${C.randomId(12)}-0`, parents: ['root0'], data: Buffer.from('x') });
 
     srv = await startServer(gdEnv());
-    for (let i = 0; i < 50 && !pieces().length; i++) await sleep(100);
-    const folder = [...google.files].find(([, f]) => f.folder);
-    assert.equal(folder[1].name, 'Sanga Drive');
-    assert.deepEqual(pieces()[0].parents, [folder[0]]);
-    assert.deepEqual(pieces()[0].data, Buffer.from(oldBody, 'base64')); // stored as bytes, after Google's hiccup
+    const mine = () => [...google.files].find(([, f]) => f.folder && f.name === a.u);
+    for (let i = 0; i < 50 && !(pieces().length === 2 && pieces().every((p) => p.parents[0] === mine()?.[0])); i++) await sleep(100);
+    assert.equal([...google.files.values()].filter((f) => f.folder && f.name === 'Sanga Drive').length, 1);
+    assert.deepEqual(mine()[1].parents, ['root0']);
+    for (const p of pieces()) assert.deepEqual(p.parents, [mine()[0]]); // the old one too
+    const moved = pieces().find((p) => p.name === `${old}-0`);
+    assert.deepEqual(moved.data, Buffer.from(oldBody, 'base64')); // stored as bytes, after Google's hiccup
+    google.files.delete('loose0');
     assert.equal((await srv.api(`/api/drive/chunk?file=${old}&i=0`, undefined, a.token)).data.body, oldBody);
 
     const f = C.randomId(12), body = piece(1000), again = piece(1000);

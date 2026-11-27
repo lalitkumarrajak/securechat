@@ -1,6 +1,7 @@
 // End-to-end: voice and video calls between two friends, over real WebRTC (Chrome's fake camera and
 // microphone). Answering, muting, hanging up, declining, cancelling, and the calls in the chat.
 import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
 import { makeFriends, phone, signUp, uname, type Phone, openFriends } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
@@ -46,6 +47,23 @@ test('a voice call: ring, answer, talk, mute, hang up', async () => {
   await callScreen(P).getByRole('button', { name: 'Unmute' }).click();
   await expect(callScreen(Q).getByText(`${P.u} is muted`)).toHaveCount(0);
 
+  // The small floating window, where the browser has one: their photo, name and the call's time.
+  const pip = callScreen(P).getByRole('button', { name: 'Small window' });
+  if (await pip.count()) {
+    await pip.click();
+    await expect.poll(() => P.page.evaluate(() => (document.pictureInPictureElement as HTMLElement | null)?.dataset.callPip !== undefined)).toBe(true);
+    // What it shows: a frame of it, kept with the test's screenshots.
+    const frame = await P.page.evaluate(() => {
+      const v = document.pictureInPictureElement as HTMLVideoElement;
+      const c = Object.assign(document.createElement('canvas'), { width: v.videoWidth, height: v.videoHeight });
+      c.getContext('2d')!.drawImage(v, 0, 0);
+      return c.toDataURL('image/png');
+    });
+    fs.mkdirSync('e2e/.artifacts/screens', { recursive: true });
+    fs.writeFileSync('e2e/.artifacts/screens/78-call-small-window.png', Buffer.from(frame.split(',')[1], 'base64'));
+    await P.page.evaluate(() => document.exitPictureInPicture());
+  }
+
   // Minimise to keep chatting, then come back.
   await callScreen(P).getByRole('button', { name: 'Minimise call' }).click();
   await expect(P.page.getByRole('button', { name: 'Return to call' })).toBeVisible();
@@ -63,7 +81,7 @@ test('a video call: both see each other', async () => {
   await callScreen(Q).getByRole('button', { name: 'Accept video call' }).click();
   await expect(callScreen(P).getByText(/^0:0\d$/)).toBeVisible({ timeout: 20_000 });
   // Their video plays (Chrome's fake camera), and ours shows in the corner.
-  await expect.poll(() => P.page.evaluate(() => [...document.querySelectorAll('video')].filter((v) => v.videoWidth > 0).length)).toBe(2);
+  await expect.poll(() => P.page.evaluate(() => [...document.querySelectorAll('video:not([data-call-pip])')].filter((v) => (v as HTMLVideoElement).videoWidth > 0).length)).toBe(2);
   await callScreen(Q).getByRole('button', { name: 'Turn camera off' }).click();
   await expect(callScreen(P).getByText(`${Q.u}’s camera is off`)).toBeVisible();
   await callScreen(P).getByRole('button', { name: 'End call' }).click();
