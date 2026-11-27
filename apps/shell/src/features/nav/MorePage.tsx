@@ -1,7 +1,7 @@
 // The More tab: Sanga's apps that don't have a tab of their own along the bottom, as big tiles in their
 // own colours (the landing page's). Each opens with a Back button that returns here; More stays lit.
 import type { ReactNode } from 'react';
-import { ArrowRight, Gamepad2, KeyRound, Landmark, NotebookPen } from 'lucide-react';
+import { ArrowRight, Gamepad2, HardDrive, KeyRound, Landmark, NotebookPen } from 'lucide-react';
 import { go } from '../../lib/nav';
 import { setApp } from '../../state/app';
 import { AppTabs, useGamesDue } from './AppTabs';
@@ -38,6 +38,7 @@ export function MorePage() {
             () => { setApp({ notesChat: null }); go('diary'); })}
           {tile(t('Money'), t('Banks, cards, cash and bills'), <Landmark />, 'linear-gradient(140deg, #0ea5e9, #1e3a8a)', () => go('accounts'))}
           {tile(t('Passwords'), t('Logins to copy or open in a tap'), <KeyRound />, 'linear-gradient(140deg, #10b981, #065f46)', () => go('passwords'))}
+          {tile(t('Drive'), t('Your files and folders, with previews'), <HardDrive />, 'linear-gradient(140deg, #6366f1, #312e81)', () => go('drive'))}
         </ul>
       </div>
       <AppTabs />

@@ -10,7 +10,8 @@
         "$TURBO_ROOT$/apps/calendar/src/**",
         "$TURBO_ROOT$/apps/split/src/**",
         "$TURBO_ROOT$/apps/accounts/src/**",
-        "$TURBO_ROOT$/apps/passwords/src/**"
+        "$TURBO_ROOT$/apps/passwords/src/**",
+        "$TURBO_ROOT$/apps/drive/src/**"
       ]
     }
   }

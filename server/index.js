@@ -22,6 +22,7 @@ import { routes as groupRoutes } from './groups.js';
 import { routes as noteRoutes } from './notes.js';
 import { routes as itemRoutes } from './items.js';
 import { routes as splitRoutes } from './split.js';
+import { routes as driveRoutes } from './drive.js';
 import { routes as reminderRoutes, startReminders } from './reminders.js';
 import { purgeStories, routes as storyRoutes } from './stories.js';
 import { handlers as callHandlers, onClose as callClosed, onConnect as callConnected, routes as callRoutes } from './calls.js';
@@ -54,7 +55,7 @@ loadStatic();
 const handlers = { ...messageHandlers, ...gameHandlers, ...callHandlers };
 
 // ---------- HTTP ----------
-const routes = { ...authRoutes, ...profileRoutes, ...friendRoutes, ...pushRoutes, ...gifRoutes, ...songRoutes, ...previewRoutes, ...groupRoutes, ...noteRoutes, ...itemRoutes, ...splitRoutes, ...reminderRoutes, ...storyRoutes, ...callRoutes };
+const routes = { ...authRoutes, ...profileRoutes, ...friendRoutes, ...pushRoutes, ...gifRoutes, ...songRoutes, ...previewRoutes, ...groupRoutes, ...noteRoutes, ...itemRoutes, ...splitRoutes, ...driveRoutes, ...reminderRoutes, ...storyRoutes, ...callRoutes };
 
 async function handleHttp(req, res) {
   const url = new URL(req.url, 'http://x');

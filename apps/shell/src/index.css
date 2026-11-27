@@ -8,7 +8,8 @@
 @source "../../calendar/src";
 @source "../../split/src";
 @source "../../accounts/src";
-@source "../../passwords/src"; /* keep apps/shell/turbo.json build inputs in step with these */
+@source "../../passwords/src";
+@source "../../drive/src"; /* keep apps/shell/turbo.json build inputs in step with these */
 
 /* ---------- chat wallpapers (Settings → Appearance): .wallpaper.wp-<name> ---------- */
 .wallpaper { background-color: var(--chat); }

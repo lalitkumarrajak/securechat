@@ -40,8 +40,8 @@ export function AppTabs() {
       {tab(tk('Calendar'), <CalendarDays />, section === 'calendar', to('calendar'))}
       {tab(tk('Account'), <CircleUserRound />, section === 'profile', to('profile'), requests > 0 && <Count n={requests} />)}
       {tab(tk('Split'), <Wallet />, section === 'split', to('split'))}
-      {/* Games, the Diary, Money and Passwords are opened from More's page, and More stays lit while you're in them. */}
-      {tab(tk('More'), <LayoutGrid />, section === 'more' || section === 'games' || section === 'diary' || section === 'accounts' || section === 'passwords', to('more'), gamesDue > 0 && <Count n={gamesDue} />)}
+      {/* Games, the Diary, Money, Passwords and Drive are opened from More's page, and More stays lit while you're in them. */}
+      {tab(tk('More'), <LayoutGrid />, section === 'more' || section === 'games' || section === 'diary' || section === 'accounts' || section === 'passwords' || section === 'drive', to('more'), gamesDue > 0 && <Count n={gamesDue} />)}
     </nav>
   );
 }

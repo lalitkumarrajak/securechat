@@ -170,6 +170,14 @@ const SCHEMA = (pg) => `
     body TEXT NOT NULL,
     PRIMARY KEY (gid, id)
   );
+  CREATE TABLE IF NOT EXISTS drive_chunks (
+    username TEXT NOT NULL,
+    file     TEXT NOT NULL,
+    idx      INTEGER NOT NULL,
+    body     TEXT NOT NULL,
+    size     BIGINT NOT NULL,
+    PRIMARY KEY (username, file, idx)
+  );
   CREATE TABLE IF NOT EXISTS reminders (
     username TEXT NOT NULL,
     id       TEXT NOT NULL,
@@ -360,6 +368,14 @@ const SQL = {
   getItem: 'SELECT updated FROM items WHERE username = ? AND app = ? AND id = ?',
   itemStats: 'SELECT COUNT(*) AS n, COALESCE(MAX(updated), 0) AS last, COALESCE(SUM(octet_length(body)), 0) AS bytes FROM items WHERE username = ? AND app = ?',
 
+  // Drive: each file's sealed pieces (the file's name, folder and key are an item of app 'drive').
+  putDriveChunk: `INSERT INTO drive_chunks (username, file, idx, body, size) VALUES (?, ?, ?, ?, ?)
+                  ON CONFLICT (username, file, idx) DO UPDATE SET body = excluded.body, size = excluded.size`,
+  getDriveChunk: 'SELECT body FROM drive_chunks WHERE username = ? AND file = ? AND idx = ?',
+  driveChunkSize: 'SELECT size FROM drive_chunks WHERE username = ? AND file = ? AND idx = ?',
+  driveStats: 'SELECT COALESCE(SUM(size), 0) AS bytes FROM drive_chunks WHERE username = ?',
+  delDriveFile: 'DELETE FROM drive_chunks WHERE username = ? AND file = ?',
+
   // Split: groups of people sharing expenses. The server knows who is in a group and keeps sealed records
   // and sealed bill photos; the group key is wrapped for each member and never seen in the clear.
   splitMember: 'SELECT username, wrapper, wrapped, added FROM split_members WHERE gid = ? AND username = ?',
@@ -500,9 +516,9 @@ async function openMongo(uri) {
   const mdb = client.db(client.options.dbName === 'test' ? 'securechat' : undefined);
   const c = (name) => mdb.collection(name);
   const [users, sessions, messages, hidden, avatars, friendships, blocks, profiles, pushSubs, games, config, groups, groupMembers, groupPhotos, notes,
-    stories, storyKeys, storyViews, storyComments, items, reminders, splitMembers, splitRecords, splitBills, sharedNotes] =
+    stories, storyKeys, storyViews, storyComments, items, reminders, splitMembers, splitRecords, splitBills, sharedNotes, driveChunks] =
     ['users', 'sessions', 'messages', 'message_hidden', 'avatars', 'friendships', 'blocks', 'profiles', 'push_subs', 'games', 'config',
-      'groups', 'group_members', 'group_photos', 'notes', 'stories', 'story_keys', 'story_views', 'story_comments', 'items', 'reminders', 'split_members', 'split_records', 'split_bills', 'shared_notes'].map(c);
+      'groups', 'group_members', 'group_photos', 'notes', 'stories', 'story_keys', 'story_views', 'story_comments', 'items', 'reminders', 'split_members', 'split_records', 'split_bills', 'shared_notes', 'drive_chunks'].map(c);
   await Promise.all([
     users.createIndex({ email: 1 }, { unique: true, partialFilterExpression: { email: { $type: 'string' } } }),
     sessions.createIndex({ expires: 1 }),
@@ -524,6 +540,7 @@ async function openMongo(uri) {
     sharedNotes.createIndex({ recipient: 1, updated: 1 }),
     sharedNotes.createIndex({ owner: 1 }),
     items.createIndex({ username: 1, app: 1, updated: 1 }),
+    driveChunks.createIndex({ username: 1, file: 1 }),
     splitMembers.createIndex({ gid: 1 }),
     splitMembers.createIndex({ username: 1 }),
     splitRecords.createIndex({ gid: 1, updated: 1 }),
@@ -755,6 +772,15 @@ async function openMongo(uri) {
       last: (await items.find({ username: u, app }).sort({ updated: -1 }).limit(1).next())?.updated ?? 0,
       bytes: await sumBytes(items, { username: u, app }),
     }),
+
+    putDriveChunk: async (u, file, idx, body, size) => {
+      await driveChunks.replaceOne({ _id: `${u}|${file}|${idx}` }, { username: u, file, idx, body, size }, { upsert: true });
+      return changes(1);
+    },
+    getDriveChunk: async (u, file, idx) => (await driveChunks.findOne({ _id: `${u}|${file}|${idx}` }, { projection: { body: 1 } })) ?? undefined,
+    driveChunkSize: async (u, file, idx) => (await driveChunks.findOne({ _id: `${u}|${file}|${idx}` }, { projection: { size: 1 } })) ?? undefined,
+    driveStats: async (u) => ({ bytes: (await driveChunks.aggregate([{ $match: { username: u } }, { $group: { _id: null, bytes: { $sum: '$size' } } }]).next())?.bytes ?? 0 }),
+    delDriveFile: async (u, file) => changes((await driveChunks.deleteMany({ username: u, file })).deletedCount),
 
     splitMember: async (gid, u) => {
       const d = await splitMembers.findOne({ _id: gid + '|' + u });
