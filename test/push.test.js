@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { befriend, connect, name, register, sendText, sleep, startServer } from './helpers.js';
+import { befriend, C, connect, name, register, sendText, sleep, startServer } from './helpers.js';
 
 let srv, push, pushPort;
 const hits = [];
@@ -97,6 +97,30 @@ describe('push notifications', () => {
     await sleep(300);
     assert.equal(hits.length, 0, 'muted');
     await srv.api('/api/mute', { u: a.u, until: 0 }, b.token);
+  });
+
+  it('reaches a phone with Sanga in the background even while Sanga is open on a computer', async () => {
+    const d = await register(srv, name('xd'));
+    await befriend(srv, a, d);
+    const { auth } = await C.deriveFromPassword(d.u, d.pw);
+    const phone = (await srv.api('/api/login', { u: d.u, auth })).data.token; // a second sign-in: the phone
+    assert.ok(phone);
+    assert.equal((await srv.api('/api/push/subscribe', { sub: subscription('d-phone') }, phone)).status, 200);
+    const laptop = await connect(srv, d.token); // Sanga open on the computer
+    await sleep(4100);
+    hits.length = 0;
+    await sendText(wa, a, d, 'on your phone?');
+    await waitHits(1);
+    assert.deepEqual(hits.map((h) => h.path), ['/push/d-phone']);
+
+    // The phone has Sanga on screen itself: it shows the message there, no notification.
+    const onPhone = await connect(srv, phone);
+    await sleep(4100);
+    hits.length = 0;
+    await sendText(wa, a, d, 'now you see it');
+    await sleep(400);
+    assert.equal(hits.length, 0);
+    onPhone.close(); laptop.close();
   });
 
   it('an endpoint stays with its account: others can neither take it over nor remove it', async () => {

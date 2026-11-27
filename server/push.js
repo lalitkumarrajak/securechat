@@ -3,9 +3,10 @@
 import webpush from 'web-push';
 import { ctx } from './context.js';
 import { config } from './config.js';
-import { readJson, sendJson } from './http.js';
+import { readJson, sendJson, sha256 } from './http.js';
 import { getProfile, isMuted } from './profiles.js';
 import { friendHooks } from './friends.js';
+import { isActive, isSessionActive } from './hub.js';
 
 let publicKey = null;
 
@@ -35,7 +36,11 @@ function allowedEndpoint(s) {
 
 const lastSent = new Map(); // "to|kind|from" -> ts, so a burst of messages makes one notification
 
-export async function notify(user, payload, coalesceKey) {
+/** A push to each of the user's devices. `away`: only to devices that don't have Sanga on screen (it
+ *  shows the message itself there), whatever the others are doing, so a phone in a pocket still hears
+ *  of a message while Sanga is open on a computer. A subscription from before devices were told apart
+ *  goes only while none of them is looking. */
+export async function notify(user, payload, coalesceKey, away = false) {
   if (!publicKey) return;
   if (coalesceKey) {
     const now = Date.now();
@@ -43,7 +48,8 @@ export async function notify(user, payload, coalesceKey) {
     lastSent.set(coalesceKey, now);
     if (lastSent.size > 10000) lastSent.clear();
   }
-  const subs = await ctx.db.all('pushSubsFor', user);
+  let subs = await ctx.db.all('pushSubsFor', user);
+  if (away) subs = subs.filter((s) => !(s.session ? isSessionActive(user, s.session) : isActive(user)));
   await Promise.all(subs.map(async (s) => {
     try {
       await webpush.sendNotification({ endpoint: s.endpoint, keys: JSON.parse(s.keys) }, JSON.stringify(payload),
@@ -58,7 +64,7 @@ export async function notify(user, payload, coalesceKey) {
 export async function notifyMessage(to, from) {
   if (await isMuted(to, from)) return;
   const name = (await getProfile(from)).name || from;
-  await notify(to, { t: 'msg', from, name }, `${to}|m|${from}`);
+  await notify(to, { t: 'msg', from, name }, `${to}|m|${from}`, true);
 }
 
 friendHooks.onRequest = async (to, from) => {
@@ -69,7 +75,7 @@ friendHooks.onRequest = async (to, from) => {
 export const routes = {
   'GET /api/push/key': async (req, res) => sendJson(res, 200, { key: publicKey }),
 
-  'POST /api/push/subscribe': async (req, res, me) => {
+  'POST /api/push/subscribe': async (req, res, me, token) => {
     const { sub } = await readJson(req);
     const ok = sub && typeof sub.endpoint === 'string' && sub.endpoint.length < 1000 && allowedEndpoint(sub.endpoint) &&
       typeof sub.keys?.p256dh === 'string' && sub.keys.p256dh.length < 200 &&
@@ -78,7 +84,8 @@ export const routes = {
     // An endpoint already registered to another account stays theirs: otherwise anyone who learned it
     // could cut that browser off from its account's notifications and send it their own. (Signing out
     // unsubscribes the browser, so the next account to sign in there gets a new endpoint.)
-    const { changes } = await ctx.db.run('setPushSub', sub.endpoint, me, JSON.stringify({ p256dh: sub.keys.p256dh, auth: sub.keys.auth }), Date.now());
+    // Which sign-in this browser is: its notifications are held back only while it shows Sanga itself.
+    const { changes } = await ctx.db.run('setPushSub', sub.endpoint, me, JSON.stringify({ p256dh: sub.keys.p256dh, auth: sub.keys.auth }), Date.now(), sha256(token));
     if (!changes) return sendJson(res, 409, { error: 'This browser is set up for notifications for another account' });
     sendJson(res, 200, { ok: true });
   },

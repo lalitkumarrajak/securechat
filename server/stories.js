@@ -7,7 +7,7 @@
 import { B64_RE, USER_RE } from './config.js';
 import { ctx } from './context.js';
 import { rateLimited, readJson, sendJson } from './http.js';
-import { isActive, sendTo } from './hub.js';
+import { sendTo } from './hub.js';
 import { canChat } from './friends.js';
 import { getProfile } from './profiles.js';
 import { notify } from './push.js';
@@ -105,7 +105,7 @@ export const routes = {
     for (const u of audience.keys()) sendTo(u, { t: 'story', u: me, ...(tagged.includes(u) && { tag: id }) });
     if (tagged.length) {
       const name = await nameOf(me);
-      for (const u of tagged) if (!isActive(u)) notify(u, { t: 'stag', from: me, name }).catch(() => {});
+      for (const u of tagged) notify(u, { t: 'stag', from: me, name }, undefined, true).catch(() => {});
     }
     sendJson(res, 200, { id, ts, exp: ts + STORY_MS });
   },
@@ -153,7 +153,7 @@ export const routes = {
     sendTo(s.owner, { t: 'story', u: s.owner, act: id, ...(s.owner !== me && { cmt: me }) });
     if (s.owner !== me) {
       sendTo(me, { t: 'story', u: s.owner, act: id });
-      if (!isActive(s.owner)) notify(s.owner, { t: 'scmt', from: me, name: await nameOf(me) }, `${s.owner}|sc|${me}`).catch(() => {});
+      notify(s.owner, { t: 'scmt', from: me, name: await nameOf(me) }, `${s.owner}|sc|${me}`, true).catch(() => {});
     }
     sendJson(res, 200, { ts });
   },

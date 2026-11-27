@@ -11,6 +11,7 @@ import { Main } from './features/Shell';
 import { joinFromLink } from './features/games/store';
 import { LockScreen } from './features/lock/LockScreen';
 import { useLock } from './lib/applock';
+import { useCall } from './lib/calls';
 import { rememberGroupInvite, rememberInvite } from './lib/invite';
 
 let booted = false;
@@ -19,6 +20,8 @@ export function App() {
   const status = useApp((s) => s.status);
   const theme = useSettings((s) => s.theme);
   const locked = useLock((s) => s.locked); // app lock: only the PIN screen is on the page
+  // A call carries on over the lock: it locks once the call is over.
+  const inCall = useCall((s) => !!s.call && s.call.phase !== 'ended');
   const lang = useLang(); // a new language redraws everything in it
 
   useEffect(() => {
@@ -47,9 +50,9 @@ export function App() {
     <Fragment key={lang}>
       {status === 'loading' && <ShellSkeleton />}
       {status === 'auth' && <Landing />}
-      {status === 'app' && (locked ? <LockScreen /> : <Main />)}
+      {status === 'app' && (locked && !inCall ? <LockScreen /> : <Main />)}
       <ConfirmHost />
-      {!(status === 'app' && locked) && <Toaster position="top-center" theme={theme === 'system' ? 'system' : theme} richColors closeButton
+      {!(status === 'app' && locked && !inCall) && <Toaster position="top-center" theme={theme === 'system' ? 'system' : theme} richColors closeButton
         toastOptions={{ className: 'rounded-xl!' }} />}
     </Fragment>
   );

@@ -43,5 +43,7 @@
   "Incoming group voice call": "ग्रुप वॉइस कॉल आ रही है",
   "Incoming video call": "वीडियो कॉल आ रही है",
   "Incoming voice call": "वॉइस कॉल आ रही है",
-  "Calling…": "कॉल कर रहे हैं…"
+  "Calling…": "कॉल कर रहे हैं…",
+  "Video call with {name}": "{name} के साथ वीडियो कॉल",
+  "Voice call with {name}": "{name} के साथ वॉइस कॉल"
 }

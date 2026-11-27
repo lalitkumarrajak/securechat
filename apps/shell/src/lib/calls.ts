@@ -70,6 +70,20 @@ interface Link {
   inIce: RTCIceCandidateInit[];      // arrived before we could use them
   screenSender: RTCRtpSender | null; // a voice call has no video to swap: sharing adds one
   drop: number;
+  restarted?: number;                // when we last asked for a fresh route (ICE restart)
+}
+
+// A phone that leaves Sanga during a call can go quiet for a while (the system pauses it, or its
+// network changes). Instead of hanging up, ask for a fresh route, and give it time to come back.
+const RECONNECT_MS = 45_000;
+async function restartIce(id: string, l: Link) {
+  if (Date.now() - (l.restarted ?? 0) < 4000 || l.pc.signalingState === 'closed') return;
+  l.restarted = Date.now();
+  try {
+    const offer = await l.pc.createOffer({ iceRestart: true });
+    await l.pc.setLocalDescription(offer);
+    sendFrame({ t: 'csig', id, k: 'offer', to: l.u, b: await seal(l.u, id, 'reoffer', { sdp: offer.sdp }) });
+  } catch { /* the other side may be restarting it at the same moment: theirs will do */ }
 }
 
 // Per-call internals that the screen doesn't need.
@@ -168,10 +182,11 @@ async function link(id: string, u: string) {
       setMember(u, { state: 'connected' });
       const c = cur()!;
       set({ phase: 'active', ...(!c.started && { started: Date.now() }) });
-    } else if (s === 'disconnected') {
+    } else if (s === 'disconnected' || s === 'failed') {
       setMember(u, { state: 'reconnecting' });
-      l.drop = window.setTimeout(() => { if (pc.connectionState !== 'connected') lost(u); }, 20_000);
-    } else if (s === 'failed') lost(u);
+      void restartIce(id, l);
+      l.drop = window.setTimeout(() => { if (pc.connectionState !== 'connected') lost(u); }, RECONNECT_MS);
+    }
   };
   return l;
 }
@@ -570,6 +585,32 @@ readyHooks.push(() => {
   const c = cur();
   if (c && c.phase !== 'ended' && c.phase !== 'incoming') sendFrame({ t: 'cre', id: c.id });
 });
+// Back in Sanga during a call: any connection that went quiet while away gets a fresh route now.
+document.addEventListener('visibilitychange', () => {
+  const c = cur();
+  if (document.visibilityState !== 'visible' || !c || c.phase === 'ended' || c.phase === 'incoming') return;
+  for (const l of R.links.values()) if (l.answered && l.pc.connectionState !== 'connected') void restartIce(c.id, l);
+});
+
+// The phone's media controls show the call (and Android keeps a page with a call in them running).
+useCall.subscribe((s, prev) => {
+  const ms = typeof navigator !== 'undefined' ? navigator.mediaSession : undefined;
+  if (!ms || s.call?.phase === prev.call?.phase) return;
+  try {
+    const on = s.call && s.call.phase !== 'ended' && s.call.phase !== 'incoming';
+    if (on) {
+      const name = displayName(getApp().friends[s.call!.peer], s.call!.peer);
+      ms.metadata = new MediaMetadata({ title: s.call!.video ? t('Video call with {name}', { name }) : t('Voice call with {name}', { name }), artist: 'Sanga' }); // i18n-ok
+      ms.playbackState = 'playing';
+      try { ms.setActionHandler('hangup' as MediaSessionAction, () => hangUp()); } catch { /* not supported here */ }
+    } else if (!s.call || s.call.phase === 'ended') {
+      ms.metadata = null;
+      ms.playbackState = 'none';
+      try { ms.setActionHandler('hangup' as MediaSessionAction, null); } catch { /* not supported here */ }
+    }
+  } catch { /* no media controls */ }
+});
+
 // Closing the app hangs up (capture: before the engine closes the connection on the same event).
 window.addEventListener('pagehide', (e) => { if (!e.persisted) hangUp(); }, { capture: true });
 

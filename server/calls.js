@@ -15,7 +15,7 @@
 import crypto from 'node:crypto';
 import { B64_RE, USER_RE } from './config.js';
 import { rateLimited, sendJson } from './http.js';
-import { isActive, online, send, sendTo } from './hub.js';
+import { online, send, sendTo } from './hub.js';
 import { canChat } from './friends.js';
 import { getProfile } from './profiles.js';
 import { notify } from './push.js';
@@ -69,7 +69,7 @@ function ring(c, u, by, offer) {
     notifyCall(u, by, { t: 'missed', v: c.video ? 1 : 0 });
   }, RING_MS);
   sendTo(u, ringFrame(c, x));
-  if (!isActive(u)) notifyCall(u, by, { t: 'call', v: c.video ? 1 : 0 });
+  notifyCall(u, by, { t: 'call', v: c.video ? 1 : 0 }, true); // to their devices not showing Sanga
 }
 
 /** Someone leaves (or never answered): the others are told; with one person left, it's over. */
@@ -209,10 +209,10 @@ export function onClose(ws) {
   }
 }
 
-async function notifyCall(to, from, payload) {
+async function notifyCall(to, from, payload, away = false) {
   try {
     const name = (await getProfile(from)).name || from;
-    await notify(to, { ...payload, from, name });
+    await notify(to, { ...payload, from, name }, undefined, away);
   } catch (err) { console.error('push', err.message); }
 }
 

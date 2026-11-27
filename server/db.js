@@ -247,6 +247,7 @@ const COLUMNS = [
   'ALTER TABLE users ADD COLUMN email TEXT', // verified, lowercase; NULL for accounts without one
   'CREATE UNIQUE INDEX IF NOT EXISTS users_email ON users (email)', // NULLs don't clash
   "ALTER TABLE drive_chunks ADD COLUMN ref TEXT NOT NULL DEFAULT ''", // where a piece kept outside the database is ('gd:<id>', 'r2:<key>')
+  "ALTER TABLE push_subs ADD COLUMN session TEXT NOT NULL DEFAULT ''", // the sign-in (token hash) of the device it reaches
 ];
 
 // Queries written once with `?` placeholders; converted to $1, $2… for Postgres.
@@ -326,12 +327,12 @@ const SQL = {
                privacy = excluded.privacy, mutes = excluded.mutes`,
 
   // An endpoint stays with the account that registered it: changes = 0 if someone else has it.
-  setPushSub: `INSERT INTO push_subs (endpoint, username, keys, created) VALUES (?, ?, ?, ?)
-               ON CONFLICT (endpoint) DO UPDATE SET keys = excluded.keys, created = excluded.created
+  setPushSub: `INSERT INTO push_subs (endpoint, username, keys, created, session) VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT (endpoint) DO UPDATE SET keys = excluded.keys, created = excluded.created, session = excluded.session
                WHERE push_subs.username = excluded.username`,
   deletePushSub: 'DELETE FROM push_subs WHERE endpoint = ?',
   deletePushSubOf: 'DELETE FROM push_subs WHERE endpoint = ? AND username = ?',
-  pushSubsFor: 'SELECT endpoint, keys FROM push_subs WHERE username = ?',
+  pushSubsFor: 'SELECT endpoint, keys, session FROM push_subs WHERE username = ?',
 
   // Games (Ludo, …): the whole state as JSON, rewritten after every move.
   saveGame: `INSERT INTO games (id, type, status, state, updated) VALUES (?, ?, ?, ?, ?)
@@ -719,14 +720,14 @@ async function openMongo(uri) {
     },
 
     // Matching on the owner too: someone else's endpoint makes the upsert insert a duplicate _id.
-    setPushSub: async (endpoint, username, keys, created) => {
-      try { await pushSubs.replaceOne({ _id: endpoint, username }, { username, keys, created }, { upsert: true }); }
+    setPushSub: async (endpoint, username, keys, created, session) => {
+      try { await pushSubs.replaceOne({ _id: endpoint, username }, { username, keys, created, session }, { upsert: true }); }
       catch (e) { if (e.code === 11000) return changes(0); throw e; }
       return changes(1);
     },
     deletePushSub: async (endpoint) => changes((await pushSubs.deleteOne({ _id: endpoint })).deletedCount),
     deletePushSubOf: async (endpoint, username) => changes((await pushSubs.deleteOne({ _id: endpoint, username })).deletedCount),
-    pushSubsFor: async (u) => (await pushSubs.find({ username: u }).toArray()).map((d) => ({ endpoint: d._id, keys: d.keys })),
+    pushSubsFor: async (u) => (await pushSubs.find({ username: u }).toArray()).map((d) => ({ endpoint: d._id, keys: d.keys, session: d.session ?? '' })),
 
     saveGame: async (id, type, status, state, updated) => {
       await games.replaceOne({ _id: id }, { type, status, state, updated }, { upsert: true });

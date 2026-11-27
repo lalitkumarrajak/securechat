@@ -8,7 +8,7 @@ import { B64_RE } from './config.js';
 import { ctx } from './context.js';
 import { canChat } from './friends.js';
 import { readJson, sendJson } from './http.js';
-import { isActive, sendTo } from './hub.js';
+import { sendTo } from './hub.js';
 import { getProfile } from './profiles.js';
 import { notify } from './push.js';
 
@@ -76,7 +76,7 @@ export const routes = {
     if (body && !Number(had?.live)) {
       const name = (await getProfile(me)).name || me;
       sendTo(to, { t: 'nshare', from: me, name });
-      if (!isActive(to)) notify(to, { t: 'nshare', from: me, name }, `${to}|n|${me}`).catch(() => {});
+      notify(to, { t: 'nshare', from: me, name }, `${to}|n|${me}`, true).catch(() => {});
     }
     sendJson(res, 200, { updated });
   },

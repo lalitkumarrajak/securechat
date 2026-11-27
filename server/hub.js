@@ -28,6 +28,14 @@ export function isActive(user) {
   }
   return false;
 }
+/** Whether the device signed in with this session (its token's hash) has Sanga on screen right now. */
+export function isSessionActive(user, session) {
+  const now = Date.now();
+  for (const ws of online.get(user) || []) {
+    if (ws.tokenHash === session && ws.active && now - ws.beat < config.presenceTimeoutMs) return true;
+  }
+  return false;
+}
 export const isShownOnline = (user) => shownOnline.has(user);
 
 // Recompute a user's online state and tell watchers if it changed.

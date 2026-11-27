@@ -10,7 +10,7 @@ import crypto from 'node:crypto';
 import { B64_RE } from './config.js';
 import { ctx, nextSeq } from './context.js';
 import { readJson, rateLimited, sendBody, sendJson } from './http.js';
-import { isActive, sendTo } from './hub.js';
+import { sendTo } from './hub.js';
 import { canChat } from './friends.js';
 import { getProfile, imageType, isMuted, profileHooks } from './profiles.js';
 import { notify } from './push.js';
@@ -36,16 +36,16 @@ export async function fanout(row, except) {
   for (const u of await memberNames(row.recipient.slice(2))) sendTo(u, frame, except);
 }
 
-/** Push notifications for a group message, to members who aren't looking at the app. */
+/** Push notifications for a group message, to members' devices that aren't showing the app. */
 export async function notifyGroup(gid, from, mentioned = []) {
   const g = await ctx.db.get('getGroup', gid);
   if (!g) return;
   const name = (await getProfile(from)).name || from;
   for (const u of await memberNames(gid)) {
-    if (u === from || isActive(u)) continue;
+    if (u === from) continue;
     const tagged = mentioned.includes(u);
     if (!tagged && await isMuted(u, 'g:' + gid)) continue;
-    notify(u, { t: 'gmsg', from, name, group: g.name, peer: 'g:' + gid, ...(tagged && { mention: 1 }) }, `${u}|g|${gid}`).catch(() => {});
+    notify(u, { t: 'gmsg', from, name, group: g.name, peer: 'g:' + gid, ...(tagged && { mention: 1 }) }, `${u}|g|${gid}`, true).catch(() => {});
   }
 }
 

@@ -77,7 +77,7 @@ export const handlers = {
     if (res.changes === 0) return; // retransmit of a message we already have
     sendTo(m.to, { t: 'm', ...(await rowOut(row, m.to)) });
     sendTo(ws.user, { t: 'm', ...(await rowOut(row, ws.user)) }, ws); // sender's other devices
-    if (!m.q && !isActive(m.to)) notifyMessage(m.to, ws.user).catch((err) => console.error('push', err.message));
+    if (!m.q) notifyMessage(m.to, ws.user).catch((err) => console.error('push', err.message));
   },
 
   async rcpt(ws, m) {

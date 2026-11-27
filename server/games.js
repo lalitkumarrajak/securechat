@@ -178,7 +178,7 @@ export const handlers = {
     await commit(g, ref);
     const host = g.players[0].n || ws.user;
     for (const u of to) {
-      if (!isActive(u)) notify(u, { t: 'game', from: ws.user, name: host, game: d.name }, `${u}|g|${ws.user}`).catch(() => {});
+      notify(u, { t: 'game', from: ws.user, name: host, game: d.name }, `${u}|g|${ws.user}`, true).catch(() => {});
     }
   },
 
@@ -347,7 +347,7 @@ export const handlers = {
     await commit(g0);
     if (!people.length) await start(g); // only computer players: play now
     const host = g.players[0].n || ws.user;
-    for (const pl of people) if (!isActive(pl.u)) notify(pl.u, { t: 'game', from: ws.user, name: host, game: d.name }, `${pl.u}|g|${ws.user}`).catch(() => {});
+    for (const pl of people) notify(pl.u, { t: 'game', from: ws.user, name: host, game: d.name }, `${pl.u}|g|${ws.user}`, true).catch(() => {});
   },
 
   async gbot(ws, m) {
