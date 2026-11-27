@@ -268,5 +268,16 @@
   "Pinned": "पिन किया गया",
   "edited": "बदला गया",
   "Tap to remove your reaction": "अपना रिएक्शन हटाने के लिए टैप करें",
-  "React with {emoji}": "{emoji} से रिएक्ट करें"
+  "React with {emoji}": "{emoji} से रिएक्ट करें",
+  "Media, links and docs": "मीडिया, लिंक और डॉक्यूमेंट",
+  "Media": "मीडिया",
+  "Docs": "डॉक्यूमेंट",
+  "Links": "लिंक",
+  "No photos or videos in this chat yet": "इस चैट में अभी कोई फ़ोटो या वीडियो नहीं",
+  "No documents in this chat yet": "इस चैट में अभी कोई डॉक्यूमेंट नहीं",
+  "No links in this chat yet": "इस चैट में अभी कोई लिंक नहीं",
+  "This week": "इस हफ़्ते",
+  "This month": "इस महीने",
+  "Video": "वीडियो",
+  "Show in chat": "चैट में दिखाएँ"
 }

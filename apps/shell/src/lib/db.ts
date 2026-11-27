@@ -95,6 +95,30 @@ export async function photoKeys(peer: string): Promise<string[]> {
   return wrap(idx.getAllKeys(IDBKeyRange.bound([peer, 'img', -Infinity], [peer, 'img', Infinity]))) as Promise<string[]>;
 }
 
+/** How many messages of a kind a chat has (photos, files…), counted from the index alone. */
+export async function countOfType(peer: string, type: string): Promise<number> {
+  const idx = (await store('msgs')).index('peer_type_ts');
+  return wrap(idx.count(IDBKeyRange.bound([peer, type, -Infinity], [peer, type, Infinity])));
+}
+
+/** A chat's messages of one kind, newest first, light: each one's content (the photo, the file)
+ *  is dropped as it's read, so a chat with many big files stays small in memory. */
+export async function lightOfType(peer: string, type: string, keep?: (m: Msg) => boolean): Promise<Msg[]> {
+  const idx = (await store('msgs')).index('peer_type_ts');
+  return new Promise((resolve, reject) => {
+    const out: Msg[] = [];
+    const req = idx.openCursor(IDBKeyRange.bound([peer, type, -Infinity], [peer, type, Infinity]), 'prev');
+    req.onsuccess = () => {
+      const cur = req.result;
+      if (!cur) return resolve(out);
+      const m = cur.value as Msg;
+      if (!keep || keep(m)) out.push({ ...m, src: undefined, file: m.file && { ...m.file, text: undefined } });
+      cur.continue();
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
 /** Just the key, time and text of every message in a chat (for search): photos, voice notes and
  *  files are read one at a time and dropped, never all held in memory at once. */
 export async function messageTexts(peer: string): Promise<Pick<Msg, 'k' | 'ts' | 'text' | 'type' | 'peer'>[]> {

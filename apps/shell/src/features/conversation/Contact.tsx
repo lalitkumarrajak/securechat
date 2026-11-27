@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { Archive, ArchiveRestore, ArrowLeft, Bell, BellOff, Lock, Search, ShieldCheck, UserMinus, UserX } from 'lucide-react';
 import { Avatar } from '../../components/Avatar';
@@ -10,6 +11,7 @@ import { setApp, useApp } from '../../state/app';
 import { setChatUi } from './chatUi';
 import { Quick } from './Quick';
 import { Row } from './Row';
+import { MediaBrowser, MediaSummary } from './media/MediaBrowser';
 import { locale, t, tn } from '@sanga/i18n';
 
 export function Contact({ peer }: { peer: string }) {
@@ -23,6 +25,8 @@ export function Contact({ peer }: { peer: string }) {
   const muted = isMuted(peer);
   const name = displayName(friend, peer);
   const close = () => setApp({ panel: null });
+  const [media, setMedia] = useState(false);
+  if (media) return <MediaBrowser peer={peer} name={name} onBack={() => setMedia(false)} />;
 
   return (
     <>
@@ -45,6 +49,8 @@ export function Contact({ peer }: { peer: string }) {
             <Quick icon={archived ? <ArchiveRestore /> : <Archive />} label={archived ? t('Unarchive') : t('Archive')} onClick={() => setArchived(peer, !archived)} />
           </div>
         </section>
+
+        <MediaSummary peer={peer} onOpen={() => setMedia(true)} />
 
         {friend?.about && (
           <section className="mt-2 bg-panel px-6 py-4">

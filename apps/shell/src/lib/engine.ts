@@ -765,6 +765,11 @@ export const findMessage = (k: string) => db.getMsg(k);
 
 /** Every photo in a chat, oldest first, for swiping through them. */
 export const photoKeys = (peer: string) => db.photoKeys(peer);
+/** A chat's photos (keys, oldest first), files and links, for its "Media, links and docs". */
+export const countOfType = (peer: string, type: string) => db.countOfType(peer, type);
+export const fileMessages = (peer: string) => db.lightOfType(peer, 'file');
+export const LINK_RE = /https?:\/\/[^\s<]+[^\s<.,;:!?)"'\]]/; // i18n-ok
+export const linkMessages = (peer: string) => db.lightOfType(peer, 'text', (m) => !!m.lp || LINK_RE.test(m.text ?? ''));
 
 /** Insert or replace a message in the open chat's list. */
 function showMessage(m: Msg) {

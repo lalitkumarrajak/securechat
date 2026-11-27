@@ -19,6 +19,7 @@ import { Row } from '../../conversation/Row';
 import { MAX_GROUP } from '../groupLimits';
 import { AddMembers } from './AddMembers';
 import { MemberRow } from './MemberRow';
+import { MediaBrowser, MediaSummary } from '../../conversation/media/MediaBrowser';
 import { fail } from './fail';
 import { t } from '@sanga/i18n';
 
@@ -28,7 +29,7 @@ export function Info({ g }: { g: Group }) {
   useApp((s) => s.me?.mutes);
   const peer = 'g:' + g.id;
   const muted = isMuted(peer);
-  const [view, setView] = useState<'info' | 'add'>('info');
+  const [view, setView] = useState<'info' | 'add' | 'media'>('info');
   const [editing, setEditing] = useState<null | 'name' | 'about'>(null);
   const [draft, setDraft] = useState('');
   const [link, setLink] = useState<string | null>(null);
@@ -40,6 +41,7 @@ export function Info({ g }: { g: Group }) {
   const members = [...g.members].sort((a, b) => Number(b.u === me) - Number(a.u === me) || Number(b.admin) - Number(a.admin) || nameOf(a).localeCompare(nameOf(b)));
 
   if (view === 'add') return <AddMembers g={g} onDone={() => setView('info')} />;
+  if (view === 'media') return <MediaBrowser peer={peer} name={g.name} onBack={() => setView('info')} />;
 
   const save = async () => {
     try {
@@ -103,6 +105,8 @@ export function Info({ g }: { g: Group }) {
             {g.admin && <Quick icon={<UserPlus />} label={t('Add')} onClick={() => setView('add')} />}
           </div>
         </section>
+
+        <MediaSummary peer={peer} onOpen={() => setView('media')} />
 
         <section className="mt-2 bg-panel px-6 py-4">
           <div className="flex items-center justify-between">
