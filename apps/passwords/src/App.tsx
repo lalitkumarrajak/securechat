@@ -6,12 +6,12 @@ import { t, useI18n } from '@sanga/i18n';
 import { UI_DICTS } from '@sanga/ui/locale';
 import { PASSWORDS_DICTS } from './locale';
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, KeyRound, Plus, Search, WifiOff } from 'lucide-react';
+import { ArrowLeft, Check, KeyRound, Plus, Search, WifiOff } from 'lucide-react';
 import { Button, IconButton } from '@sanga/ui/button';
 import { Input } from '@sanga/ui/input';
 import { sdk, type AppProps } from '@sanga/sdk';
 import { host, liveLogins, matches, newLogin, startPasswords, usePasswords, type Login } from './store';
-import { CopyButton, OpenButton } from './actions';
+import { CopyButton, OpenButton, useNotice } from './actions';
 import { LoginSheet } from './LoginSheet';
 
 const COLORS = ['#0ea5e9', '#6366f1', '#f59e0b', '#10b981', '#ec4899', '#ef4444', '#8b5cf6', '#14b8a6'];
@@ -66,6 +66,7 @@ function PasswordsAppInner({ onClose, tab }: AppProps) {
       </div>
 
       <LoginSheet login={editing} onClose={() => setEditing(null)} />
+      <Notice />
     </div>
   );
 }
@@ -85,8 +86,18 @@ function Row({ x, onOpen }: { x: Login; onOpen: () => void }) {
       {x.url && <CopyButton small kind="link" value={x.url} />}
       {x.username && <CopyButton small kind="username" value={x.username} />}
       {x.password && <CopyButton small kind="password" value={x.password} />}
-      <OpenButton small url={x.url} />
+      <OpenButton small url={x.url} password={x.password} />
     </li>
+  );
+}
+
+function Notice() {
+  const text = useNotice((s) => s.text);
+  if (!text) return null;
+  return (
+    <div role="status" className="absolute bottom-6 left-1/2 z-30 flex w-[min(26rem,calc(100%-1.5rem))] -translate-x-1/2 items-center gap-2 rounded-2xl bg-[#1d2733] px-4 py-3 text-sm text-white shadow-2xl">
+      <Check className="size-4 shrink-0 text-emerald-300" />{text}
+    </div>
   );
 }
 

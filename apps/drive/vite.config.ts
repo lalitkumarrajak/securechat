@@ -14,7 +14,11 @@ export default defineConfig({
     federation({ name: 'drive', filename: 'remoteEntry.js', exposes: { './App': './src/App.tsx' }, ...FEDERATION }),
     precompress(), sharedCheck(),
   ],
-  build: { outDir: 'dist', emptyOutDir: true, target: 'es2022' },
+  build: {
+    outDir: 'dist', emptyOutDir: true, target: 'es2022',
+    // Two pages: Drive on its own, and what a share link opens (for anyone, no sign-in).
+    rollupOptions: { input: { index: `${import.meta.dirname}/index.html`, share: `${import.meta.dirname}/share.html` } },
+  },
   server: { port: 5179, proxy: DEV_PROXY },
   test: { include: ['src/**/*.test.ts'] },
 });

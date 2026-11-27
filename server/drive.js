@@ -6,13 +6,20 @@
 // plain bytes; otherwise the database itself, as base64 text. Either way the database keeps a row per
 // piece (who, which file, which piece, its size, and where it is: 'gd:<file id>' or 'r2:<key>'), which
 // is how space is counted. Pieces still in the database from before move out in the background.
-import { B64_RE } from './config.js';
+import { B64_RE, USER_RE } from './config.js';
 import { ctx } from './context.js';
-import { readJson, sendJson } from './http.js';
+import { canChat } from './friends.js';
+import { clientIp, rateLimited, readJson, sendJson } from './http.js';
+import { sendTo } from './hub.js';
 import { r2FromEnv } from './r2.js';
 import { gdriveFromEnv } from './gdrive.js';
 
 const FILE_RE = /^[A-Za-z0-9_-]{8,40}$/;
+const LINK_RE = /^[A-Za-z0-9_-]{16,40}$/;
+const MAX_BOX = 4_000_000;     // a share's sealed list of what's in it (base64)
+const MAX_LINK_FILES = 5000;   // files one share may hand out
+const MAX_LINKS = 500;         // shares per person
+const MAX_RECIPIENTS = 50;     // friends per share
 export const MAX_CHUNK = 2_200_000; // base64 of one sealed piece (1.5 MB of the file)
 const MAX_PIECES = 4000;
 
@@ -50,6 +57,34 @@ const pieceOf = (url) => {
   return Number.isSafeInteger(i) && i >= 0 && i < MAX_PIECES ? i : null;
 };
 const asFiles = (stored) => Math.round(Number(stored) / RATIO);
+/** One piece of `owner`'s file, as base64, wherever it's kept; or why not. */
+async function readChunk(owner, file, i) {
+  const row = await ctx.db.get('getDriveChunk', owner, file, i);
+  if (!row) return { status: 404 };
+  if (row.body) return { body: row.body }; // still in the database
+  try {
+    const buf = await outside(row.ref || 'r2:' + keyOf(owner, file, i)).get();
+    return buf ? { body: buf.toString('base64') } : { status: 404 };
+  } catch (e) { return { status: 502, e }; }
+}
+const sendChunk = (res, r) => (r.body ? sendJson(res, 200, { body: r.body })
+  : r.status === 502 ? unreachable(res, r.e) : sendJson(res, 404, { error: 'File not found' }));
+
+/** The share, if `me` owns it (or it doesn't exist yet when `fresh`); else answers 404 and returns null. */
+async function ownShare(res, me, id, fresh = false) {
+  if (typeof id !== 'string' || !LINK_RE.test(id)) { sendJson(res, 400, { error: 'Invalid share' }); return null; }
+  const row = await ctx.db.get('getDriveLink', id);
+  if (row ? row.owner !== me : !fresh) { sendJson(res, 404, { error: 'Share not found' }); return null; }
+  return row ?? { id, owner: me, fresh: true };
+}
+const tellRecipients = async (id, extra = {}) => {
+  for (const { recipient } of await ctx.db.all('driveLinkRecipients', id)) sendTo(recipient, { t: 'drive', ...extra });
+};
+const publicLimit = (req) => rateLimited('drivepub:' + clientIp(req), 600, 60e3);
+
+/** The routes anyone may call, signed in or not: what a share link opens. */
+export const PUBLIC = ['GET /api/drive/public', 'GET /api/drive/public/chunk'];
+
 const unreachable = (res, e) => { console.error('drive:', e.message); sendJson(res, 502, { error: 'Couldn’t reach file storage. Try again.' }); };
 
 export const routes = {
@@ -64,13 +99,85 @@ export const routes = {
   'GET /api/drive/chunk': async (req, res, me, token, url) => {
     const file = fileOf(url), i = pieceOf(url);
     if (!file || i == null) return sendJson(res, 400, { error: 'Invalid file' });
-    const row = await ctx.db.get('getDriveChunk', me, file, i);
-    if (!row) return sendJson(res, 404, { error: 'File not found' });
-    if (row.body) return sendJson(res, 200, { body: row.body }); // still in the database
-    let buf;
-    try { buf = await outside(row.ref || 'r2:' + keyOf(me, file, i)).get(); } catch (e) { return unreachable(res, e); }
-    if (!buf) return sendJson(res, 404, { error: 'File not found' });
-    sendJson(res, 200, { body: buf.toString('base64') });
+    sendChunk(res, await readChunk(me, file, i));
+  },
+
+  // ---------- sharing ----------
+  // A share's sealed list, and the files it may hand out (sent again whenever what's in it changes).
+  'POST /api/drive/link': async (req, res, me) => {
+    const { id, box, files } = await readJson(req, MAX_BOX + MAX_LINK_FILES * 45 + 1000);
+    const row = await ownShare(res, me, id, true);
+    if (!row) return;
+    if (typeof box !== 'string' || !box || box.length > MAX_BOX || !B64_RE.test(box)) return sendJson(res, 400, { error: 'That is too much to share at once' });
+    if (!Array.isArray(files) || files.length > MAX_LINK_FILES || !files.every((f) => typeof f === 'string' && FILE_RE.test(f))) return sendJson(res, 400, { error: 'That is too much to share at once' });
+    if (row.fresh && (await ctx.db.get('driveLinkCount', me)).n >= MAX_LINKS) return sendJson(res, 400, { error: `You can share up to ${MAX_LINKS} things at a time` });
+    await ctx.db.run('putDriveLink', id, me, box, [...new Set(files)].join(','), Date.now());
+    if (!row.fresh) await tellRecipients(id);
+    sendJson(res, 200, {});
+  },
+
+  // Sharing stopped: the link stops working and the friends it went to lose it.
+  'POST /api/drive/link/delete': async (req, res, me) => {
+    const { id } = await readJson(req, 500);
+    const row = await ownShare(res, me, id, true);
+    if (!row) return;
+    if (!row.fresh) {
+      await tellRecipients(id);
+      await ctx.db.run('delDriveLinkAllTo', id);
+      await ctx.db.run('delDriveLink', id);
+    }
+    sendJson(res, 200, {});
+  },
+
+  // Friends a share goes to: each gets its key wrapped with the key the two of you share.
+  'POST /api/drive/link/to': async (req, res, me) => {
+    const { id, add = [], remove = [] } = await readJson(req, 64_000);
+    const row = await ownShare(res, me, id);
+    if (!row) return;
+    if (!Array.isArray(add) || !Array.isArray(remove) || add.length > MAX_RECIPIENTS || remove.length > MAX_RECIPIENTS) return sendJson(res, 400, { error: 'Invalid share' });
+    for (const u of remove) {
+      if (typeof u !== 'string' || !USER_RE.test(u)) return sendJson(res, 400, { error: 'Invalid share' });
+      if ((await ctx.db.run('delDriveLinkTo', id, u)).changes) sendTo(u, { t: 'drive' });
+    }
+    const have = new Set((await ctx.db.all('driveLinkRecipients', id)).map((r) => r.recipient));
+    for (const a of add) {
+      if (typeof a?.u !== 'string' || !USER_RE.test(a.u) || a.u === me || typeof a.wrapped !== 'string' || a.wrapped.length > 400 || !B64_RE.test(a.wrapped)) {
+        return sendJson(res, 400, { error: 'Invalid share' });
+      }
+      if (!(await canChat(me, a.u))) continue; // only friends
+      if (!have.has(a.u) && have.size >= MAX_RECIPIENTS) return sendJson(res, 400, { error: `You can share with up to ${MAX_RECIPIENTS} people` });
+      await ctx.db.run('putDriveLinkTo', id, a.u, me, a.wrapped, Date.now());
+      if (!have.has(a.u)) { have.add(a.u); sendTo(a.u, { t: 'drive', from: me }); }
+    }
+    sendJson(res, 200, {});
+  },
+
+  // What friends shared with me (only while we're still friends).
+  'GET /api/drive/shared': async (req, res, me) => {
+    const ok = new Map();
+    const shares = [];
+    for (const r of await ctx.db.all('driveSharedWith', me)) {
+      if (!ok.has(r.owner)) ok.set(r.owner, await canChat(r.owner, me));
+      if (ok.get(r.owner)) shares.push({ id: r.id, owner: r.owner, wrapped: r.wrapped, updated: Number(r.updated) });
+    }
+    sendJson(res, 200, { shares });
+  },
+
+  // ---------- opening a share (no sign-in needed: the key is in the link) ----------
+  'GET /api/drive/public': async (req, res, me, token, url) => {
+    if (publicLimit(req)) return sendJson(res, 429, { error: 'Slow down' });
+    const id = url.searchParams.get('id');
+    const row = typeof id === 'string' && LINK_RE.test(id) ? await ctx.db.get('getDriveLink', id) : null;
+    if (!row) return sendJson(res, 404, { error: 'This link doesn’t work any more' });
+    sendJson(res, 200, { box: row.box, updated: Number(row.updated) });
+  },
+
+  'GET /api/drive/public/chunk': async (req, res, me, token, url) => {
+    if (publicLimit(req)) return sendJson(res, 429, { error: 'Slow down' });
+    const id = url.searchParams.get('id'), file = fileOf(url), i = pieceOf(url);
+    const row = typeof id === 'string' && LINK_RE.test(id) ? await ctx.db.get('getDriveLink', id) : null;
+    if (!row || !file || i == null || !row.files.split(',').includes(file)) return sendJson(res, 404, { error: 'File not found' });
+    sendChunk(res, await readChunk(row.owner, file, i));
   },
 
   'POST /api/drive/chunk': async (req, res, me, token, url) => {

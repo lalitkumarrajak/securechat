@@ -62,3 +62,28 @@ describe('files', () => {
     expect(parseCsv('a,b\n"x, y","say ""hi""\nthere"\r\n1,2')).toEqual([['a', 'b'], ['x, y', 'say "hi"\nthere'], ['1', '2']]);
   });
 });
+
+import { manifest, openShare, parseShareHash, sealShare } from './store';
+
+describe('shares', () => {
+  it('hold a folder and what is in it, not what is in the Trash, and nothing of yours that isn’t theirs', () => {
+    const own = { ...m, a: { ...m.a, starred: true, share: { id: 'x'.repeat(16), key: 'k'.repeat(43), to: ['ravi'] } } };
+    const mf = manifest(own.a, 'me', own);
+    expect(mf.items.map((x) => x.id).sort()).toEqual(['a', 'b', 'f1']);
+    expect(mf.items.find((x) => x.id === 'a')).not.toHaveProperty('share');
+    expect(mf.items.find((x) => x.id === 'a')).not.toHaveProperty('starred');
+    expect(manifest(m.t, 'me', m).gone).toBe(true); // in the Trash: nothing shared
+  });
+  it('are sealed with the link’s key, and open only with it', async () => {
+    const id = 'AbCdEfGhIjKlMnOp', key = 'q'.repeat(43);
+    const keyed = { ...m, f1: { ...m.f1, key: 'a2V5', chunks: 1 } };
+    const box = await sealShare(key, id, manifest(keyed.a, 'me', keyed));
+    expect((await openShare(key, id, box))!.items.map((x) => x.name).sort()).toEqual(['a', 'b', 'f1']);
+    await expect(openShare('r'.repeat(43), id, box)).rejects.toThrow();
+    await expect(openShare(key, 'AbCdEfGhIjKlMnOq', box)).rejects.toThrow(); // can't be passed off as another share
+  });
+  it('read the id and key from a link', () => {
+    expect(parseShareHash('#AbCdEfGhIjKlMnOp.' + 'q'.repeat(43))).toEqual({ id: 'AbCdEfGhIjKlMnOp', key: 'q'.repeat(43) });
+    expect(parseShareHash('#AbCdEfGhIjKlMnOp')).toBeNull();
+  });
+});

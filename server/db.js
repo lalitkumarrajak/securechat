@@ -178,6 +178,23 @@ const SCHEMA = (pg) => `
     size     BIGINT NOT NULL,
     PRIMARY KEY (username, file, idx)
   );
+  CREATE TABLE IF NOT EXISTS drive_links (
+    id      TEXT PRIMARY KEY,
+    owner   TEXT NOT NULL,
+    box     TEXT NOT NULL,
+    files   TEXT NOT NULL,
+    updated BIGINT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS drive_links_owner ON drive_links(owner);
+  CREATE TABLE IF NOT EXISTS drive_link_to (
+    id        TEXT NOT NULL,
+    recipient TEXT NOT NULL,
+    owner     TEXT NOT NULL,
+    wrapped   TEXT NOT NULL,
+    updated   BIGINT NOT NULL,
+    PRIMARY KEY (id, recipient)
+  );
+  CREATE INDEX IF NOT EXISTS drive_link_to_recipient ON drive_link_to(recipient);
   CREATE TABLE IF NOT EXISTS reminders (
     username TEXT NOT NULL,
     id       TEXT NOT NULL,
@@ -382,6 +399,20 @@ const SQL = {
   driveInDb: "SELECT username, file, idx, body FROM drive_chunks WHERE body <> '' LIMIT ?",
   driveMoved: "UPDATE drive_chunks SET body = '', size = ?, ref = ? WHERE username = ? AND file = ? AND idx = ?",
 
+  // Drive's shares: a sealed list of what's shared (opened with a key the server never sees: in the link,
+  // or wrapped for each friend it's shared with), and which of the owner's files it may hand out.
+  getDriveLink: 'SELECT id, owner, box, files, updated FROM drive_links WHERE id = ?',
+  putDriveLink: `INSERT INTO drive_links (id, owner, box, files, updated) VALUES (?, ?, ?, ?, ?)
+                 ON CONFLICT (id) DO UPDATE SET box = excluded.box, files = excluded.files, updated = excluded.updated`,
+  delDriveLink: 'DELETE FROM drive_links WHERE id = ?',
+  driveLinkCount: 'SELECT COUNT(*) AS n FROM drive_links WHERE owner = ?',
+  putDriveLinkTo: `INSERT INTO drive_link_to (id, recipient, owner, wrapped, updated) VALUES (?, ?, ?, ?, ?)
+                   ON CONFLICT (id, recipient) DO UPDATE SET wrapped = excluded.wrapped, updated = excluded.updated`,
+  delDriveLinkTo: 'DELETE FROM drive_link_to WHERE id = ? AND recipient = ?',
+  delDriveLinkAllTo: 'DELETE FROM drive_link_to WHERE id = ?',
+  driveLinkRecipients: 'SELECT recipient FROM drive_link_to WHERE id = ?',
+  driveSharedWith: 'SELECT id, owner, wrapped, updated FROM drive_link_to WHERE recipient = ? ORDER BY updated DESC LIMIT 1000',
+
   // Split: groups of people sharing expenses. The server knows who is in a group and keeps sealed records
   // and sealed bill photos; the group key is wrapped for each member and never seen in the clear.
   splitMember: 'SELECT username, wrapper, wrapped, added FROM split_members WHERE gid = ? AND username = ?',
@@ -522,9 +553,9 @@ async function openMongo(uri) {
   const mdb = client.db(client.options.dbName === 'test' ? 'securechat' : undefined);
   const c = (name) => mdb.collection(name);
   const [users, sessions, messages, hidden, avatars, friendships, blocks, profiles, pushSubs, games, config, groups, groupMembers, groupPhotos, notes,
-    stories, storyKeys, storyViews, storyComments, items, reminders, splitMembers, splitRecords, splitBills, sharedNotes, driveChunks] =
+    stories, storyKeys, storyViews, storyComments, items, reminders, splitMembers, splitRecords, splitBills, sharedNotes, driveChunks, driveLinks, driveLinkTo] =
     ['users', 'sessions', 'messages', 'message_hidden', 'avatars', 'friendships', 'blocks', 'profiles', 'push_subs', 'games', 'config',
-      'groups', 'group_members', 'group_photos', 'notes', 'stories', 'story_keys', 'story_views', 'story_comments', 'items', 'reminders', 'split_members', 'split_records', 'split_bills', 'shared_notes', 'drive_chunks'].map(c);
+      'groups', 'group_members', 'group_photos', 'notes', 'stories', 'story_keys', 'story_views', 'story_comments', 'items', 'reminders', 'split_members', 'split_records', 'split_bills', 'shared_notes', 'drive_chunks', 'drive_links', 'drive_link_to'].map(c);
   await Promise.all([
     users.createIndex({ email: 1 }, { unique: true, partialFilterExpression: { email: { $type: 'string' } } }),
     sessions.createIndex({ expires: 1 }),
@@ -547,6 +578,9 @@ async function openMongo(uri) {
     sharedNotes.createIndex({ owner: 1 }),
     items.createIndex({ username: 1, app: 1, updated: 1 }),
     driveChunks.createIndex({ username: 1, file: 1 }),
+    driveLinks.createIndex({ owner: 1 }),
+    driveLinkTo.createIndex({ recipient: 1, updated: -1 }),
+    driveLinkTo.createIndex({ id: 1 }),
     splitMembers.createIndex({ gid: 1 }),
     splitMembers.createIndex({ username: 1 }),
     splitRecords.createIndex({ gid: 1, updated: 1 }),
@@ -798,6 +832,26 @@ async function openMongo(uri) {
     driveInDb: async (limit) => (await driveChunks.find({ body: { $ne: '' } }).limit(limit).toArray())
       .map((d) => ({ username: d.username, file: d.file, idx: d.idx, body: d.body })),
     driveMoved: async (size, ref, u, file, idx) => changes((await driveChunks.updateOne({ _id: `${u}|${file}|${idx}` }, { $set: { body: '', size, ref } })).modifiedCount),
+
+    getDriveLink: async (id) => {
+      const d = await driveLinks.findOne({ _id: id });
+      return d ? { id, owner: d.owner, box: d.box, files: d.files, updated: d.updated } : undefined;
+    },
+    putDriveLink: async (id, owner, box, files, updated) => {
+      await driveLinks.replaceOne({ _id: id }, { owner, box, files, updated }, { upsert: true });
+      return changes(1);
+    },
+    delDriveLink: async (id) => changes((await driveLinks.deleteOne({ _id: id })).deletedCount),
+    driveLinkCount: async (owner) => ({ n: await driveLinks.countDocuments({ owner }) }),
+    putDriveLinkTo: async (id, recipient, owner, wrapped, updated) => {
+      await driveLinkTo.replaceOne({ _id: id + '|' + recipient }, { id, recipient, owner, wrapped, updated }, { upsert: true });
+      return changes(1);
+    },
+    delDriveLinkTo: async (id, recipient) => changes((await driveLinkTo.deleteOne({ _id: id + '|' + recipient })).deletedCount),
+    delDriveLinkAllTo: async (id) => changes((await driveLinkTo.deleteMany({ id })).deletedCount),
+    driveLinkRecipients: async (id) => (await driveLinkTo.find({ id }, { projection: { recipient: 1 } }).toArray()).map((d) => ({ recipient: d.recipient })),
+    driveSharedWith: async (recipient) => (await driveLinkTo.find({ recipient }).sort({ updated: -1 }).limit(1000).toArray())
+      .map((d) => ({ id: d.id, owner: d.owner, wrapped: d.wrapped, updated: d.updated })),
 
     splitMember: async (gid, u) => {
       const d = await splitMembers.findOne({ _id: gid + '|' + u });

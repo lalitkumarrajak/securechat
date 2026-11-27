@@ -14,7 +14,8 @@
     "test:unit": "turbo run test",
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
     "cert": "sh scripts/gen-cert.sh",
-    "google-drive-login": "node scripts/google-drive-login.mjs"
+    "google-drive-login": "node scripts/google-drive-login.mjs",
+    "google-drive-check": "node scripts/google-drive-check.mjs"
   },
   "engines": {
     "node": ">=22.13"

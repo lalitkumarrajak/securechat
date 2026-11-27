@@ -22,7 +22,7 @@ import { routes as groupRoutes } from './groups.js';
 import { routes as noteRoutes } from './notes.js';
 import { routes as itemRoutes } from './items.js';
 import { routes as splitRoutes } from './split.js';
-import { moveDriveOut, storage as driveStorage, routes as driveRoutes } from './drive.js';
+import { moveDriveOut, PUBLIC as DRIVE_PUBLIC, storage as driveStorage, routes as driveRoutes } from './drive.js';
 import { routes as reminderRoutes, startReminders } from './reminders.js';
 import { purgeStories, routes as storyRoutes } from './stories.js';
 import { handlers as callHandlers, onClose as callClosed, onConnect as callConnected, routes as callRoutes } from './calls.js';
@@ -57,6 +57,7 @@ if (driveStorage) {
 }
 loadStatic();
 
+for (const r of DRIVE_PUBLIC) PUBLIC_ROUTES.add(r); // a Drive share link opens without signing in
 const handlers = { ...messageHandlers, ...gameHandlers, ...callHandlers };
 
 // ---------- HTTP ----------

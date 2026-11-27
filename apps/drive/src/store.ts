@@ -25,6 +25,10 @@ export interface Entry extends Thumb {
   mime?: string;
   key?: string;
   chunks?: number;
+  /** Shared by a link anyone can open: its id and key (the key travels only inside the link). */
+  link?: { id: string; key: string };
+  /** Shared with friends: its id, key, and who. */
+  share?: { id: string; key: string; to: string[] };
 }
 interface Kept { id: string; box: string; edited: number; srv?: number; dirty?: boolean; deleted?: boolean }
 type Live = Entry & { box: string; srv?: number; dirty?: boolean; deleted?: boolean };
@@ -42,8 +46,13 @@ interface State {
   usage: { used: number; max: number } | null;
   /** Files being fetched to open, and how far along (0–1). */
   fetching: Record<string, number>;
+  /** What friends shared with me, opened. */
+  shared: Shared[];
 }
-export const useDrive = create<State>(() => ({ entries: {}, loaded: false, failed: false, uploads: [], usage: null, fetching: {} }));
+/** A share opened: a file or folder (and what's in it) as its owner shared it. */
+export interface Shared { id: string; key: string; owner: string; updated: number; m: Manifest }
+export interface Manifest { v: 1; owner: string; root: string; gone?: boolean; items: Entry[] }
+export const useDrive = create<State>(() => ({ entries: {}, loaded: false, failed: false, uploads: [], usage: null, fetching: {}, shared: [] }));
 const set = useDrive.setState, get = useDrive.getState;
 
 const APP = 'drive';
@@ -125,7 +134,8 @@ const unseal = async (box: string, id: string) => valid(await C.decryptItem(awai
 export function startDrive() {
   if (started) return load();
   started = true;
-  sdk().on(APP, () => void syncDrive());
+  sdk().on(APP, () => { void syncDrive(); void loadShared(); });
+  void loadShared();
   sdk().onReady(() => void syncDrive());
   return load().then(() => { void syncDrive(); });
 }
@@ -182,6 +192,7 @@ export async function restore(e: Entry) {
 /** Gone for good, with everything inside it, from every device; the files' pieces go from the server. */
 export async function deleteForever(e: Entry) {
   const gone = [e, ...(e.type === 'folder' ? descendants(e.id) : [])];
+  for (const x of gone) for (const sh of [x.link, x.share]) if (sh) void stopShare(sh.id);
   const files = gone.filter((x) => x.type === 'file').map((x) => x.id);
   if (files.length) await sdk().store.put(PURGE, [...new Set([...((await sdk().store.get<string[]>(PURGE)) ?? []), ...files])]);
   for (const x of gone) {
@@ -283,7 +294,7 @@ async function pump() {
   } finally { pumping = false; void refreshUsage(); }
 }
 
-const aad = (id: string, i: number, n: number) => new TextEncoder().encode(`drive|${me()}|${id}|${i}|${n}`);
+const aad = (id: string, i: number, n: number, owner = me()) => new TextEncoder().encode(`drive|${owner}|${id}|${i}|${n}`);
 
 async function send(u: Upload, file: File) {
   const raw = crypto.getRandomValues(new Uint8Array(32));
@@ -335,27 +346,35 @@ const blobs = new Map<string, Promise<Blob>>();
 const sizes = new Map<string, number>();
 const CACHE = 300e6;
 
+/** Where a file's pieces come from: your own Drive, or a share (a friend's, or a link's). */
+export interface Source { owner: string; tag: string; chunk: (file: string, i: number) => Promise<string> }
+const own = (): Source => ({ owner: me(), tag: '', chunk: (f, i) => sdk().api<{ body: string }>(`/api/drive/chunk?file=${f}&i=${i}`).then((r) => r.body) });
+/** A share's files: through its public routes, which hand out only what's in it. `get` is the fetch to use. */
+export const shareSource = (id: string, owner: string, get: (path: string) => Promise<{ body: string }>): Source =>
+  ({ owner, tag: id + ':', chunk: (f, i) => get(`/api/drive/public/chunk?id=${id}&file=${f}&i=${i}`).then((r) => r.body) });
+
 /** A file's contents, fetched and opened on this device (kept for a while, so opening it again is instant). */
-export function fileBlob(e: Entry): Promise<Blob> {
-  let p = blobs.get(e.id);
-  if (p) { blobs.delete(e.id); blobs.set(e.id, p); return p; } // most recently used last
-  p = fetchFile(e).finally(() => set((s) => { const f = { ...s.fetching }; delete f[e.id]; return { fetching: f }; }));
-  blobs.set(e.id, p);
+export function fileBlob(e: Entry, src: Source = own()): Promise<Blob> {
+  const k = src.tag + e.id;
+  let p = blobs.get(k);
+  if (p) { blobs.delete(k); blobs.set(k, p); return p; } // most recently used last
+  p = fetchFile(e, src).finally(() => set((s) => { const f = { ...s.fetching }; delete f[e.id]; return { fetching: f }; }));
+  blobs.set(k, p);
   p.then(() => {
-    sizes.set(e.id, e.size ?? 0);
+    sizes.set(k, e.size ?? 0);
     // Over the limit: the least recently opened go (they're fetched again if opened again).
     let total = [...sizes.values()].reduce((a, b) => a + b, 0);
     for (const id of blobs.keys()) {
       if (total <= CACHE) break;
-      if (id === e.id || !sizes.has(id)) continue;
+      if (id === k || !sizes.has(id)) continue;
       total -= sizes.get(id)!;
       forget(id);
     }
-  }, () => blobs.delete(e.id));
+  }, () => blobs.delete(k));
   return p;
 }
 
-async function fetchFile(e: Entry): Promise<Blob> {
+async function fetchFile(e: Entry, src: Source): Promise<Blob> {
   if (!e.key || !e.chunks) throw new Error('missing');
   const key = await C.aesKeyFrom(C.unb64(e.key));
   const n = e.chunks;
@@ -365,9 +384,9 @@ async function fetchFile(e: Entry): Promise<Blob> {
   const worker = async () => {
     while (next < n) {
       const i = next++;
-      const { body } = await withRetry(() => sdk().api<{ body: string }>(`/api/drive/chunk?file=${e.id}&i=${i}`));
+      const body = await withRetry(() => src.chunk(e.id, i));
       const box = C.unb64(body) as Uint8Array<ArrayBuffer>;
-      parts[i] = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: box.subarray(0, 12), additionalData: aad(e.id, i, n) }, key, box.subarray(12)));
+      parts[i] = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: box.subarray(0, 12), additionalData: aad(e.id, i, n, src.owner) }, key, box.subarray(12)));
       done++;
       set((s) => ({ fetching: { ...s.fetching, [e.id]: done / n } }));
     }
@@ -377,8 +396,8 @@ async function fetchFile(e: Entry): Promise<Blob> {
 }
 
 /** Save the file to this device's downloads. */
-export async function download(e: Entry) {
-  const blob = await fileBlob(e);
+export async function download(e: Entry, src?: Source) {
+  const blob = await fileBlob(e, src);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = e.name; a.rel = 'noopener';
@@ -387,8 +406,8 @@ export async function download(e: Entry) {
 }
 
 /** Hand the file to another app (the phone's share sheet), where the browser can. */
-export async function shareFile(e: Entry) {
-  const file = new File([await fileBlob(e)], e.name, { type: e.mime });
+export async function shareFile(e: Entry, src?: Source) {
+  const file = new File([await fileBlob(e, src)], e.name, { type: e.mime });
   await navigator.share({ files: [file], title: e.name });
 }
 export const canShare = () => typeof navigator.canShare === 'function' && navigator.canShare({ files: [new File([''], 'x.txt', { type: 'text/plain' })] });
@@ -445,6 +464,132 @@ async function sync() {
     await sdk().store.put(SINCE, since);
     if (!r.more) break;
   }
+  await refreshShares();
+}
+
+// ---------- sharing ----------
+// A share is a sealed list of what's in it (a file, or a folder and everything in it: names, keys,
+// pictures), sealed with a random key of its own. A link carries that key after the # (never sent to
+// the server); a friend gets it wrapped with the key the two of you share. The server keeps the sealed
+// list and hands out only the pieces of the files on it. Your devices send the list again whenever
+// what's in it changes, so it stays up to date; a removed friend means a new key.
+const SHARE_HASH = 'app/drive/sharehash/';
+const SHARE_APP = 'drive-share';
+const b64url = (b: Uint8Array) => C.b64(b).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const unb64url = (s: string) => C.unb64(s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (s.length % 4)) % 4));
+const newShare = () => ({ id: C.randomId(16), key: b64url(crypto.getRandomValues(new Uint8Array(32))) });
+const shareAad = (id: string) => new TextEncoder().encode(`drive-share|${id}`);
+const THUMBS = 2_500_000; // characters of pictures a share's list may carry
+
+/** What a share holds now: the item, and for a folder everything inside it that isn't in the Trash. */
+export function manifest(root: Entry, owner: string, m: Record<string, Live> = get().entries): Manifest {
+  if (inTrash(root, m) || !alive(m[root.id])) return { v: 1, owner, root: root.id, gone: true, items: [] };
+  const inside = root.type === 'folder' ? descendants(root.id, m).filter((x) => !inTrash(x, m)) : [];
+  let budget = THUMBS;
+  const items = [root, ...inside].map((x) => {
+    const y = clean({ ...x, starred: undefined, trashed: undefined, link: undefined, share: undefined });
+    if (y.thumb && (budget -= y.thumb.length) < 0) delete y.thumb;
+    return y;
+  });
+  return { v: 1, owner, root: root.id, items };
+}
+
+export async function sealShare(key: string, id: string, m: Manifest) {
+  const k = await C.aesKeyFrom(unb64url(key));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: shareAad(id) }, k, new TextEncoder().encode(JSON.stringify(m))));
+  const out = new Uint8Array(12 + ct.length); out.set(iv); out.set(ct, 12);
+  return C.b64(out);
+}
+export async function openShare(key: string, id: string, box: string): Promise<Manifest | null> {
+  const k = await C.aesKeyFrom(unb64url(key));
+  const b = C.unb64(box) as Uint8Array<ArrayBuffer>;
+  const o = JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b.subarray(0, 12), additionalData: shareAad(id) }, k, b.subarray(12))));
+  if (!o || o.v !== 1 || typeof o.owner !== 'string' || typeof o.root !== 'string' || !Array.isArray(o.items)) return null;
+  const items = o.items.slice(0, 6000).map((x: any) => (x && typeof x.id === 'string' ? valid(x, x.id.slice(0, 40)) : null)).filter(Boolean) as Entry[];
+  return { v: 1, owner: o.owner, root: o.root, gone: o.gone === true || undefined, items };
+}
+
+/** The link that opens a share, for anyone. */
+export const shareUrl = (sh: { id: string; key: string }) => `${location.origin}/apps/drive/share.html#${sh.id}.${sh.key}`;
+/** "#id.key" from a link, or null. */
+export function parseShareHash(hash: string) {
+  const m = /^#?([A-Za-z0-9_-]{16,40})\.([A-Za-z0-9_-]{40,50})$/.exec(hash.trim());
+  return m ? { id: m[1], key: m[2] } : null;
+}
+
+async function pushShare(root: Entry, sh: { id: string; key: string }, force = false) {
+  const m = manifest(root, me());
+  const json = JSON.stringify(m);
+  const hash = C.b64(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(sh.id + json))));
+  if (!force && (await sdk().store.get<string>(SHARE_HASH + sh.id)) === hash) return;
+  const files = m.items.filter((x) => x.type === 'file').map((x) => x.id);
+  await sdk().api('/api/drive/link', { id: sh.id, box: await sealShare(sh.key, sh.id, m), files });
+  await sdk().store.put(SHARE_HASH + sh.id, hash);
+}
+async function stopShare(id: string) {
+  await sdk().api('/api/drive/link/delete', { id }).catch(() => {});
+  await sdk().store.del(SHARE_HASH + id);
+}
+
+/** Every share of yours whose contents changed goes up again. */
+async function refreshShares() {
+  for (const x of all()) for (const sh of [x.link, x.share]) if (sh) await pushShare(x, sh).catch(() => {});
+}
+
+/** Turn the link on (returns it) or off. */
+export async function setLink(e: Entry, on: boolean): Promise<string | null> {
+  const cur = get().entries[e.id] ?? e;
+  if (!on) {
+    if (cur.link) await stopShare(cur.link.id);
+    await save({ ...cur, link: undefined }, false);
+    return null;
+  }
+  const link = cur.link ?? newShare();
+  await pushShare(cur, link, true);
+  await save({ ...cur, link }, false);
+  return shareUrl(link);
+}
+
+/** Share with exactly these friends. Taking someone off makes a new key, so they can't open it again. */
+export async function setPeople(e: Entry, people: string[]) {
+  const cur = get().entries[e.id] ?? e;
+  const was = cur.share;
+  if (!people.length) {
+    if (was) await stopShare(was.id);
+    await save({ ...cur, share: undefined }, false);
+    return;
+  }
+  const removed = (was?.to ?? []).filter((u) => !people.includes(u));
+  const sh = was && !removed.length ? { id: was.id, key: was.key } : newShare();
+  const fresh = sh.id !== was?.id;
+  await pushShare(cur, sh, fresh);
+  const add: { u: string; wrapped: string }[] = [];
+  for (const u of people.filter((u) => fresh || !was!.to.includes(u))) {
+    try { add.push({ u, wrapped: await C.encryptItem(await sdk().pairKey(u), { k: sh.key }, `${me()}>${u}`, SHARE_APP, sh.id) }); }
+    catch { /* not a friend whose key is known: left out */ }
+  }
+  if (add.length) await sdk().api('/api/drive/link/to', { id: sh.id, add });
+  if (fresh && was) await stopShare(was.id);
+  await save({ ...cur, share: { ...sh, to: people.filter((u) => fresh ? add.some((a) => a.u === u) : true) } }, false);
+}
+
+/** What friends shared with me: each one's key unwrapped, its list fetched and opened. */
+let sharing: Promise<void> | null = null;
+export function loadShared(): Promise<void> {
+  return (sharing ??= (async () => {
+    const { shares } = await sdk().api<{ shares: { id: string; owner: string; wrapped: string; updated: number }[] }>('/api/drive/shared');
+    const out: Shared[] = [];
+    for (const r of shares) {
+      try {
+        const { k } = await C.decryptItem(await sdk().pairKey(r.owner), r.wrapped, `${r.owner}>${me()}`, SHARE_APP, r.id);
+        const { box } = await sdk().api<{ box: string }>(`/api/drive/public?id=${r.id}`);
+        const m = await openShare(k, r.id, box);
+        if (m && !m.gone && m.owner === r.owner) out.push({ id: r.id, key: k, owner: r.owner, updated: r.updated, m });
+      } catch { /* can't be opened here: left out */ }
+    }
+    set({ shared: out });
+  })().catch(() => {}).finally(() => { sharing = null; }));
 }
 
 async function receive(rows: { id: string; body: string; updated: number }[]) {
@@ -473,6 +618,10 @@ export function valid(o: any, id: string): Entry | null {
     starred: o.starred === true || undefined, trashed: int(o.trashed) || undefined,
   };
   if (e.parent === id) e.parent = '';
+  const sh = (v: any) => (v && typeof v.id === 'string' && /^[A-Za-z0-9_-]{16,40}$/.test(v.id) && typeof v.key === 'string' && /^[A-Za-z0-9_-]{40,50}$/.test(v.key) ? { id: v.id, key: v.key } : undefined);
+  e.link = sh(o.link);
+  const share = sh(o.share);
+  if (share) e.share = { ...share, to: Array.isArray(o.share.to) ? o.share.to.filter((u: unknown) => typeof u === 'string' && /^[a-z0-9_.]{3,24}$/.test(u)).slice(0, 50) : [] };
   if (e.type === 'file') {
     Object.assign(e, {
       size: int(o.size) ?? 0, mime: str(o.mime, 200) || 'application/octet-stream', key: opt(o.key, 60), chunks: int(o.chunks),
@@ -484,7 +633,7 @@ export function valid(o: any, id: string): Entry | null {
   return clean(e);
 }
 /** Only the record's own fields, with nothing empty (parent stays: '' is My Drive). */
-const FIELDS = ['id', 'type', 'name', 'parent', 'created', 'edited', 'starred', 'trashed', 'size', 'mime', 'key', 'chunks', 'thumb', 'w', 'h', 'pages', 'duration'] as const;
+const FIELDS = ['id', 'type', 'name', 'parent', 'created', 'edited', 'starred', 'trashed', 'size', 'mime', 'key', 'chunks', 'thumb', 'w', 'h', 'pages', 'duration', 'link', 'share'] as const;
 function clean(x: Entry): Entry {
   const o: Record<string, unknown> = {};
   for (const k of FIELDS) { const v = x[k]; if (v !== undefined && (v !== '' || k === 'parent')) o[k] = v; }

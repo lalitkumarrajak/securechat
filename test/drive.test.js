@@ -6,7 +6,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { C, name, register, sleep, startServer } from './helpers.js';
+import { befriend, C, connect, name, register, sleep, startServer } from './helpers.js';
 import { sign } from '../server/r2.js';
 
 const piece = (n) => C.b64(crypto.getRandomValues(new Uint8Array(n)));
@@ -216,5 +216,53 @@ describe('drive pieces in Google Drive', () => {
     assert.equal(pieces().length, 1);
     assert.equal(google.tokens, 1); // one sign-in, reused
     await srv.stop();
+  });
+
+  it('npm run google-drive-check goes through every step the server needs', async () => {
+    const lines = [];
+    const { checkDrive } = await import('../scripts/google-drive-check.mjs');
+    await checkDrive({ ...gdEnv(), DATA_DIR: undefined }, (l) => lines.push(l));
+    assert.equal(lines.filter((l) => l.includes('✔')).length, 4);
+    await assert.rejects(checkDrive({ ...gdEnv(), GDRIVE_REFRESH_TOKEN: 'wrong' }, () => {}), /Google sign-in failed \(invalid_grant\)/);
+  });
+});
+
+describe('drive shares', () => {
+  let srv;
+  before(async () => { srv = await startServer(); });
+  after(() => srv.stop());
+
+  it('open by link without signing in, only for the files listed, and go to friends picked', async () => {
+    const [a, b, c] = await Promise.all(['dsa', 'dsb', 'dsc'].map((n) => register(srv, name(n))));
+    await befriend(srv, a, b);
+    const f1 = C.randomId(12), f2 = C.randomId(12), body = piece(300);
+    for (const f of [f1, f2]) assert.equal((await srv.api(`/api/drive/chunk?file=${f}&i=0`, { body }, a.token)).status, 200);
+    const id = C.randomId(16), box = piece(200);
+
+    assert.equal((await srv.api('/api/drive/link', { id, box, files: [f1] }, a.token)).status, 200);
+    // Anyone with the link: the sealed list, and the listed file's pieces, without signing in.
+    assert.equal((await srv.api(`/api/drive/public?id=${id}`)).data.box, box);
+    assert.equal((await srv.api(`/api/drive/public/chunk?id=${id}&file=${f1}&i=0`)).data.body, body);
+    assert.equal((await srv.api(`/api/drive/public/chunk?id=${id}&file=${f2}&i=0`)).status, 404); // not in this share
+    assert.equal((await srv.api(`/api/drive/public?id=${C.randomId(16)}`)).status, 404);
+    // Someone else can't take it over or change who it goes to.
+    assert.equal((await srv.api('/api/drive/link', { id, box: piece(10), files: [] }, b.token)).status, 404);
+    assert.equal((await srv.api('/api/drive/link/to', { id, add: [{ u: c.u, wrapped: piece(60) }] }, b.token)).status, 404);
+
+    // To friends only: b gets it (and is told), c (not a friend) doesn't.
+    const live = await connect(srv, b.token);
+    const wrapped = piece(60);
+    assert.equal((await srv.api('/api/drive/link/to', { id, add: [{ u: b.u, wrapped }, { u: c.u, wrapped }] }, a.token)).status, 200);
+    assert.equal((await live.next('drive')).from, a.u);
+    assert.deepEqual((await srv.api('/api/drive/shared', undefined, b.token)).data.shares.map((x) => [x.id, x.owner, x.wrapped]), [[id, a.u, wrapped]]);
+    assert.equal((await srv.api('/api/drive/shared', undefined, c.token)).data.shares.length, 0);
+
+    // Taken off: gone from b's list. Stopped: the link stops working.
+    assert.equal((await srv.api('/api/drive/link/to', { id, remove: [b.u] }, a.token)).status, 200);
+    assert.equal((await srv.api('/api/drive/shared', undefined, b.token)).data.shares.length, 0);
+    assert.equal((await srv.api('/api/drive/link/delete', { id }, a.token)).status, 200);
+    assert.equal((await srv.api(`/api/drive/public?id=${id}`)).status, 404);
+    assert.equal((await srv.api(`/api/drive/public/chunk?id=${id}&file=${f1}&i=0`)).status, 404);
+    live.close();
   });
 });

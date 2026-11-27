@@ -8,16 +8,22 @@ import { cn } from '@sanga/ui/utils';
 import { t } from '@sanga/i18n';
 import { ext, fmtSize, isHeic, kindName, previewable } from './kinds';
 import { ItemMenu, KindIcon, kindOfEntry, type Action } from './parts';
-import { download, fileBlob, useDrive, type Entry } from './store';
+import { download, fileBlob, useDrive, type Entry, type Source } from './store';
 import { fromHeic, loadPdf } from './thumbs';
 import { parseCsv } from './csv';
 
 const dark = 'text-white/80 hover:bg-white/10 hover:text-white';
 
-export function Viewer({ list, id, onNav, onClose, onAction }: {
-  list: Entry[]; id: string; onNav: (id: string) => void; onClose: () => void; onAction: (a: Action, e: Entry) => void;
+export function Viewer({ list, id, onNav, onClose, onAction, srcOf, readOnly, noClose }: {
+  list: Entry[]; id: string; onNav: (id: string) => void; onClose: () => void; onAction?: (a: Action, e: Entry) => void;
+  /** Where a file's pieces come from, for files someone shared (yours by default). */
+  srcOf?: (e: Entry) => Source | undefined;
+  /** Someone else's: only Download. */
+  readOnly?: boolean;
+  /** The whole page (a shared file opened from its link): nothing to close to. */
+  noClose?: boolean;
 }) {
-  const live = useDrive((s) => s.entries[id]);
+  const live = useDrive((s) => (readOnly ? undefined : s.entries[id]));
   const i = list.findIndex((x) => x.id === id);
   const e = live && !live.deleted ? live : list[i];
   const prev = i > 0 ? list[i - 1] : null, next = i >= 0 && i < list.length - 1 ? list[i + 1] : null;
@@ -39,6 +45,7 @@ export function Viewer({ list, id, onNav, onClose, onAction }: {
   const touch = useRef<{ x: number; y: number } | null>(null);
   if (!e) return null;
   const k = kindOfEntry(e);
+  const src = srcOf?.(e);
 
   return (
     <div role="dialog" aria-modal aria-label={e.name} data-viewer className="fixed inset-0 z-40 flex flex-col bg-[#0b0d10] text-white animate-fade-in"
@@ -50,18 +57,18 @@ export function Viewer({ list, id, onNav, onClose, onAction }: {
         if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) { const to = dx < 0 ? next : prev; if (to) onNav(to.id); }
       }}>
       <header className="flex h-14 shrink-0 items-center gap-2 bg-gradient-to-b from-black/60 to-transparent px-2 pt-[env(safe-area-inset-top)]">
-        <IconButton label={t('Close')} className={dark} onClick={onClose}><X /></IconButton>
+        {noClose ? <span className="w-2" /> : <IconButton label={t('Close')} className={dark} onClick={onClose}><X /></IconButton>}
         <KindIcon e={e} className="size-5 shrink-0" />
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-1.5 truncate font-medium">{e.name}{e.starred && <Star className="size-3.5 shrink-0 fill-amber-400 text-amber-400" aria-label={t('Starred')} />}</p>
           <p className="truncate text-xs text-white/55">{kindName(k)} · {fmtSize(e.size ?? 0)}{list.length > 1 && i >= 0 ? ` · ${t('{i} of {n}', { i: i + 1, n: list.length })}` : ''}</p>
         </div>
-        <IconButton label={t('Download')} className={dark} onClick={() => void download(e).catch(() => {})}><Download /></IconButton>
-        <ItemMenu e={e} onAction={onAction} trigger={<IconButton label={t('More')} className={dark}><EllipsisVertical /></IconButton>} />
+        <IconButton label={t('Download')} className={dark} onClick={() => void download(e, src).catch(() => {})}><Download /></IconButton>
+        {!readOnly && onAction && <ItemMenu e={e} onAction={onAction} trigger={<IconButton label={t('More')} className={dark}><EllipsisVertical /></IconButton>} />}
       </header>
 
       <div className="relative min-h-0 flex-1">
-        <Content key={e.id} e={e} onZoom={setZoomed} />
+        <Content key={e.id} e={e} src={src} onZoom={setZoomed} />
         {prev && <Side side="left" label={t('Previous')} onClick={() => onNav(prev.id)} />}
         {next && <Side side="right" label={t('Next')} onClick={() => onNav(next.id)} />}
       </div>
@@ -79,13 +86,13 @@ function Side({ side, label, onClick }: { side: 'left' | 'right'; label: string;
 }
 
 /** The file's contents, fetched and opened, as an object URL (and the Blob, for PDFs and text). */
-function useFile(e: Entry, enabled: boolean) {
+function useFile(e: Entry, enabled: boolean, src?: Source) {
   const [state, setState] = useState<{ url?: string; blob?: Blob; error?: boolean }>({});
   useEffect(() => {
     if (!enabled) return;
     let url = '', gone = false;
     (async () => {
-      let blob = await fileBlob(e);
+      let blob = await fileBlob(e, src);
       if (isHeic(e.mime ?? '', e.name)) blob = await fromHeic(blob);
       url = URL.createObjectURL(blob);
       if (gone) URL.revokeObjectURL(url); else setState({ url, blob });
@@ -95,14 +102,14 @@ function useFile(e: Entry, enabled: boolean) {
   return state;
 }
 
-function Content({ e, onZoom }: { e: Entry; onZoom: (z: boolean) => void }) {
+function Content({ e, src, onZoom }: { e: Entry; src?: Source; onZoom: (z: boolean) => void }) {
   const k = kindOfEntry(e);
   const can = previewable(e.mime ?? '', e.name, e.size ?? 0);
-  const { url, blob, error } = useFile(e, can);
+  const { url, blob, error } = useFile(e, can, src);
   const progress = useDrive((s) => s.fetching[e.id]);
 
-  if (!can) return <NoPreview e={e} />;
-  if (error) return <NoPreview e={e} failed />;
+  if (!can) return <NoPreview e={e} src={src} />;
+  if (error) return <NoPreview e={e} src={src} failed />;
   if (!url || !blob) {
     return (
       <div className="absolute inset-0 grid place-items-center">
@@ -133,7 +140,7 @@ function Content({ e, onZoom }: { e: Entry; onZoom: (z: boolean) => void }) {
   return <TextView blob={blob} name={e.name} />;
 }
 
-function NoPreview({ e, failed }: { e: Entry; failed?: boolean }) {
+function NoPreview({ e, src, failed }: { e: Entry; src?: Source; failed?: boolean }) {
   const [busy, setBusy] = useState(false);
   return (
     <div className="absolute inset-0 grid place-items-center p-6 text-center">
@@ -143,7 +150,7 @@ function NoPreview({ e, failed }: { e: Entry; failed?: boolean }) {
         </span>
         <p className="mt-4 max-w-sm truncate text-lg font-semibold">{e.name}</p>
         <p className="mt-1 text-sm text-white/60">{failed ? t('Couldn’t open this file. Check your connection and try again.') : t('No preview for this kind of file.')}</p>
-        <Button className="mt-5" loading={busy} onClick={() => { setBusy(true); void download(e).catch(() => {}).finally(() => setBusy(false)); }}>
+        <Button className="mt-5" loading={busy} onClick={() => { setBusy(true); void download(e, src).catch(() => {}).finally(() => setBusy(false)); }}>
           <Download className="size-4" />{t('Download')} · {fmtSize(e.size ?? 0)}
         </Button>
       </div>

@@ -46,7 +46,7 @@ function Form({ l0, onClose }: { l0: Login; onClose: () => void }) {
           <div className="flex gap-1">
             <Input id="p-url" type="url" inputMode="url" autoCapitalize="none" spellCheck={false} maxLength={LIMITS.url} value={l.url ?? ''} onChange={(e) => set({ url: e.target.value || undefined })} placeholder="https://example.com" />
             {l.url?.trim() && <CopyButton kind="link" value={l.url.trim()} className="shrink-0" />}
-            {urlOk && <OpenButton url={l.url} className="shrink-0" />}
+            {urlOk && <OpenButton url={l.url} password={l.password} className="shrink-0" />}
           </div>
           {!urlOk && <p className="mt-1 text-sm text-danger" role="alert">{t('That isn’t a web link.')}</p>}
         </div>

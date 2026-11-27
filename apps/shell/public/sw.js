@@ -67,9 +67,10 @@ self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   if (url.pathname.startsWith('/api/') || url.pathname === '/ws') return;
   const immutable = url.pathname.startsWith('/assets/') || url.pathname.startsWith('/emoji/') || /^\/apps\/[^/]+\/assets\//.test(url.pathname) || /^\/remoteEntry-[\w-]+\.js$/.test(url.pathname);
-  // The other apps (/apps/<name>/): the list of apps and each app's entry file must be current, or
-  // an old entry would ask for files a new version no longer has. Network first, saved copy offline.
-  const current = url.pathname === '/apps.json' || url.pathname.endsWith('/remoteEntry.js') || /^\/apps\/[^/]+\/?(index\.html)?$/.test(url.pathname);
+  // The other apps (/apps/<name>/, and their other pages like Drive's share.html): the list of apps and
+  // each app's entry file must be current, or an old entry would ask for files a new version no longer
+  // has. Network first, saved copy offline. (Not Sanga's own page: a share link opens its own.)
+  const current = url.pathname === '/apps.json' || url.pathname.endsWith('/remoteEntry.js') || /^\/apps\/[^/]+\/?([\w-]+\.html)?$/.test(url.pathname);
   const page = !current && (e.request.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html');
   const key = page ? '/' : url.pathname;
   if (current) {

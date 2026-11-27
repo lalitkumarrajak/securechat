@@ -2,7 +2,7 @@
 import type { ReactNode } from 'react';
 import {
   Download, EllipsisVertical, File, FileArchive, FileAudio, FileImage, FileSpreadsheet, FileText, FileVideo, Folder,
-  FolderInput, Info, Pencil, Play, Presentation, RotateCcw, Share2, Star, StarOff, Trash2,
+  FolderInput, Info, Link2, Pencil, Play, Presentation, RotateCcw, Share2, Star, StarOff, Trash2, UserPlus, Users,
 } from 'lucide-react';
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '@sanga/ui/menu';
 import { IconButton } from '@sanga/ui/button';
@@ -50,10 +50,22 @@ export function Preview({ e, className, big }: { e: Entry; className?: string; b
   );
 }
 
-export type Action = 'open' | 'download' | 'share' | 'rename' | 'move' | 'star' | 'info' | 'trash' | 'restore' | 'forever';
+export type Action = 'open' | 'download' | 'send' | 'share' | 'rename' | 'move' | 'star' | 'info' | 'trash' | 'restore' | 'forever';
 
-export function ItemMenu({ e, onAction, trigger, className }: { e: Entry; onAction: (a: Action, e: Entry) => void; trigger?: ReactNode; className?: string }) {
-  const trashed = inTrash(e);
+/** Shared by you: with friends, by link, or both. */
+export function SharedMark({ e }: { e: Entry }) {
+  if (!e.share && !e.link) return null;
+  const label = e.share && e.link ? t('Shared with friends and by link') : e.share ? t('Shared with friends') : t('Shared by link');
+  const Icon = e.share ? Users : Link2;
+  return <Icon className="size-3.5 shrink-0 text-muted" aria-label={label}><title>{label}</title></Icon>;
+}
+
+export function ItemMenu({ e, onAction, trigger, className, readOnly }: {
+  e: Entry; onAction: (a: Action, e: Entry) => void; trigger?: ReactNode; className?: string;
+  /** Shared with you: only Download (and Send to…). */
+  readOnly?: boolean;
+}) {
+  const trashed = !readOnly && inTrash(e);
   const item = (a: Action, icon: ReactNode, label: string, danger?: boolean) => (
     // After the menu has closed: a window opened while it is still closing can leave the page not taking taps.
     <MenuItem key={a} icon={icon} danger={danger} onSelect={() => { setTimeout(() => onAction(a, e), 0); }}>{label}</MenuItem>
@@ -68,7 +80,13 @@ export function ItemMenu({ e, onAction, trigger, className }: { e: Entry; onActi
         )}
       </MenuTrigger>
       <MenuContent onClick={(ev) => ev.stopPropagation()} className="min-w-52">
-        {trashed ? (
+        {readOnly ? (
+          <>
+            {e.type === 'file' && item('download', <Download />, t('Download'))}
+            {e.type === 'file' && canShare() && item('send', <Share2 />, t('Send to…'))}
+            {e.type === 'folder' && item('open', <FolderInput />, t('Open'))}
+          </>
+        ) : trashed ? (
           <>
             {item('restore', <RotateCcw />, t('Restore'))}
             {item('forever', <Trash2 />, t('Delete forever'), true)}
@@ -76,7 +94,8 @@ export function ItemMenu({ e, onAction, trigger, className }: { e: Entry; onActi
         ) : (
           <>
             {e.type === 'file' && item('download', <Download />, t('Download'))}
-            {e.type === 'file' && canShare() && item('share', <Share2 />, t('Send to…'))}
+            {item('share', <UserPlus />, t('Share'))}
+            {e.type === 'file' && canShare() && item('send', <Share2 />, t('Send to…'))}
             {item('rename', <Pencil />, t('Rename'))}
             {item('move', <FolderInput />, t('Move'))}
             {item('star', e.starred ? <StarOff /> : <Star />, e.starred ? t('Remove from Starred') : t('Add to Starred'))}

@@ -9,7 +9,7 @@ import crypto from 'node:crypto';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
 import readline from 'node:readline/promises';
-import { gdriveFromEnv } from '../server/gdrive.js';
+import { checkDrive } from './google-drive-check.mjs';
 
 const SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -66,15 +66,15 @@ console.log(`GDRIVE_CLIENT_ID=${clientId}`);
 console.log('GDRIVE_CLIENT_SECRET=(the secret you entered)');
 console.log(`GDRIVE_REFRESH_TOKEN=${data.refresh_token}\n`);
 
-// Check it works: find (or make) the folder Sanga's files go in.
-const gd = gdriveFromEnv({ GDRIVE_CLIENT_ID: clientId, GDRIVE_CLIENT_SECRET: clientSecret, GDRIVE_REFRESH_TOKEN: data.refresh_token });
+// Check it works, with the server's own code: the folder, then a test file up, back and deleted.
+console.log('Checking it works the way Sanga’s server uses it:\n');
 try {
-  const folder = await gd.folder();
-  console.log(`Checked: Sanga's files will go in https://drive.google.com/drive/folders/${folder}\n`);
+  await checkDrive({ GDRIVE_CLIENT_ID: clientId, GDRIVE_CLIENT_SECRET: clientSecret, GDRIVE_REFRESH_TOKEN: data.refresh_token });
+  console.log('\nAll good. Put the three values above in Render and save.\n');
 } catch (e) {
   const off = /has not been used|is disabled|accessNotConfigured|SERVICE_DISABLED/i.test(e.message);
   console.error(off
-    ? 'But the Google Drive API is off in this Google Cloud project. Turn it on (APIs & Services → Library → Google Drive API → Enable),\nwait 2–5 minutes, and run this again. The token above works once the API is on.'
-    : `But the check failed: ${e.message}`);
+    ? 'The Google Drive API is off in this Google Cloud project. Turn it on (APIs & Services → Library → Google Drive API → Enable),\nwait 2–5 minutes, and run this again.'
+    : 'That step failed with the reason above. Paste it to Claude (it contains no secrets).');
   process.exit(1);
 }
