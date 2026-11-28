@@ -316,5 +316,9 @@
   "Entry coins were given back.": "एंट्री के सिक्के वापस कर दिए गए।",
   "You won {n} coins!": "आपने {n} सिक्के जीते!",
   "{n} coins back": "{n} सिक्के वापस",
-  "Not enough coins": "पर्याप्त सिक्के नहीं हैं"
+  "Not enough coins": "पर्याप्त सिक्के नहीं हैं",
+  "Custom": "अपनी रकम",
+  "Coins to join": "जुड़ने के सिक्के",
+  "Pick {min} to {max} coins": "{min} से {max} सिक्के चुनें",
+  "You have {n} coins": "आपके पास {n} सिक्के हैं"
 }

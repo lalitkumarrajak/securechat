@@ -8,7 +8,10 @@ import { sendTo } from './hub.js';
 
 export const START = 50_000;
 export const EMOJI_COST = 10;
-export const BETS = [0, 100, 500, 1000, 5000, 10_000]; // entry fees a game can have
+export const BETS = [0, 100, 500, 1000, 5000, 10_000]; // the entry fees offered; any whole amount in between the limits works too
+export const MIN_BET = 10, MAX_BET = 1_000_000;
+/** The entry asked for, if it's allowed: 0 (free), or a whole number of coins within the limits. */
+export const validBet = (n) => (Number.isSafeInteger(n) && n >= MIN_BET && n <= MAX_BET ? n : 0);
 
 const cache = new Map(); // username -> balance
 const locks = new Map(); // username -> the last change still being made, so changes don't interleave

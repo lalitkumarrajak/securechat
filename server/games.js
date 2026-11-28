@@ -193,7 +193,7 @@ export const handlers = {
     }
     if (mine(ws.user).filter(isOpen).length >= MAX_OPEN) return fail('Finish or leave one of your games first');
     if (rateLimited('gnew:' + ws.user, 10, 60e3)) return fail('Slow down');
-    const bet = coins.BETS.includes(m.bet) ? m.bet : 0;
+    const bet = coins.validBet(m.bet);
     if (bet && !(await coins.spend(ws.user, bet, 'entry'))) return fail('Not enough coins');
     const now = Date.now();
     const name = async (u) => (await getProfile(u)).name || '';

@@ -193,10 +193,16 @@ describe('games', () => {
       assert.equal(g1.bet, 1000);
       X.sendJson({ t: 'gleave', id: g1.id });
       assert.equal(await coins(X, (m) => m.why === 'refund'), 50_000);
-      // An amount that isn't offered is a free game
-      X.sendJson({ t: 'gnew', type: 'ludo', to: [y.u], ref: 'k2', bet: 123 });
+      // A custom entry works; one below the limit (or not a whole number) is a free game
+      X.sendJson({ t: 'gnew', type: 'ludo', to: [y.u], ref: 'k2', bet: 5 });
       const g2 = (await X.next('g', (m) => m.ref === 'k2')).g;
       assert.equal(g2.bet, 0);
+      X.sendJson({ t: 'gnew', type: 'ludo', to: [y.u], ref: 'k2b', bet: 1234 });
+      assert.equal(await coins(X), 48_766);
+      const g2b = (await X.next('g', (m) => m.ref === 'k2b')).g;
+      assert.equal(g2b.bet, 1234);
+      X.sendJson({ t: 'gleave', id: g2b.id });
+      assert.equal(await coins(X, (m) => m.why === 'refund'), 50_000);
       X.sendJson({ t: 'gleave', id: g2.id });
       // Both pay 500; Y leaves mid-game; X wins the pot of 1000
       X.sendJson({ t: 'gnew', type: 'ludo', to: [y.u], ref: 'k3', bet: 500 });

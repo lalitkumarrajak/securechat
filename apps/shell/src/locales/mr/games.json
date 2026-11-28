@@ -316,5 +316,9 @@
   "Entry coins were given back.": "एंट्रीची नाणी परत दिली.",
   "You won {n} coins!": "तुम्ही {n} नाणी जिंकलीत!",
   "{n} coins back": "{n} नाणी परत",
-  "Not enough coins": "पुरेशी नाणी नाहीत"
+  "Not enough coins": "पुरेशी नाणी नाहीत",
+  "Custom": "स्वतःची रक्कम",
+  "Coins to join": "सामील होण्यासाठी नाणी",
+  "Pick {min} to {max} coins": "{min} ते {max} नाणी निवडा",
+  "You have {n} coins": "तुमच्याकडे {n} नाणी आहेत"
 }

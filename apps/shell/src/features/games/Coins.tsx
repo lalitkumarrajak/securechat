@@ -5,6 +5,7 @@ import { useGames } from './store';
 
 export const COIN = '🪙';
 export const BETS = [0, 100, 500, 1000, 5000, 10_000]; // as server/coins.js
+export const MIN_BET = 10, MAX_BET = 1_000_000;
 export const EMOJI_COST = 10;
 export const fmtCoins = (n: number) => n.toLocaleString();
 

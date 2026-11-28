@@ -10,7 +10,7 @@ import { useApp } from '../../state/app';
 import { GAME_UI } from './registry';
 import { ChatRowSkeleton } from '../../components/skeleton/ChatRowSkeleton';
 import { closePicker, createGame, useGames } from './store';
-import { BETS, COIN, CoinBalance, fmtCoins } from './Coins';
+import { BETS, COIN, CoinBalance, fmtCoins, MAX_BET, MIN_BET } from './Coins';
 
 export function PickerDialog({ initial, pool, start }: { initial: string[]; pool?: { u: string; name?: string }[]; start?: string }) {
   const friends = useApp((s) => s.friends);
@@ -20,8 +20,12 @@ export function PickerDialog({ initial, pool, start }: { initial: string[]; pool
   const [picked, setPicked] = useState<string[]>(() => initial.slice(0, GAME_UI[type].max - 1));
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
-  const [bet, setBet] = useState(0);
+  const [preset, setPreset] = useState(0);
+  const [custom, setCustom] = useState<string | null>(null); // typed entry, when "Custom" is picked
   const coins = useGames((s) => s.coins);
+  const typed = custom === null ? null : Number(custom);
+  const badCustom = typed !== null && (!Number.isInteger(typed) || typed < MIN_BET || typed > MAX_BET);
+  const bet = typed === null ? preset : badCustom ? 0 : typed;
   const short = bet > 0 && coins !== null && coins < bet;
   const ui = GAME_UI[type];
   const max = ui.max - 1;
@@ -54,14 +58,28 @@ export function PickerDialog({ initial, pool, start }: { initial: string[]; pool
       </div>
       <div className="mb-1 flex gap-1.5 overflow-x-auto pb-1" role="radiogroup" aria-label={t('Entry')}>
         {BETS.map((b) => (
-          <button key={b} type="button" role="radio" aria-checked={b === bet} onClick={() => setBet(b)}
+          <button key={b} type="button" role="radio" aria-checked={custom === null && b === preset} onClick={() => { setPreset(b); setCustom(null); }}
             disabled={b > 0 && coins !== null && coins < b}
             className={cn('shrink-0 rounded-full border-2 px-3 py-1 text-sm font-semibold tabular-nums disabled:opacity-40',
-              b === bet ? 'border-amber-500 bg-amber-400/20' : 'border-line')}>
+              custom === null && b === preset ? 'border-amber-500 bg-amber-400/20' : 'border-line')}>
             {b ? `${COIN} ${fmtCoins(b)}` : t('Free')}
           </button>
         ))}
+        <button type="button" role="radio" aria-checked={custom !== null} onClick={() => setCustom((c) => c ?? '')}
+          className={cn('shrink-0 rounded-full border-2 px-3 py-1 text-sm font-semibold', custom !== null ? 'border-amber-500 bg-amber-400/20' : 'border-line')}>
+          {t('Custom')}
+        </button>
       </div>
+      {custom !== null && (
+        <label className="mb-1 flex h-10 items-center gap-2 rounded-full bg-hover px-3">
+          <span aria-hidden>{COIN}</span>
+          <input autoFocus inputMode="numeric" value={custom} onChange={(e) => setCustom(e.target.value.replace(/\D/g, '').slice(0, 7))}
+            placeholder={t('Coins to join')} aria-label={t('Coins to join')} className="min-w-0 flex-1 bg-transparent text-sm tabular-nums outline-none" />
+        </label>
+      )}
+      {custom !== null && custom !== '' && (badCustom || short) && (
+        <p className="mb-1 text-xs text-danger" role="alert">{badCustom ? t('Pick {min} to {max} coins', { min: fmtCoins(MIN_BET), max: fmtCoins(MAX_BET) }) : t('You have {n} coins', { n: fmtCoins(coins ?? 0) })}</p>
+      )}
       <p className="mb-4 text-xs text-muted">{bet ? t('Everyone pays {n} to join. The winner takes the pot; with 3 or more players, 2nd gets 30%.', { n: fmtCoins(bet) }) : t('No coins at stake.')}</p>
 
       <div className="mb-2 flex items-center justify-between text-sm">
@@ -93,7 +111,7 @@ export function PickerDialog({ initial, pool, start }: { initial: string[]; pool
         })}
       </ul>
 
-      <Button className="mt-4 w-full gap-2" loading={busy} disabled={short} onClick={go}>
+      <Button className="mt-4 w-full gap-2" loading={busy} disabled={short || (custom !== null && (custom === '' || badCustom))} onClick={go}>
         {picked.length ? tn(picked.length, 'Invite {n} friend', 'Invite {n} friends') : <><Link2 className="size-4" /> {t('Create game and share link')}</>}
       </Button>
       <p className="mt-2 text-center text-xs text-muted">{t('You can also share a link from the waiting room, so people who aren’t your friends can join.')}</p>
