@@ -3,6 +3,7 @@ import { Button } from '@sanga/ui/button';
 import { dismiss, nameOf, rematch, useGames, type Game } from '../store';
 import { Confetti } from './Confetti';
 import { t } from '@sanga/i18n';
+import { COIN, fmtCoins } from '../Coins';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 
@@ -25,7 +26,7 @@ export function Results({ g, me }: { g: Game; me: string }) {
       <div className="relative w-full max-w-sm rounded-3xl bg-white p-6 text-center text-slate-900 shadow-2xl">
         {cancelled ? (
           <><div className="text-5xl">🕓</div><h2 className="mt-2 text-xl font-bold">{t('Game called off')}</h2>
-            <p className="mt-1 text-sm text-slate-500">{t('Not enough players joined.')}</p></>
+            <p className="mt-1 text-sm text-slate-500">{t('Not enough players joined.')}{g.bet ? ' ' + t('Entry coins were given back.') : ''}</p></>
         ) : (
           <>
             <div className="text-5xl">{draw ? '🤝' : mine?.rank === 1 ? '🏆' : '🎲'}</div>
@@ -36,6 +37,7 @@ export function Results({ g, me }: { g: Game; me: string }) {
                   <span className="w-7 text-center text-xl">{p.rank ? MEDALS[p.rank - 1] || p.rank : '–'}</span>
                   <Avatar u={p.u} name={p.n} size={32} />
                   <span className="min-w-0 flex-1 truncate font-medium">{p.u === me ? t('You') : p.n || p.u}</span>
+                  {g.won?.find((w) => w.u === p.u) && <span className="rounded-full bg-amber-400 px-2 py-0.5 text-xs font-bold text-amber-950 tabular-nums">+{COIN} {fmtCoins(g.won.find((w) => w.u === p.u)!.n)}</span>}
                   <span className="text-xs text-slate-500">{p.state === 'left' ? t('left') : p.state === 'out' ? t('removed') : ''}</span>
                 </li>
               ))}

@@ -44,3 +44,9 @@ export function insertMention(text: string, cursor: number, start: number, u: st
   const before = text.slice(0, start) + '@' + u + ' ';
   return { text: before + text.slice(cursor).replace(/^\s+/, ''), cursor: before.length };
 }
+
+/** The text with each @tag written as the player's name, for places that show plain text (a toast). */
+export function mentionsAsNames(text: string, players: { u: string; n: string }[]) {
+  const names = Object.fromEntries(players.map((p) => [p.u, p.n || p.u]));
+  return splitMentions(text, players.map((p) => p.u)).map((p) => (p.u ? '@' + names[p.u] : p.t)).join('');
+}

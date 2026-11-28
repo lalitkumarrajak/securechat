@@ -8,6 +8,8 @@
 //                  gtease {to, k} (throw something at a player: not kept) · glink (share by link) · gjoinlink (join from a link) · gbot {add | drop} (computer players)
 //
 // Computer players sit in seats like people (u "bot:<id>"); the server plays their turns.
+// Coins: a game may have an entry fee (bet), paid on joining into the pot; the pot goes to 1st (and
+// 2nd, with three or more players) when it ends. Emoji in game chat cost coins.EMOJI_COST.
 // Server → client: g {g, ref} after every change · gc {id, f, x, ts} chat line · gt {id, f, to, k} a tease · gl {games} on glist
 import crypto from 'node:crypto';
 import { config, USER_RE } from './config.js';
@@ -18,6 +20,7 @@ import { canChat } from './friends.js';
 import { shareGroup } from './groups.js';
 import { getProfile, profileHooks } from './profiles.js';
 import { notify } from './push.js';
+import * as coins from './coins.js';
 import * as core from '@sanga/game-rules/core.js';
 import { GAMES } from '@sanga/game-rules';
 
@@ -48,6 +51,7 @@ function pub(g, u) {
 }
 
 async function commit(g, ref) {
+  if (g.status === 'over' && g.pot && !g.won) payOut(g);
   g.v = (g.v || 0) + 1;
   g.updated = Date.now();
   ctx.db.run('saveGame', g.id, g.type, g.status, JSON.stringify(g), g.updated)
@@ -95,13 +99,36 @@ const turnDeadline = (g) => {
   g.deadline = Date.now() + (core.isBot(g.players[g.turn]) ? botDelay(g) : (config.gameTurnMs || def(g).turnMs) + config.gameAnimMs);
 };
 
+// Entry fees: who has paid, so leaving the lobby or a called-off game gives it back.
+async function payIn(g, u) {
+  if (!g.bet || u.startsWith('bot:') || g.paid?.includes(u)) return true;
+  if (!(await coins.spend(u, g.bet, 'entry'))) return false;
+  (g.paid ||= []).push(u);
+  return true;
+}
+function refund(g, u) {
+  if (!g.paid?.includes(u)) return;
+  g.paid = g.paid.filter((x) => x !== u);
+  coins.give(u, g.bet, 'refund').catch((err) => console.error('refund failed', err.message));
+}
+// The pot counts every seat, computer players' too (they play for nothing: what they'd win is lost).
+function payOut(g) {
+  const ranked = g.players.filter((pl) => pl.rank).sort((a, b) => a.rank - b.rank);
+  g.won = coins.prizes(g.pot, g.seats || ranked.length).map((n, k) => ({ u: ranked[k]?.u, n })).filter((w) => w.u);
+  for (const w of g.won) if (!w.u.startsWith('bot:')) coins.give(w.u, w.n, 'won').catch((err) => console.error('prize failed', err.message));
+}
+const notEnough = (ws, g, ref) => send(ws, { t: 'gerr', id: g?.id, ref, e: 'Not enough coins' });
+
 function start(g) {
   core.begin(g, def(g), rand);
+  g.seats = g.players.filter((pl) => pl.state === 'playing').length;
+  if (g.bet) g.pot = g.bet * g.seats;
   turnDeadline(g);
   return commit(g);
 }
 
 function cancel(g, why) {
+  for (const u of g.paid || []) refund(g, u);
   g.status = 'over';
   g.ev = [{ k: why }];
   g.deadline = 0;
@@ -166,13 +193,15 @@ export const handlers = {
     }
     if (mine(ws.user).filter(isOpen).length >= MAX_OPEN) return fail('Finish or leave one of your games first');
     if (rateLimited('gnew:' + ws.user, 10, 60e3)) return fail('Slow down');
+    const bet = coins.BETS.includes(m.bet) ? m.bet : 0;
+    if (bet && !(await coins.spend(ws.user, bet, 'entry'))) return fail('Not enough coins');
     const now = Date.now();
     const name = async (u) => (await getProfile(u)).name || '';
     const g = {
       id: crypto.randomBytes(9).toString('base64url'), type: d.type, host: ws.user, status: 'lobby', created: now,
       players: [{ u: ws.user, n: await name(ws.user), state: 'joined' },
         ...(await Promise.all(to.map(async (u) => ({ u, n: await name(u), state: 'invited' }))))],
-      ev: [{ k: 'lobby' }], chat: [], deadline: now + config.gameLobbyMs, open,
+      ev: [{ k: 'lobby' }], chat: [], deadline: now + config.gameLobbyMs, open, bet, paid: bet ? [ws.user] : [],
     };
     games.set(g.id, g);
     await commit(g, ref);
@@ -187,6 +216,8 @@ export const handlers = {
     if (!g) return;
     const pl = g.players[seat(g, ws.user)];
     if (g.status !== 'lobby' || pl.state !== 'invited') return send(ws, { t: 'g', g: pub(g) });
+    if (!(await payIn(g, ws.user))) return notEnough(ws, g);
+    if (g.status !== 'lobby' || pl.state !== 'invited') return refund(g, ws.user); // it changed while paying
     pl.state = 'joined';
     g.ev = [{ k: 'joined', s: seat(g, ws.user) }];
     await settleLobby(g);
@@ -232,6 +263,9 @@ export const handlers = {
     for (const u of members(g)) if (u !== ws.user && await blockedBetween(u, ws.user)) return fail('You can’t join this game');
     const taken = g.players.filter((pl) => pl.state !== 'declined').length;
     if ((i < 0 || g.players[i].state === 'declined') && taken >= def(g).max) return fail('This game is full');
+    if (!(await payIn(g, ws.user))) return fail('Not enough coins');
+    if (g.status !== 'lobby') { refund(g, ws.user); return fail('This game has already started'); }
+    i = seat(g, ws.user);
     if (i < 0) {
       g.players.push({ u: ws.user, n: (await getProfile(ws.user)).name || '', state: 'joined' });
       i = g.players.length - 1;
@@ -246,6 +280,7 @@ export const handlers = {
     const i = seat(g, ws.user);
     if (g.status === 'lobby') {
       if (ws.user === g.host) return cancel(g, 'cancelled');
+      refund(g, ws.user);
       g.players[i].state = 'declined';
       g.ev = [{ k: 'declined', s: i }];
       send(ws, { t: 'g', g: pub(g) });
@@ -268,10 +303,13 @@ export const handlers = {
     catch (err) { g.ev = []; return send(ws, { t: 'gerr', id: g.id, e: err.message }); }
     // Some actions don't need your turn (UNO's "UNO!" and catching): they don't reset the clock.
     if (i === turn) g.players[i].missed = 0;
-    // One clock per turn: rolling the dice (or drawing a card) doesn't start it again. The next player
-    // gets a fresh one; whoever goes on (a move after the roll, a bonus roll) keeps theirs, with enough
-    // left to see what happened and act.
+    // Rolling the dice (or drawing a card) doesn't start the clock again. The next player gets a fresh
+    // one, and so does a bonus roll (a six, a capture, a token home in Ludo; a six in Snakes): the full
+    // turn time once the move has played out. A move after the roll keeps the clock, with enough left
+    // to see what happened and act.
+    const bonus = g.status === 'play' && g.turn === turn && g.ev.some((e) => e.k === 'again' && e.s === i);
     if (g.turn !== turn || g.turnNo !== turnNo) turnDeadline(g);
+    else if (bonus) g.deadline = Date.now() + Math.max(def(g).animMs?.(g.ev) ?? 0, config.gameAnimMs) + (config.gameTurnMs || def(g).turnMs);
     else if (i === turn && g.status === 'play') g.deadline = Math.max(g.deadline, Date.now() + (def(g).animMs?.(g.ev) ?? 0) + KEEP_GOING_MS);
     await commit(g);
   },
@@ -292,6 +330,7 @@ export const handlers = {
     const x = typeof m.x === 'string' ? m.x.trim().slice(0, 200) : '';
     if (!x || g.players[seat(g, ws.user)].state === 'declined') return;
     if (rateLimited('gsay:' + ws.user, 10, 10e3)) return send(ws, { t: 'gerr', id: g.id, e: 'Slow down' });
+    if (coins.isEmojiOnly(x) && !(await coins.spend(ws.user, coins.EMOJI_COST, 'emoji'))) return notEnough(ws, g);
     const line = { f: ws.user, x, ts: Date.now() };
     g.chat.push(line);
     if (g.chat.length > CHAT_KEEP) g.chat.splice(0, g.chat.length - CHAT_KEEP);
@@ -308,6 +347,7 @@ export const handlers = {
 
   async glist(ws) {
     await giveTime(ws.user);
+    coins.tell(ws.user).catch(() => {});
     send(ws, { t: 'gl', games: mine(ws.user).map((g) => ({ ...pub(g, ws.user), chat: g.chat })) });
   },
 
@@ -323,7 +363,10 @@ export const handlers = {
     const next = g0.again && games.get(g0.again);
     if (next && next.status === 'lobby' && seat(next, ws.user) >= 0) {
       const pl = next.players[seat(next, ws.user)];
-      if (pl.state === 'invited' || pl.state === 'declined') { pl.state = 'joined'; next.ev = [{ k: 'joined', s: seat(next, ws.user) }]; }
+      if (pl.state === 'invited' || pl.state === 'declined') {
+        if (!(await payIn(next, ws.user))) return fail('Not enough coins');
+        pl.state = 'joined'; next.ev = [{ k: 'joined', s: seat(next, ws.user) }];
+      }
       return settleLobby(next);
     }
     const d = def(g0);
@@ -332,13 +375,15 @@ export const handlers = {
     for (const pl of people) if (await blockedBetween(pl.u, ws.user)) return fail('You can’t join this game');
     if (mine(ws.user).filter(isOpen).length >= MAX_OPEN) return fail('Finish or leave one of your games first');
     if (rateLimited('gnew:' + ws.user, 10, 60e3)) return fail('Slow down');
+    const bet = g0.bet || 0;
+    if (bet && !(await coins.spend(ws.user, bet, 'entry'))) return fail('Not enough coins');
     const now = Date.now();
     const g = {
       id: crypto.randomBytes(9).toString('base64url'), type: d.type, host: ws.user, status: 'lobby', created: now,
       players: [{ u: ws.user, n: (await getProfile(ws.user)).name || '', state: 'joined' },
         ...people.map((pl) => ({ u: pl.u, n: pl.n, state: 'invited' })),
         ...played.filter(core.isBot).map((pl) => ({ u: 'bot:' + crypto.randomBytes(4).toString('base64url'), n: pl.n, state: 'joined', bot: true }))],
-      ev: [{ k: 'lobby' }], chat: [], deadline: now + config.gameLobbyMs, open: false,
+      ev: [{ k: 'lobby' }], chat: [], deadline: now + config.gameLobbyMs, open: false, bet, paid: bet ? [ws.user] : [],
     };
     games.set(g.id, g);
     await commit(g, ref); // the new game first, so the asker's app has it before the old one points at it

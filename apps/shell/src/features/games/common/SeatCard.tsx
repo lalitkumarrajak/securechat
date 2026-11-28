@@ -35,7 +35,7 @@ export function SeatCard({ g, i, me, color, mark, status, bubble, align = 'left'
       {pl.rank === 1 && g.status === 'over' && <span className="ludo-crown pointer-events-none absolute -top-5 left-6 z-10 text-2xl" role="img" aria-label={t('Winner')}>👑</span>}
       {bubble && (
         <div className={cn('ludo-bubble absolute top-full z-20 mt-1 max-w-[170px] rounded-2xl bg-white px-3 py-1.5 text-sm font-medium text-slate-900 shadow-lg', align === 'right' ? 'right-2' : 'left-2')}>
-          <MentionText text={bubble} users={g.players.map((p) => p.u)} me={me >= 0 ? g.players[me]?.u : undefined} />
+          <MentionText text={bubble} users={g.players.map((p) => p.u)} names={Object.fromEntries(g.players.map((p) => [p.u, p.n || p.u]))} me={me >= 0 ? g.players[me]?.u : undefined} onLight />
         </div>
       )}
     </div>

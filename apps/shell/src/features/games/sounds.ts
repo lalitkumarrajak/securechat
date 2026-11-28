@@ -6,7 +6,7 @@ export type Sound = 'roll' | 'step' | 'capture' | 'zip' | 'home' | 'turn' | 'cha
 
 let ctx: AudioContext | null = null;
 
-function tone(at: number, freq: number, dur: number, vol = 0.12, type: OscillatorType = 'sine', slideTo?: number) {
+export function tone(at: number, freq: number, dur: number, vol = 0.12, type: OscillatorType = 'sine', slideTo?: number) {
   const o = ctx!.createOscillator();
   const g = ctx!.createGain();
   o.type = type;
@@ -21,7 +21,7 @@ function tone(at: number, freq: number, dur: number, vol = 0.12, type: Oscillato
 }
 
 // A short burst of filtered noise: one dice knock, a wooden tap, a whoosh.
-function noise(at: number, dur: number, freq: number, vol: number, q = 1, sweepTo?: number) {
+export function noise(at: number, dur: number, freq: number, vol: number, q = 1, sweepTo?: number) {
   const len = Math.floor(ctx!.sampleRate * dur);
   const buf = ctx!.createBuffer(1, len, ctx!.sampleRate);
   const d = buf.getChannelData(0);
@@ -40,12 +40,20 @@ function noise(at: number, dur: number, freq: number, vol: number, q = 1, sweepT
 }
 const knock = (at: number, freq = 1800 + Math.random() * 1600, vol = 0.45) => noise(at, 0.035, freq, vol, 2);
 
-export function playSound(s: Sound) {
-  if (!useSettings.getState().gameSound || document.visibilityState !== 'visible') return;
+/** The audio clock to schedule on, or null when game sounds are off, the app is hidden, or there's no audio. */
+export function audioNow(): number | null {
+  if (!useSettings.getState().gameSound || document.visibilityState !== 'visible') return null;
   try {
     ctx ??= new AudioContext();
     if (ctx.state === 'suspended') ctx.resume();
-    const t = ctx.currentTime;
+    return ctx.currentTime;
+  } catch { return null; }
+}
+
+export function playSound(s: Sound) {
+  const t = audioNow();
+  if (t === null) return;
+  try {
     switch (s) {
       // Dice shaken in the hand, then two clacks as they land.
       case 'roll': {

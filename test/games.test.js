@@ -154,7 +154,7 @@ describe('games', () => {
     } finally { await s2.stop(); }
   });
 
-  it('one clock per turn: rolling, moving and a bonus roll don’t start it again', async () => {
+  it('a bonus roll after a six starts the clock again; the next player gets a whole turn', async () => {
     const s2 = await startServer({ GAME_TURN_MS: '30000', GAME_ANIM_MS: '0', GAME_TEST_DICE: '6,3' });
     try {
       const [x, y] = await Promise.all(['cx', 'cy'].map((v) => register(s2, name(v))));
@@ -169,10 +169,54 @@ describe('games', () => {
       X.sendJson({ t: 'gact', id: gid, a: { a: 'roll' } }); // a 6: the only move (a token comes out) is made, and a bonus roll
       const rolled = await frame(Y, (v) => v.id === gid && v.s?.tokens[0][0] === 0);
       assert.equal(rolled.turn, 0);
-      assert.ok(rolled.left < 29_000, `the clock kept running through the roll (${rolled.left} ms left)`);
+      assert.ok(rolled.left > 29_000, `the bonus roll gets a whole turn (${rolled.left} ms left)`);
       X.sendJson({ t: 'gact', id: gid, a: { a: 'roll' } }); // a 3, moved for them, and Y's turn
       const next = await frame(Y, (v) => v.id === gid && v.turn === 1);
       assert.ok(next.left > 29_000, 'the next player gets a whole turn');
+      X.close(); Y.close();
+    } finally { await s2.stop(); }
+  });
+
+  it('coins: 50,000 to start, entry fees into the pot, refunds, the winner’s prize and emoji', async () => {
+    const s2 = await startServer({ GAME_TURN_MS: '30000', GAME_ANIM_MS: '0' });
+    try {
+      const [x, y] = await Promise.all(['kx', 'ky'].map((v) => register(s2, name(v))));
+      await befriend(s2, x, y);
+      const [X, Y] = await Promise.all([connect(s2, x.token), connect(s2, y.token)]);
+      const coins = (ws, pred = () => true) => ws.next('coins', pred).then((m) => m.n);
+      X.sendJson({ t: 'glist' });
+      assert.equal(await coins(X), 50_000);
+      // Called off in the lobby: the entry comes back
+      X.sendJson({ t: 'gnew', type: 'ludo', to: [y.u], ref: 'k1', bet: 1000 });
+      assert.equal(await coins(X), 49_000);
+      const g1 = (await X.next('g', (m) => m.ref === 'k1')).g;
+      assert.equal(g1.bet, 1000);
+      X.sendJson({ t: 'gleave', id: g1.id });
+      assert.equal(await coins(X, (m) => m.why === 'refund'), 50_000);
+      // An amount that isn't offered is a free game
+      X.sendJson({ t: 'gnew', type: 'ludo', to: [y.u], ref: 'k2', bet: 123 });
+      const g2 = (await X.next('g', (m) => m.ref === 'k2')).g;
+      assert.equal(g2.bet, 0);
+      X.sendJson({ t: 'gleave', id: g2.id });
+      // Both pay 500; Y leaves mid-game; X wins the pot of 1000
+      X.sendJson({ t: 'gnew', type: 'ludo', to: [y.u], ref: 'k3', bet: 500 });
+      const g3 = (await X.next('g', (m) => m.ref === 'k3')).g;
+      assert.equal(await coins(X), 49_500);
+      Y.sendJson({ t: 'gjoin', id: g3.id });
+      assert.equal(await coins(Y), 49_500);
+      const begun = await frame(X, (v) => v.id === g3.id && v.status === 'play');
+      assert.equal(begun.pot, 1000);
+      Y.sendJson({ t: 'gleave', id: g3.id });
+      const over = await frame(X, (v) => v.id === g3.id && v.status === 'over');
+      assert.deepEqual(over.won, [{ u: x.u, n: 1000 }]);
+      assert.equal(await coins(X, (m) => m.why === 'won'), 50_500);
+      // Emoji cost 10 coins; words are free
+      X.sendJson({ t: 'gnew', type: 'ludo', to: [y.u], ref: 'k4' });
+      const g4 = (await X.next('g', (m) => m.ref === 'k4')).g;
+      X.sendJson({ t: 'gsay', id: g4.id, x: '😂' });
+      assert.equal(await coins(X), 50_490);
+      X.sendJson({ t: 'gsay', id: g4.id, x: 'hi' });
+      await X.next('gc', (m) => m.x === 'hi');
       X.close(); Y.close();
     } finally { await s2.stop(); }
   });

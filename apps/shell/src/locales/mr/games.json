@@ -304,5 +304,17 @@
   "Watching you": "लक्ष आहे तुझ्यावर",
   "Ba dum tss": "ढम ढम टिश",
   "Too cool": "एकदम कूल",
-  "Party": "पार्टी"
+  "Party": "पार्टी",
+  "Entry": "एंट्री",
+  "Free": "मोफत",
+  "Everyone pays {n} to join. The winner takes the pot; with 3 or more players, 2nd gets 30%.": "सामील होण्यासाठी प्रत्येकजण {n} देतो. जिंकणाऱ्याला संपूर्ण पॉट मिळतो; 3 किंवा अधिक खेळाडू असल्यास दुसऱ्याला 30% मिळतात.",
+  "No coins at stake.": "कोणतीही नाणी पणाला नाहीत.",
+  "Entry {n}": "एंट्री {n}",
+  "Pot {n}": "पॉट {n}",
+  "Join for {n}": "{n} मध्ये सामील व्हा",
+  "emoji {n} each": "प्रत्येक इमोजी {n}",
+  "Entry coins were given back.": "एंट्रीची नाणी परत दिली.",
+  "You won {n} coins!": "तुम्ही {n} नाणी जिंकलीत!",
+  "{n} coins back": "{n} नाणी परत",
+  "Not enough coins": "पुरेशी नाणी नाहीत"
 }

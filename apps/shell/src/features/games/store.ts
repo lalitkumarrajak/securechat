@@ -4,8 +4,9 @@ import { toast } from 'sonner';
 import { create } from 'zustand';
 import { frameArrived, frameHooks, myName, sendFrame } from '../../lib/engine';
 import { randomId } from '@sanga/crypto';
-import { mentioned } from '../../lib/mentions';
+import { mentioned, mentionsAsNames } from '../../lib/mentions';
 import { playSound } from './sounds';
+import { playEmoji } from './emojiSounds';
 import { t, tk } from '@sanga/i18n';
 
 export type PlayerState = 'invited' | 'joined' | 'declined' | 'playing' | 'done' | 'left' | 'out';
@@ -16,6 +17,9 @@ export interface Game<S = any> {
   players: GamePlayer[]; turn: number; s: S; ev: GameEvent[]; v: number;
   open?: boolean;   // anyone with the link may join while in the lobby
   again?: string;   // finished: the rematch someone started
+  bet?: number;     // entry fee in coins (0: free)
+  pot?: number;     // coins the winners share, once it has started
+  won?: { u: string; n: number }[]; // finished: what each winner got
   deadline: number; // local clock: when the current turn (or the invite) runs out
 }
 export interface ChatLine { f: string; x: string; ts: number }
@@ -32,6 +36,7 @@ interface GamesState {
   chatOpen: boolean;
   picker: Picker | null;     // "new game" dialog
   dismissed: string[];       // finished games whose results were closed
+  coins: number | null;      // my game coins (null until the server says)
 }
 
 /** Finished games you closed, kept on this device so they don't come back when the list reloads. */
@@ -39,7 +44,7 @@ const CLOSED = 'sanga-games-closed';
 function closedBefore(): string[] { try { return JSON.parse(localStorage.getItem(CLOSED) ?? '[]'); } catch { return []; } }
 
 export const useGames = create<GamesState>(() => ({
-  games: {}, chat: {}, unread: {}, bubble: {}, open: null, chatOpen: false, picker: null, dismissed: closedBefore(),
+  games: {}, chat: {}, unread: {}, bubble: {}, open: null, chatOpen: false, picker: null, dismissed: closedBefore(), coins: null,
 }));
 const set = useGames.setState;
 const get = useGames.getState;
@@ -123,12 +128,12 @@ frameHooks.gc = (m) => {
       unread: seen || m.f === myName() ? s.unread : { ...s.unread, [m.id]: (s.unread[m.id] || 0) + 1 },
     };
   });
-  if (m.f !== myName()) playSound('chat');
+  if (!playEmoji(m.x) && m.f !== myName()) playSound('chat'); // an emoji's own sound, for the sender too
   const g = get().games[m.id];
   if (g && m.f !== myName() && mentioned(m.x, [myName()]).length && !(get().open === m.id && get().chatOpen)) {
     navigator.vibrate?.([30, 50, 30]);
     toast(t('{name} mentioned you', { name: nameOf(g, m.f) }), {
-      description: m.x, duration: 8000,
+      description: mentionsAsNames(m.x, g.players), duration: 8000,
       action: { label: t('Reply'), onClick: () => set({ open: m.id, chatOpen: true }) },
     });
   }
@@ -140,6 +145,12 @@ const teaseListeners = new Set<(m: TeaseMsg) => void>();
 export const onTease = (fn: (m: TeaseMsg) => void) => { teaseListeners.add(fn); return () => { teaseListeners.delete(fn); }; };
 frameHooks.gt = (m) => teaseListeners.forEach((f) => f({ id: m.id, f: m.f, to: m.to, k: m.k }));
 export const tease = (id: string, to: string, k: string) => sendOrWarn({ t: 'gtease', id, to, k });
+
+frameHooks.coins = (m) => {
+  set({ coins: m.n });
+  if (m.why === 'won') toast.success(t('You won {n} coins!', { n: m.d.toLocaleString() }), { id: 'coins-won' });
+  else if (m.why === 'refund') toast(t('{n} coins back', { n: m.d.toLocaleString() }), { id: 'coins-refund' });
+};
 
 frameHooks.gerr = (m) => {
   if (m.ref) pending.delete(m.ref);
@@ -165,13 +176,13 @@ export const GAME_ERRORS = [
   tk('Call UNO when you’re about to have one card'), tk('Not allowed now'), tk('Nothing to keep'), tk('Not your turn'),
   tk('Pick a colour'), tk('Pick a column'), tk('Pick a square'), tk('Play the card you drew, or keep it'),
   tk('That card doesn’t match'), tk('That card isn’t in your hand'), tk('That column is full'), tk('That square is taken'),
-  tk('That token can’t move'), tk('Too late'), tk('You’re not playing'), tk('You’ve already drawn'),
+  tk('That token can’t move'), tk('Too late'), tk('You’re not playing'), tk('You’ve already drawn'), tk('Not enough coins'),
 ];
 
-export function createGame(type: string, to: string[]) {
+export function createGame(type: string, to: string[], bet = 0) {
   const ref = randomId();
   pending.set(ref, true);
-  sendOrWarn({ t: 'gnew', type, to, ref });
+  sendOrWarn({ t: 'gnew', type, to, ref, bet });
 }
 /** Play a finished game again with the same people (computer players sit down again by themselves). */
 const wantAgain = new Set<string>();

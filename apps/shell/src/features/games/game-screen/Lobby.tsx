@@ -6,6 +6,7 @@ import { Button } from '@sanga/ui/button';
 import { cn } from '@sanga/ui/utils';
 import { t } from '@sanga/i18n';
 import { GAME_UI } from '../registry';
+import { COIN, fmtCoins } from '../Coins';
 import { addBot, decline, dropBot, gameName, join, linkShared, nameOf, openGame, shareLink, startNow, type Game } from '../store';
 
 export function Lobby({ g, me, onLeave }: { g: Game; me: string; onLeave: () => void }) {
@@ -24,6 +25,11 @@ export function Lobby({ g, me, onLeave }: { g: Game; me: string; onLeave: () => 
           <Clock className="size-4" /> {t('Invite expires in {time}', { time: `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` })}
         </p>
       </div>
+      {!!g.bet && (
+        <p className="rounded-full bg-amber-400/90 px-4 py-1.5 text-sm font-bold text-amber-950">
+          {t('Entry {n}', { n: `${COIN} ${fmtCoins(g.bet)}` })} · {t('Pot {n}', { n: `${COIN} ${fmtCoins(g.bet * g.players.filter((p) => p.state === 'joined').length)}` })}
+        </p>
+      )}
       <ul className="w-full space-y-2">
         {g.players.map((p) => (
           <li key={p.u} className="flex items-center gap-3 rounded-2xl bg-white/10 px-3 py-2 text-left">
@@ -53,7 +59,7 @@ export function Lobby({ g, me, onLeave }: { g: Game; me: string; onLeave: () => 
       {mine?.state === 'invited' ? (
         <div className="flex w-full gap-3">
           <Button variant="secondary" className="flex-1" onClick={() => { decline(g.id); openGame(null); }}>{t('Decline')}</Button>
-          <Button className="flex-1 bg-emerald-500 hover:bg-emerald-600" onClick={() => join(g.id)}>{t('Join game')}</Button>
+          <Button className="flex-1 bg-emerald-500 hover:bg-emerald-600" onClick={() => join(g.id)}>{g.bet ? t('Join for {n}', { n: `${COIN} ${fmtCoins(g.bet)}` }) : t('Join game')}</Button>
         </div>
       ) : null}
       {mine?.state === 'joined' && (

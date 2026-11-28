@@ -234,6 +234,11 @@ const SCHEMA = (pg) => `
     ts     BIGINT NOT NULL,
     PRIMARY KEY (story, id)
   );
+  CREATE TABLE IF NOT EXISTS coins (
+    username TEXT PRIMARY KEY,
+    balance  BIGINT NOT NULL,
+    updated  BIGINT NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS config (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -469,6 +474,10 @@ const SQL = {
   deleteStory: 'DELETE FROM stories WHERE id = ?',
   expiredStories: 'SELECT id FROM stories WHERE expires <= ? LIMIT 500',
 
+  // Game coins: no row yet means the starting amount (coins.js).
+  getCoins: 'SELECT balance FROM coins WHERE username = ?',
+  setCoins: `INSERT INTO coins (username, balance, updated) VALUES (?, ?, ?)
+             ON CONFLICT (username) DO UPDATE SET balance = excluded.balance, updated = excluded.updated`,
   getConfig: 'SELECT value FROM config WHERE key = ?',
   setConfig: 'INSERT INTO config (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value',
 };
@@ -935,6 +944,11 @@ async function openMongo(uri) {
     deleteStory: async (id) => changes((await stories.deleteOne({ _id: id })).deletedCount),
     expiredStories: async (now) => (await stories.find({ expires: { $lte: now } }, { projection: { _id: 1 } }).limit(500).toArray()).map((d) => ({ id: d._id })),
 
+    getCoins: async (u) => { const d = await c('coins').findOne({ _id: u }); return d && { balance: d.balance }; },
+    setCoins: async (u, balance, updated) => {
+      await c('coins').replaceOne({ _id: u }, { balance, updated }, { upsert: true });
+      return changes(1);
+    },
     getConfig: (key) => config.findOne({ _id: key }),
     setConfig: async (key, value) => {
       await config.replaceOne({ _id: key }, { value }, { upsert: true });

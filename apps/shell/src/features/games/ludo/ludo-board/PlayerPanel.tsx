@@ -42,8 +42,8 @@ export function PlayerPanel({ g, i, me, shown, canRoll, onRoll, spinning, bubble
       {bubble && (
         <div className={cn('ludo-bubble absolute z-20 max-w-[160px] rounded-2xl bg-white px-3 py-1.5 text-sm font-medium text-slate-900 shadow-lg',
           below ? 'bottom-full mb-2' : 'top-full mt-2', right ? 'right-0' : 'left-0',
-          /^\p{Extended_Pictographic}+$/u.test(bubble.replace(/\s/g, '')) && 'text-3xl px-2 py-0.5')}>
-          <MentionText text={bubble} users={g.players.map((p) => p.u)} me={me >= 0 ? g.players[me]?.u : undefined} />
+          /^\p{Extended_Pictographic}+$/u.test(bubble.replace(/[\s\uFE0F\u200D]/g, '')) && 'text-3xl px-2 py-0.5')}>
+          <MentionText text={bubble} users={g.players.map((p) => p.u)} names={Object.fromEntries(g.players.map((p) => [p.u, p.n || p.u]))} me={me >= 0 ? g.players[me]?.u : undefined} onLight />
         </div>
       )}
     </div>

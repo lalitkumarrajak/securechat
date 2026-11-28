@@ -9,7 +9,8 @@ import { t, tn } from '@sanga/i18n';
 import { useApp } from '../../state/app';
 import { GAME_UI } from './registry';
 import { ChatRowSkeleton } from '../../components/skeleton/ChatRowSkeleton';
-import { closePicker, createGame } from './store';
+import { closePicker, createGame, useGames } from './store';
+import { BETS, COIN, CoinBalance, fmtCoins } from './Coins';
 
 export function PickerDialog({ initial, pool, start }: { initial: string[]; pool?: { u: string; name?: string }[]; start?: string }) {
   const friends = useApp((s) => s.friends);
@@ -19,6 +20,9 @@ export function PickerDialog({ initial, pool, start }: { initial: string[]; pool
   const [picked, setPicked] = useState<string[]>(() => initial.slice(0, GAME_UI[type].max - 1));
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
+  const [bet, setBet] = useState(0);
+  const coins = useGames((s) => s.coins);
+  const short = bet > 0 && coins !== null && coins < bet;
   const ui = GAME_UI[type];
   const max = ui.max - 1;
 
@@ -30,7 +34,7 @@ export function PickerDialog({ initial, pool, start }: { initial: string[]; pool
   }, [friends, pool, q]);
 
   const toggle = (u: string) => setPicked((p) => (p.includes(u) ? p.filter((x) => x !== u) : p.length >= max ? p : [...p, u]));
-  const go = () => { setBusy(true); createGame(type, picked); setTimeout(() => setBusy(false), 4000); };
+  const go = () => { setBusy(true); createGame(type, picked, bet); setTimeout(() => setBusy(false), 4000); };
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) closePicker(); }} title={t('Play a game')} description={t('Invite friends, or share a link with anyone.')}>
@@ -43,6 +47,22 @@ export function PickerDialog({ initial, pool, start }: { initial: string[]; pool
           </button>
         ))}
       </div>
+
+      <div className="mb-2 flex items-center justify-between text-sm">
+        <span className="font-medium">{t('Entry')}</span>
+        <CoinBalance className="py-0.5 text-xs" />
+      </div>
+      <div className="mb-1 flex gap-1.5 overflow-x-auto pb-1" role="radiogroup" aria-label={t('Entry')}>
+        {BETS.map((b) => (
+          <button key={b} type="button" role="radio" aria-checked={b === bet} onClick={() => setBet(b)}
+            disabled={b > 0 && coins !== null && coins < b}
+            className={cn('shrink-0 rounded-full border-2 px-3 py-1 text-sm font-semibold tabular-nums disabled:opacity-40',
+              b === bet ? 'border-amber-500 bg-amber-400/20' : 'border-line')}>
+            {b ? `${COIN} ${fmtCoins(b)}` : t('Free')}
+          </button>
+        ))}
+      </div>
+      <p className="mb-4 text-xs text-muted">{bet ? t('Everyone pays {n} to join. The winner takes the pot; with 3 or more players, 2nd gets 30%.', { n: fmtCoins(bet) }) : t('No coins at stake.')}</p>
 
       <div className="mb-2 flex items-center justify-between text-sm">
         <span className="font-medium">{t('Invite friends')}</span>
@@ -73,7 +93,7 @@ export function PickerDialog({ initial, pool, start }: { initial: string[]; pool
         })}
       </ul>
 
-      <Button className="mt-4 w-full gap-2" loading={busy} onClick={go}>
+      <Button className="mt-4 w-full gap-2" loading={busy} disabled={short} onClick={go}>
         {picked.length ? tn(picked.length, 'Invite {n} friend', 'Invite {n} friends') : <><Link2 className="size-4" /> {t('Create game and share link')}</>}
       </Button>
       <p className="mt-2 text-center text-xs text-muted">{t('You can also share a link from the waiting room, so people who aren’t your friends can join.')}</p>

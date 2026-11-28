@@ -8,6 +8,7 @@ import { GAME_UI } from './registry';
 import { GamesList } from './GamesStrip';
 import { listed, openPicker, useGames } from './store';
 import { SoloGames } from '../solo/SoloGames';
+import { CoinBalance } from './Coins';
 
 export function GamesHub() {
   const any = useGames((s) => listed(s.games).length > 0);
@@ -18,6 +19,7 @@ export function GamesHub() {
         <div className="mx-auto flex h-14 max-w-5xl items-center gap-2 px-4 md:h-16 md:px-8">
           <IconButton label={t('Back')} onClick={back} className="-ml-2"><ArrowLeft /></IconButton>
           <h1 className="flex-1 text-xl font-bold tracking-tight">{t('Games')}</h1>
+          <CoinBalance />
         </div>
       </header>
 

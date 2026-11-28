@@ -50,7 +50,7 @@ export function ChatSheet({ g, open, onOpenChange }: { g: Game; open: boolean; o
           <div key={k} className={cn('flex', l.f === me ? 'justify-end' : 'justify-start')}>
             <div className={cn('max-w-[80%] rounded-2xl px-3 py-1.5 text-sm', l.f === me ? 'bg-accent text-white' : 'bg-panel text-ink shadow-bubble')}>
               {l.f !== me && <div className="text-xs font-semibold text-accent">{nameOf(g, l.f)}</div>}
-              <MentionText text={l.x} users={users} me={me} onDark={l.f === me} />
+              <MentionText text={l.x} users={users} names={Object.fromEntries(g.players.map((p) => [p.u, p.n || p.u]))} me={me} onDark={l.f === me} />
             </div>
           </div>
         ))}
