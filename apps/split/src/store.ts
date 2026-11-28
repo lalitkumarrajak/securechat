@@ -90,7 +90,7 @@ function load() {
     }
     cache = list ?? [];
     // On a device that has never synced, "no groups" isn't known yet: the first sync says (syncSplit).
-    set((s) => ({ loaded: s.loaded || !!list, groups: { ...groups, ...s.groups }, seen: { ...(seen ?? {}), ...s.seen } }));
+    set((s) => ({ loaded: s.loaded || !!list, groups: { ...groups, ...Object.fromEntries(Object.entries(s.groups).filter(([, g]) => g.meta)) }, seen: { ...(seen ?? {}), ...s.seen } }));
     // The keys: from the saved wrapped copies, so a group opens offline.
     await Promise.all(cache.map((e) => groupKey(e).catch(() => {})));
   })());
@@ -301,6 +301,7 @@ export function syncSplit(): Promise<void> {
 
 async function sync() {
   await load();
+  let failed: unknown = null;
   const { groups } = await sdk().api<{ groups: ListEntry[] }>('/api/split');
   const ids = new Set(groups.map((g) => g.gid));
   for (const gid of Object.keys(get().groups)) if (!ids.has(gid)) await forget(gid); // removed from, or left on another device
@@ -310,8 +311,10 @@ async function sync() {
     try { await groupKey(e); } catch { set({ error: tk('Some groups can’t be opened yet. Their key needs your friend’s details; try again when you’re online.') }); continue; } // shown with t()
     patch(e.gid, (g) => ({ ...g, members: e.members }));
     if (get().seen[e.gid] === undefined) markSeen(e.gid); // its past isn't "new"
-    await syncGroup(e.gid);
+    // One group that can't sync right now doesn't hold up the others.
+    try { await syncGroup(e.gid); } catch (err) { failed = err; }
   }
+  if (failed) throw failed;
 }
 
 const stamp = (r: Record_) => (r.type === 'activity' ? r.ts : r.edited);
@@ -322,16 +325,21 @@ const sealable = (r: Local<Record_>) => { const { srv: _s, dirty: _d, ...rest } 
 
 async function syncGroup(gid: string) {
   const k = keyFor(gid).key;
+  let sendFailed: unknown = null;
   for (const r of dirtyOf(get().groups[gid] ?? blank(gid))) {
     const deleted = 'deleted' in r && r.deleted;
-    const body = deleted ? '' : await C.encryptItem(k, sealable(r), gid, 'split', r.id);
-    const { updated } = await sdk().api<{ updated: number }>(`/api/split/records?gid=${gid}`, { id: r.id, body });
+    let updated: number;
+    try {
+      const body = deleted ? '' : await C.encryptItem(k, sealable(r), gid, 'split', r.id);
+      ({ updated } = await sdk().api<{ updated: number }>(`/api/split/records?gid=${gid}`, { id: r.id, body }));
+    } catch (err) { sendFailed = err; continue; } // stays marked and goes next time; the others' changes still come in
     const g = get().groups[gid];
     const now = r.type === 'meta' ? g?.meta : r.type === 'expense' ? g?.expenses[r.id] : r.type === 'settle' ? g?.settles[r.id] : g?.activity[r.id];
     if (!now || stamp(now) !== stamp(r)) continue; // changed again while sending: goes next time
     if (deleted) await drop(gid, r); else await keep(gid, { ...now, dirty: false, srv: updated });
   }
-  let since: number = (await sdk().store.get<number>(SINCE(gid))) || 0;
+  // Without the group's details here (this device's copy was lost), start from the beginning again.
+  let since: number = get().groups[gid]?.meta ? (await sdk().store.get<number>(SINCE(gid))) || 0 : 0;
   for (;;) {
     const r = await sdk().api<{ items: { id: string; body: string; updated: number }[]; more: boolean }>(`/api/split/records?gid=${gid}&since=${since}`);
     // A page is opened first and shown at once: totals don't tick up record by record.
@@ -341,6 +349,7 @@ async function syncGroup(gid: string) {
     await sdk().store.put(SINCE(gid), since);
     if (!r.more) break;
   }
+  if (sendFailed) throw sendFailed;
 }
 
 type Change = { keep: Local<Record_> } | { drop: Record_ };
